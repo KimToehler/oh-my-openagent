@@ -11,7 +11,10 @@ interface QueueEntry {
   resolve: () => void
   rawReject: (error: Error) => void
   settled: boolean
+  timeout?: ReturnType<typeof setTimeout>
 }
+
+const DEFAULT_ACQUIRE_TIMEOUT_MS = 600_000
 
 export class ConcurrencyManager {
   private config?: BackgroundTaskConfig
@@ -73,15 +76,41 @@ export class ConcurrencyManager {
         resolve: () => {
           if (entry.settled) return
           entry.settled = true
+          if (entry.timeout) clearTimeout(entry.timeout)
           resolve()
         },
         rawReject: reject,
         settled: false,
       }
 
+      const waitTimeoutMs = this.getAcquireTimeoutMs()
+      if (waitTimeoutMs !== Infinity) {
+        // A stranded slot would otherwise park this waiter forever: the task
+        // never reaches startTask, so it has no session for the stale/session-gone
+        // watchdogs to reap and stays `pending` indefinitely. Failing the acquire
+        // surfaces it as an errored task instead.
+        entry.timeout = setTimeout(() => {
+          if (entry.settled) return
+          entry.settled = true
+          const index = queue.indexOf(entry)
+          if (index !== -1) queue.splice(index, 1)
+          reject(new Error(
+            `Timed out after ${waitTimeoutMs}ms waiting for a concurrency slot on "${key}". ` +
+            `This usually means a slot was not released by a previous task.`
+          ))
+        }, waitTimeoutMs)
+        entry.timeout.unref?.()
+      }
+
       queue.push(entry)
       this.queues.set(key, queue)
     })
+  }
+
+  private getAcquireTimeoutMs(): number {
+    const configured = this.config?.acquireTimeoutMs
+    if (configured === undefined) return DEFAULT_ACQUIRE_TIMEOUT_MS
+    return configured === 0 ? Infinity : configured
   }
 
   release(model: string): void {
@@ -122,6 +151,7 @@ export class ConcurrencyManager {
 
     const entry = queue[index]
     entry.settled = true
+    if (entry.timeout) clearTimeout(entry.timeout)
     entry.rawReject(new Error(`Concurrency queue cancelled for task: ${taskId}`))
     queue.splice(index, 1)
     if (queue.length === 0) {
@@ -140,6 +170,7 @@ export class ConcurrencyManager {
       for (const entry of queue) {
         if (!entry.settled) {
           entry.settled = true
+          if (entry.timeout) clearTimeout(entry.timeout)
           entry.rawReject(new Error(`Concurrency queue cancelled for model: ${model}`))
         }
       }
