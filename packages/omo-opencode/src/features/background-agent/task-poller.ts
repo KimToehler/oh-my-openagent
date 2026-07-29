@@ -10,6 +10,7 @@ import {
   DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS,
   DEFAULT_SESSION_GONE_TIMEOUT_MS,
   DEFAULT_STALE_TIMEOUT_MS,
+  MAX_ACTIVITY_UNAVAILABLE_POLLS,
   MIN_RUNTIME_BEFORE_STALE_MS,
   TERMINAL_TASK_TTL_MS,
   TASK_TTL_MS,
@@ -112,6 +113,21 @@ export function pruneStaleTasksAndNotifications(args: {
 }
 
 export type SessionStatusMap = Record<string, { type: string }>
+
+/**
+ * A failed activity lookup defers the stale interrupt, because a transient API
+ * error must not kill a healthy lane. Unbounded, that deferral is also how a
+ * hung provider stream survives forever: the session stays `busy`, the lookup
+ * keeps failing, and `staleTimeoutMs` is never reached. Cap the consecutive
+ * deferrals so an unreachable session eventually loses its reprieve.
+ *
+ * Returns true while the task may still be deferred.
+ */
+function deferForUnavailableActivity(task: BackgroundTask): boolean {
+  const misses = (task.consecutiveActivityUnavailablePolls ?? 0) + 1
+  task.consecutiveActivityUnavailablePolls = misses
+  return misses < MAX_ACTIVITY_UNAVAILABLE_POLLS
+}
 
 async function interruptStaleTask(args: {
   task: BackgroundTask
@@ -232,7 +248,8 @@ export async function checkAndInterruptStaleTasks(args: {
 
       if (shouldRefreshFromSessionActivity) {
         const activityRefresh = await refreshTaskActivityFromSession(task, getSessionActivity)
-        if (activityRefresh.type === "unavailable") continue
+        if (activityRefresh.type === "unavailable" && deferForUnavailableActivity(task)) continue
+        if (activityRefresh.type !== "unavailable") task.consecutiveActivityUnavailablePolls = 0
         if (activityRefresh.type === "activity" && now - activityRefresh.activityTime <= effectiveTimeout) continue
       }
 
@@ -275,7 +292,8 @@ export async function checkAndInterruptStaleTasks(args: {
 
     if (shouldRefreshFromSessionActivity) {
       const activityRefresh = await refreshTaskActivityFromSession(task, getSessionActivity)
-      if (activityRefresh.type === "unavailable") continue
+      if (activityRefresh.type === "unavailable" && deferForUnavailableActivity(task)) continue
+      if (activityRefresh.type !== "unavailable") task.consecutiveActivityUnavailablePolls = 0
       const refreshedLastUpdate = task.progress?.lastUpdate.getTime()
         ?? (activityRefresh.type === "activity" ? activityRefresh.activityTime : undefined)
       if (refreshedLastUpdate !== undefined && now - refreshedLastUpdate <= effectiveStaleTimeout) continue
