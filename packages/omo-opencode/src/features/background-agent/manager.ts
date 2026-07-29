@@ -2364,7 +2364,17 @@ The task was re-queued on a fallback model after a retryable failure.
         )
         const completedAtTimestamp = task.completedAt?.getTime()
         const reachedTaskTtl = completedAtTimestamp !== undefined && (Date.now() - completedAtTimestamp) >= TASK_TTL_MS
-        if (runningOrPendingSiblings.length > 0 && rescheduleCount < MAX_TASK_REMOVAL_RESCHEDULES && !reachedTaskTtl) {
+        // Delay cleanup while the parent still owes a shouldReply wake for this
+        // batch. A shouldReply wake (allComplete / failure) is the contract that
+        // the orchestrator is waiting to consume; reaping the task before that
+        // wake is consumed turns the notification into "Task not found". We cap
+        // on TASK_TTL_MS so a wake that is never consumed cannot pin a task
+        // forever. See HANDOVER-background-task-notification-bug.md D1/D3.
+        const pendingParentWake = this.parentWakeNotifier.getPendingParentWakes().get(task.parentSessionId)
+        const wakeStillOwed = !reachedTaskTtl
+          && pendingParentWake !== undefined
+          && (pendingParentWake.shouldReply || this.parentWakeNotifier.getDispatchedParentWakes().get(task.parentSessionId)?.shouldReply === true)
+        if ((runningOrPendingSiblings.length > 0 || wakeStillOwed) && rescheduleCount < MAX_TASK_REMOVAL_RESCHEDULES && !reachedTaskTtl) {
           this.scheduleTaskRemoval(taskId, rescheduleCount + 1)
           return
         }

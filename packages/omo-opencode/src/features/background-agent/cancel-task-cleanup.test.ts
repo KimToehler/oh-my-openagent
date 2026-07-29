@@ -68,6 +68,20 @@ function getConcurrencyManager(manager: BackgroundManager): ConcurrencyManager {
 
 function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> { return Reflect.get(manager, "completionTimers") as Map<string, ReturnType<typeof setTimeout>> }
 
+function clearPendingParentWakes(manager: BackgroundManager): void {
+  const notifier = Reflect.get(manager, "parentWakeNotifier") as {
+    getPendingParentWakes: () => Map<string, unknown>
+    getPendingParentWakeTimers: () => Map<string, ReturnType<typeof setTimeout>>
+    clearPendingParentWakeTimer?: (sessionID: string) => void
+  }
+  for (const sessionID of notifier.getPendingParentWakes().keys()) {
+    notifier.clearPendingParentWakeTimer?.(sessionID)
+    notifier.getPendingParentWakes().delete(sessionID)
+  }
+  const tracker = Reflect.get(manager, "parentWakeNotifier") as { getDispatchedParentWakes?: () => Map<string, unknown> }
+  tracker.getDispatchedParentWakes?.().clear()
+}
+
 async function processKeyForTest(manager: BackgroundManager, key: string): Promise<void> {
   const processKey = Reflect.get(manager, "processKey") as (key: string) => Promise<void>
   await processKey.call(manager, key)
@@ -159,6 +173,9 @@ describe("BackgroundManager.cancelTask cleanup", () => {
 
     // then
     expect(cancelled).toBe(true)
+    // The retention guard delays cleanup while a shouldReply wake is still
+    // owed for the parent, so clear the pending wake before asserting removal.
+    clearPendingParentWakes(manager)
     runScheduledCleanup(manager, task.id)
     expect(getTaskMap(manager).has(task.id)).toBe(false)
     expect(manager.getTask(task.id)?.sessionId).toBe(task.sessionId)
