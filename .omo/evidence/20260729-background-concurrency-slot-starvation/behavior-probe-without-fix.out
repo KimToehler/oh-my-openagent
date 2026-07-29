@@ -1,0 +1,6 @@
+[probe] started 2026-07-29T10:03:18.874Z
+[probe] B1: task-a holds the only slot and never releases (stranded)
+[probe] FAIL: B1: expected task-b to be rejected, got "still-waiting" after 6001ms
+[probe] FAIL: B2: waiter-1 should have timed out, got still-waiting
+[probe] PASS B4: acquireTimeoutMs=0 disables the timeout (waiter still parked)
+[probe] BEHAVIOR PROBE FAILED (2 failure(s))
