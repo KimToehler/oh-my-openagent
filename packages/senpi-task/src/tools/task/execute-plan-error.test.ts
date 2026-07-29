@@ -29,4 +29,28 @@ describe("buildTaskExecute plan errors", () => {
       'Target "nope" not found. Available agents: explore, oracle. Available categories: deep, quick.',
     )
   })
+
+  test("#given a model_unavailable plan error #when executed #then the suffix says valid category names with an override hint", async () => {
+    // given
+    const manager = createFakeManager({
+      start: async (): Promise<StartResult> => ({
+        kind: "plan_unresolved",
+        error: {
+          code: "model_unavailable",
+          message: 'No available model for category "quick" (attempted opengateway/glm-5.2-ultrafast).',
+          availableCategories: ["deep", "quick"],
+        },
+      }),
+    })
+    const execute = buildTaskExecute(makeDeps(manager))
+
+    // when
+    const result = await execute("call-model-unavailable", { prompt: "p", category: "quick" }, undefined, undefined, CTX)
+
+    // then
+    const text = result.content[0]?.type === "text" ? result.content[0].text : ""
+    expect(text).toContain("Valid category names: deep, quick")
+    expect(text).toContain("model:")
+    expect(text).not.toContain("Available categories:")
+  })
 })

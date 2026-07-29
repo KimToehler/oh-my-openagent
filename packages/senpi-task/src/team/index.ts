@@ -54,7 +54,6 @@ export {
   reclaimStaleTeamReservations,
   reconcileTeamMailboxOnSessionStart,
   sendTeamMessage,
-  WaitRegistry,
 } from "./messaging"
 export type {
   BuildTeamMessageOptions,
@@ -70,10 +69,6 @@ export type {
   ReconcileTeamMailboxDeps,
   SendTeamMessageInput,
   SendTeamMessageResult,
-  WaitClaim,
-  WaitFilter,
-  WaitMessage,
-  WaitRegistration,
 } from "./messaging"
 export {
   MEMBER_EXTENSION_BUNDLE_NAME,

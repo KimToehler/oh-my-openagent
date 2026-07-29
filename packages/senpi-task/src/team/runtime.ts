@@ -79,7 +79,6 @@ export async function createTeam(
           ...config,
           stateDir: resolveStateDir(deps.stateDir),
           members: spec.members.map((member) => member.name),
-          wait: deps.taskSettings.wait,
         }),
       },
     } : {}),

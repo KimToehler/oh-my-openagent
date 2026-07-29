@@ -25,6 +25,16 @@ function registry(models: readonly FakeModel[]): FakeRegistry {
   }
 }
 
+// The live senpi registry shape: find() answers from the whole catalog while getAvailable() is
+// filtered to providers this machine actually has credentials for.
+function catalogRegistry(available: readonly FakeModel[], catalog: readonly FakeModel[]): FakeRegistry {
+  return {
+    getAvailable: () => available,
+    find: (provider, modelId) =>
+      catalog.find((candidate) => candidate.provider === provider && candidate.id === modelId),
+  }
+}
+
 function roster(...definitions: readonly AgentDefinition[]): Readonly<Record<string, AgentDefinition>> {
   return Object.fromEntries(definitions.map((definition) => [definition.name, definition]))
 }
@@ -90,6 +100,40 @@ describe("resolveAgent", () => {
 
     // then
     expect(result.model).toBe("openai/first")
+  })
+
+  test("#given def.models entries the machine has no credentials for #when resolved #then resolution falls through to the first available entry", () => {
+    // given
+    const agents = roster({
+      name: "custom",
+      model: "keyless/primary",
+      models: ["keyless/secondary", "openai/available"],
+    })
+    const models = catalogRegistry(
+      [model("openai", "available")],
+      [model("keyless", "primary"), model("keyless", "secondary"), model("openai", "available")],
+    )
+
+    // when
+    const result = expectResolved(resolveAgent("custom", agents, models))
+
+    // then
+    expect(result.model).toBe("openai/available")
+  })
+
+  test("#given every configured model is keyless #when resolved #then the builtin fallback chain still resolves an available model", () => {
+    // given
+    const agents = roster({ name: "explore", models: ["anthropic/claude-haiku-4-5"] })
+    const models = catalogRegistry(
+      [model("openai", "gpt-5.4-mini-fast")],
+      [model("anthropic", "claude-haiku-4-5"), model("openai", "gpt-5.4-mini-fast")],
+    )
+
+    // when
+    const result = expectResolved(resolveAgent("explore", agents, models))
+
+    // then
+    expect(result.model).toBe("openai/gpt-5.4-mini-fast")
   })
 
   test("#given a disabled agent #when resolved #then it is hidden as not_found", () => {

@@ -68,7 +68,7 @@ This skill may include examples copied from the OpenCode harness. In Senpi, do n
 | \`call_omo_agent(subagent_type="librarian", ...)\` | \`task\` tool with category/agent matching \`.omo/omo.json\` (e.g. \`agent: "librarian"\`) |
 | \`task(...)\` | \`task\` tool |
 | \`background_output(task_id="...")\` | \`task_output\` tool with the task id |
-| \`team_*(...)\` | Lead team tools (\`team_create\`, \`task_create\`, \`team_wait\`, ...); members poll with \`task_send\` / \`team_wait\` |
+| \`team_*(...)\` | Lead team tools (\`team_create\`, \`task_create\`, ...); send with \`task_send\`, then keep working or end your turn — member and lead mail arrive as injected notifications, never poll for it |
 
 If a code block below conflicts with this section, this section wins.
 

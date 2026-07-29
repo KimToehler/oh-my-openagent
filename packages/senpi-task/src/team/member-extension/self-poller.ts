@@ -17,7 +17,6 @@ import { MessageSchema, type Message } from "@oh-my-opencode/team-core/types"
 
 import type { PersistedTaskEvent } from "../../store"
 import { buildPeerMessageEnvelope } from "../messaging/message"
-import type { WaitClaim, WaitRegistry } from "../messaging/wait-registry"
 import { isMissingPath, sessionJsonlContainsMessage } from "./session-scan"
 
 export { sessionJsonlContainsMessage } from "./session-scan"
@@ -31,7 +30,6 @@ export type MemberSelfPollerDeps = {
   readonly memberName: string
   readonly config: TeamModeConfig
   readonly sessionDir: string
-  readonly waitRegistry: WaitRegistry<Message>
   readonly sendUserMessage: (content: string) => void
   readonly appendEvent?: (event: PersistedTaskEvent) => void
   readonly afterInject?: (message: Message) => Promise<void>
@@ -85,25 +83,11 @@ export function createMemberSelfPoller(deps: MemberSelfPollerDeps): MemberSelfPo
     }
   }
 
-  // A pending delivery whose injected envelope never landed has no other route back to team_wait:
-  // its reservation hides the message from listUnreadMessages and recovery only runs at process
-  // start. Re-offering pending deliveries to later registrations breaks that starvation; if the
-  // queued envelope still lands afterwards, the duplicate is bounded and id-identical, never a loss.
-  const claimPendingUnderLease = async (): Promise<void> => {
-    for (const delivery of [...pending.values()]) {
-      const claim = deps.waitRegistry.takeMatch(delivery.message)
-      if (claim === undefined) continue
-      pending.delete(delivery.message.messageId)
-      await resolveWait(deps, delivery, claim)
-    }
-  }
-
   return {
     async pollOnce(filter = {}) {
       if (stopped) return
       await withLease(async () => {
         await checkPendingUnderLease()
-        await claimPendingUnderLease()
         const messages = await listUnreadMessages(deps.teamRunId, deps.memberName, deps.config)
         for (const message of messages) {
           if (filter.from !== undefined && message.from !== filter.from) continue
@@ -154,52 +138,9 @@ async function processMessage(
     return
   }
 
-  const waitClaim = deps.waitRegistry.takeMatch(message)
-  if (waitClaim !== undefined) {
-    await resolveWait(deps, { message, reservation }, waitClaim)
-    return
-  }
-
   state.pending.set(message.messageId, { message, reservation })
   deps.sendUserMessage(buildPeerMessageEnvelope(message))
   await deps.afterInject?.(message)
-}
-
-async function resolveWait(
-  deps: MemberSelfPollerDeps,
-  delivery: PendingDelivery,
-  claim: WaitClaim<Message>,
-): Promise<void> {
-  if (!claim.isActive()) {
-    await releaseDeliveryReservation(delivery.reservation)
-    claim.abandon()
-    return
-  }
-
-  let committed = false
-  try {
-    await commitDeliveryReservation(delivery.reservation)
-    committed = true
-    try {
-      appendDeliveredEvent(deps, delivery.message)
-      deps.appendEvent?.({
-        type: "team_message_waited",
-        payload: {
-          message_id: delivery.message.messageId,
-          from: delivery.message.from,
-          body: delivery.message.body,
-        },
-      })
-    } finally {
-      claim.resolve()
-    }
-  } catch (error) {
-    if (!committed) {
-      await releaseDeliveryReservation(delivery.reservation)
-      claim.abandon()
-    }
-    throw error
-  }
 }
 
 async function recoverReservations(deps: MemberSelfPollerDeps): Promise<void> {

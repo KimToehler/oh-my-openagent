@@ -93,6 +93,11 @@ export function resolveAgent<TModel extends SenpiModelPort>(
     return { kind: "model_unavailable", agent: name, attemptedModel, availableAgents }
   }
 
+  // `find` answers from the whole catalog, so a configured model the machine has no credentials for
+  // still resolves and the child dies on the first provider call. Gate every candidate on the
+  // auth-filtered available set so `models[]` and the builtin chain can actually take over. An
+  // unparseable available set keeps the find-only behavior rather than failing every resolution.
+  const availableModels = parseAvailableAgentModels(registry.getAvailable())
   let attemptedModel: string | undefined
   const directModels = [
     ...(definition.model === undefined ? [] : [definition.model]),
@@ -101,12 +106,11 @@ export function resolveAgent<TModel extends SenpiModelPort>(
   for (const candidate of directModels) {
     attemptedModel = candidate
     const found = findExactAgentModel(candidate, registry)
-    if (found !== undefined) {
-      return resolvedAgent(context, found)
-    }
+    if (found === undefined) continue
+    if (availableModels !== undefined && !availableModels.includes(`${found.provider}/${found.modelId}`)) continue
+    return resolvedAgent(context, found)
   }
 
-  const availableModels = parseAvailableAgentModels(registry.getAvailable())
   if (availableModels !== undefined && fallbackChain !== undefined) {
     const resolution = resolveModelForDelegateTask(
       { fallbackChain, availableModels: new Set(availableModels) },

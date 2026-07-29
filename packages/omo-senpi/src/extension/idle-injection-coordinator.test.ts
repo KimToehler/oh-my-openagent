@@ -27,7 +27,7 @@ describe("IdleInjectionCoordinator", () => {
     expect(collapsed).toBe(2)
     expect(calls).toHaveLength(1)
     expect(calls[0]?.content).toBe("task st_1 completed\n\ncontinue the run")
-    expect(calls[0]?.options).toEqual({ deliverAs: "steer" })
+    expect(calls[0]?.options).toEqual({ deliverAs: "followUp" })
   })
 
   it("#given repeated continuation enqueues #when flushed #then they collapse to one keyed injection", () => {
@@ -92,6 +92,7 @@ describe("IdleInjectionCoordinator", () => {
     // then it is delivered exactly once
     expect(calls).toHaveLength(1)
     expect(calls[0]?.content).toBe("continue")
+    expect(calls[0]?.options).toEqual({ deliverAs: "steer" })
   })
 
   it("#given a deferred continuation #when a synchronous wake flushOnIdle drains first #then the deferred pass no-ops", () => {

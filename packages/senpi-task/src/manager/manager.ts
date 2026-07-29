@@ -7,12 +7,13 @@ import { RpcProcessRunner } from "../runners/rpc-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { createTaskRecord, parseTaskId, syncTaskIdFloor } from "../state"
 import { TaskIdSpaceExhaustedError } from "../state/id"
-import type { TaskRecord } from "../state"
+import type { TaskRecord, TaskRunStats } from "../state"
 import { createSteeringEngine } from "../steering"
 import type { CancelOutcome, DestructionPort, InterruptOutcome, SendInput, SendOutcome, SteeringEngine, SteeringPort } from "../steering"
 import { adaptRpcHandle, discardManagedHandle, discardRpcHandle, type ManagedChildHandle, type ManagedChildListener } from "./child-handle"
 import { TaskConcurrency } from "./concurrency"
 import { decideDepthPolicy } from "./depth-policy"
+import { onceOnly } from "./once-only"
 import { resolveExecutionMode, type ExecutionMode } from "./execution-mode"
 import { toContinueResult } from "./continue-result"
 import {
@@ -373,7 +374,8 @@ class TaskManagerImpl implements TaskManager {
 
   subscribeChild(taskId: string, listener: ManagedChildListener): () => void {
     const live = this.getResidentHandle(taskId)
-    if (live !== undefined) return live.subscribe(listener)
+    // Idempotent cleanup: callers (task_output waits) may release twice, and the manager sweeps too.
+    if (live !== undefined) return onceOnly(live.subscribe(listener))
     const subscribers = this.#childSubscribers.get(taskId) ?? new Map<ManagedChildListener, () => void>()
     this.#childSubscribers.set(taskId, subscribers)
     // Pending listeners have no handle yet. A placeholder lets cleanup remove them before promotion.
@@ -383,6 +385,8 @@ class TaskManagerImpl implements TaskManager {
     })
     return () => subscribers.get(listener)?.()
   }
+
+  runStatsSnapshot(taskId: string): TaskRunStats | undefined { return this.#runStats.get(taskId)?.snapshot(this.#now()) }
 
   residentTaskIds(): readonly string[] { return [...this.#live.keys()] }
 
@@ -571,7 +575,12 @@ class TaskManagerImpl implements TaskManager {
     const subscribers = this.#childSubscribers.get(taskId)
     if (subscribers === undefined) return
     for (const [listener] of subscribers) {
-      subscribers.set(listener, handle.subscribe(listener))
+      const detach = handle.subscribe(listener)
+      subscribers.set(listener, onceOnly(() => {
+        detach()
+        subscribers.delete(listener)
+        if (subscribers.size === 0) this.#childSubscribers.delete(taskId)
+      }))
     }
   }
 

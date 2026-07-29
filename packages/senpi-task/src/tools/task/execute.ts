@@ -4,8 +4,8 @@ import { resolveExecutionMode, type ExecutionMode, type ManagerStartSpec, type S
 import type { TaskRecord } from "../../state"
 import { createChildProgress, type ToolProgressDetails } from "../../progress"
 import { executeBatch } from "./execute-batch"
+import { buildStartSpec, singleSpawnParams } from "./execute-spec"
 import type { TaskToolParamsStatic } from "./params"
-import { createFsSkillLoader } from "./skills"
 import type { ResolvedSpawnItem, TaskToolContext, TaskToolDeps, TaskToolDetails, TaskToolMode } from "./types"
 import { resolveSpawnItems, validateBatchShape, validateTaskTarget } from "./validation"
 
@@ -57,59 +57,6 @@ function syncResult(record: TaskRecord, mode: TaskToolMode): AgentToolResult<Tas
   return result(body + continuationFooter(record.task_id), recordDetails(record, mode))
 }
 
-function buildStartSpec(
-  params: SingleSpawnParams,
-  target: { readonly category: string } | { readonly subagentType: string },
-  parentSessionId: string,
-  deps: TaskToolDeps,
-  cwd: string,
-): ResolvedManagerStartSpec {
-  const ancestry = deps.resolveAncestry?.(parentSessionId)
-  const loadSkills = deps.loadSkills ?? createFsSkillLoader()
-  const skills = loadSkills(params.load_skills ?? [], cwd)
-  const executionMode = resolvedTaskExecutionMode(target, deps)
-  return {
-    prompt: skills.prepend + params.prompt,
-    parent_session_id: parentSessionId,
-    root_session_id: ancestry?.rootSessionId ?? parentSessionId,
-    depth: (ancestry?.depth ?? 0) + 1,
-    ...("category" in target ? { category: target.category } : { subagent_type: target.subagentType }),
-    execution_mode: executionMode,
-    ...(params.model !== undefined && { model: params.model }),
-    ...(params.name !== undefined && { name: params.name }),
-    ...(params.run_in_background !== undefined && { run_in_background: params.run_in_background }),
-  }
-}
-
-function toExecutionMode(value: string | undefined): ExecutionMode | undefined {
-  switch (value) {
-    case "in-process":
-    case "process":
-      return value
-    default:
-      return undefined
-  }
-}
-
-function resolvedAgentMode(
-  target: { readonly category: string } | { readonly subagentType: string },
-  deps: TaskToolDeps,
-): ExecutionMode | undefined {
-  if (!("subagentType" in target)) return undefined
-  return toExecutionMode(deps.agents[target.subagentType]?.executionMode) ?? deps.omoConfig.agents?.[target.subagentType]?.execution_mode
-}
-
-function resolvedTaskExecutionMode(
-  target: { readonly category: string } | { readonly subagentType: string },
-  deps: TaskToolDeps,
-): ExecutionMode {
-  const agentMode = resolvedAgentMode(target, deps)
-  return resolveExecutionMode({
-    ...(agentMode !== undefined && { agentMode }),
-    configMode: deps.omoConfig.task?.default_execution_mode,
-  })
-}
-
 function startedDetails(
   started: Extract<StartResult, { kind: "started" }>,
   params: SingleSpawnParams,
@@ -139,9 +86,13 @@ function partialDetails(
   return { ...startedDetails(started, params, executionMode), ...progress }
 }
 
-function backgroundStartText(started: Extract<StartResult, { kind: "started" }>): string {
+function backgroundStartText(started: Extract<StartResult, { kind: "started" }>, description: string | undefined): string {
   const queue = started.queue_position !== undefined ? ` queued at position ${started.queue_position}` : ""
-  return `Started task ${started.task_id} (${started.status})${queue}. The system will notify you on completion; use task_output to read progress or task_send to steer it.`
+  const label = description ?? started.name
+  if (label === started.task_id) {
+    return `Started task ${started.task_id} (${started.status})${queue}. The system will notify you on completion; use task_output to read progress or task_send to steer it.`
+  }
+  return `Started task ${label} (${started.task_id}, ${started.status})${queue}. The system will notify you on completion; use task_output to read progress or task_send to steer it.`
 }
 
 async function runSpawn(
@@ -164,7 +115,14 @@ async function runSpawn(
     const agents = started.error.availableAgents
     const categories = started.error.availableCategories
     const agentSuffix = agents && agents.length > 0 ? ` Available agents: ${agents.join(", ")}.` : ""
-    const categorySuffix = categories && categories.length > 0 ? ` Available categories: ${categories.join(", ")}.` : ""
+    // A model_unavailable failure means the category name IS valid; labeling the list "Available
+    // categories" told models to retry the same broken binding. Name the vocabulary honestly and
+    // surface the explicit-model escape hatch.
+    const categorySuffix = categories && categories.length > 0
+      ? started.error.code === "model_unavailable"
+        ? ` Valid category names: ${categories.join(", ")}. Pass model: "<provider>/<model>" to override the category default.`
+        : ` Available categories: ${categories.join(", ")}.`
+      : ""
     return result(started.error.message + agentSuffix + categorySuffix, { task_id: "", status: "plan_error", mode: "spawn", reason: started.error.message })
   }
   if (started.kind === "depth_denied") {
@@ -190,7 +148,7 @@ async function runSpawn(
   }
   // Background children intentionally outlive the parent turn; only the synchronous wait is abort-scoped.
   if (params.run_in_background === true) {
-    return result(backgroundStartText(started), startedDetails(started, params, spec.execution_mode))
+    return result(backgroundStartText(started, params.description), startedDetails(started, params, spec.execution_mode))
   }
 
   const startedAt = Date.now()
@@ -200,6 +158,9 @@ async function runSpawn(
       ...(params.category !== undefined && { category: params.category }),
       ...(params.subagent_type !== undefined && { agentType: params.subagent_type }),
       ...(started.resolved_model !== undefined && { resolvedModel: started.resolved_model }),
+      ...(params.model !== undefined && { model: params.model }),
+      name: started.name,
+      ...(params.description !== undefined && { description: params.description }),
     },
     startedAt,
   )
@@ -269,18 +230,6 @@ async function runSpawn(
     closed = true
     if (timer !== undefined) clearTimeout(timer)
     unsubscribe()
-  }
-}
-
-function singleSpawnParams(item: ResolvedSpawnItem, runInBackground: boolean | undefined): SingleSpawnParams {
-  return {
-    prompt: item.prompt,
-    ...(item.kind === "category" ? { category: item.category } : { subagent_type: item.subagentType }),
-    ...(item.description !== undefined && { description: item.description }),
-    ...(item.name !== undefined && { name: item.name }),
-    ...(item.model !== undefined && { model: item.model }),
-    load_skills: [...item.load_skills],
-    ...(runInBackground !== undefined && { run_in_background: runInBackground }),
   }
 }
 

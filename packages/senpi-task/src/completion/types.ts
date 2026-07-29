@@ -23,7 +23,8 @@ export type CompletionDetails = {
   readonly duration_ms: number
   readonly tokens?: number
   readonly run_stats?: TaskRunStats
-  readonly final_response_head: string
+  readonly final_response: string
+  readonly final_response_file?: string
   readonly continuation_hint: string
 }
 
@@ -57,6 +58,7 @@ export type CompletionRetrySchedule = (fn: () => void, delayMs: number) => () =>
 export type CompletionNotifierDeps = {
   readonly notifier: ParentNotifier
   readonly store: CompletionNotifierStore
+  readonly stateDir?: string
   readonly schedule?: CompletionRetrySchedule
   readonly getParentState?: () => ParentState
   readonly getCurrentSessionId?: () => string | undefined

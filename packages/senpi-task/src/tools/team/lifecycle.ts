@@ -9,12 +9,41 @@ import { toolResult } from "../control"
 import { qualifyResolvedModelDisplay } from "../task/resolved-model-display"
 import type { TeamToolDeps, TeamToolsService } from "./types"
 
+const InlineTeamSpecMemberSchema = Type.Object(
+  {
+    name: Type.Optional(Type.String({ description: "Member name; unique within the team, lowercase-stem normalized." })),
+    kind: Type.Optional(
+      Type.Union([Type.Literal("category"), Type.Literal("subagent_type"), Type.Literal("agent")], {
+        description: "Member kind; 'agent' is an alias for subagent_type. Inferred from the category/subagent_type field when omitted.",
+      }),
+    ),
+    category: Type.Optional(Type.String({ description: "Category to route this member through (kind category)." })),
+    subagent_type: Type.Optional(Type.String({ description: "Agent definition to run this member as (kind subagent_type or agent)." })),
+    prompt: Type.Optional(Type.String({ description: "Member instructions; MUST be written in English." })),
+  },
+  { additionalProperties: true },
+)
+
+const InlineTeamSpecSchema = Type.Object(
+  {
+    name: Type.Optional(Type.String({ description: "Team name; defaults to a derived inline name when omitted." })),
+    members: Type.Optional(
+      Type.Union([Type.Array(InlineTeamSpecMemberSchema), InlineTeamSpecMemberSchema], {
+        description: "Team members (an array, or a single member object which is wrapped into one). The current session is always the lead; do not declare a lead member.",
+      }),
+    ),
+  },
+  { additionalProperties: true },
+)
+
 export const TeamCreateParams = Type.Object({
   team_name: Type.Optional(
     Type.String({ description: "Named team spec (project .omo/teams or omo.json) to create. Provide exactly one of team_name or inline_spec." }),
   ),
   inline_spec: Type.Optional(
-    Type.Unknown({ description: "Inline team spec object, e.g. { name, members: [{ name, category|subagent_type, prompt? }] }. Provide exactly one of team_name or inline_spec." }),
+    Type.Union([InlineTeamSpecSchema, Type.String({ description: "The same spec as a JSON string; parsed automatically. Passing the object form is preferred." })], {
+      description: "Inline team spec, e.g. { name, members: [{ name, category|subagent_type, prompt? }] }. A JSON string of the same object is also accepted and parsed automatically. Provide exactly one of team_name or inline_spec.",
+    }),
   ),
 })
 
@@ -48,9 +77,23 @@ export type TeamDeleteDetails =
 const CREATE_DESCRIPTION = [
   "Create a team run from a named spec or an inline spec. The current session is the team lead.",
   "Provide exactly one of team_name or inline_spec. Members run as background children; you coordinate them with the other team_* tools.",
+  "Returns invalid_arguments for malformed input, spec_error for invalid specs, and runtime_error for spawn/bounds failures.",
 ].join(" ")
 
-const DELETE_DESCRIPTION = "Delete a team run and cancel its members. Lead-only. Pass force=true to tear it down while members are still active."
+const DELETE_DESCRIPTION = "Delete a team run and cancel its members (terminal, not resumable). Lead-only. Pass force=true to tear it down while members are still active."
+
+function coerceInlineSpec(input: unknown): { readonly ok: true; readonly spec: unknown } | { readonly ok: false; readonly reason: string } {
+  if (typeof input !== "string") return { ok: true, spec: input }
+  try {
+    return { ok: true, spec: JSON.parse(input) }
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    return {
+      ok: false,
+      reason: `inline_spec is a string that is not valid JSON (${detail}). Pass the spec as a nested object like { name, members: [{ name, category|subagent_type, prompt? }] }, or as a valid JSON string of that object.`,
+    }
+  }
+}
 
 export async function runTeamCreate(service: TeamToolsService, params: TeamCreateInput): Promise<AgentToolResult<TeamCreateDetails>> {
   const hasName = params.team_name !== undefined && params.team_name.length > 0
@@ -59,9 +102,18 @@ export async function runTeamCreate(service: TeamToolsService, params: TeamCreat
     return toolResult("Provide exactly one of team_name or inline_spec.", { kind: "invalid_arguments", reason: "provide exactly one of team_name or inline_spec" })
   }
 
+  let inlineSpec: unknown
+  if (hasInline) {
+    const coerced = coerceInlineSpec(params.inline_spec)
+    if (!coerced.ok) {
+      return toolResult(coerced.reason, { kind: "invalid_arguments", reason: coerced.reason })
+    }
+    inlineSpec = coerced.spec
+  }
+
   try {
     const result = await service.createTeam(
-      hasName ? { teamName: params.team_name } : { inlineSpec: params.inline_spec },
+      hasName ? { teamName: params.team_name } : { inlineSpec },
     )
     const state = result.runtimeState
     const members: TeamCreateMemberView[] = result.members.map((member) => ({

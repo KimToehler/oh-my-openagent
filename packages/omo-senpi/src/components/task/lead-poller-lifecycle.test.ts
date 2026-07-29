@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import { OmoTaskSettingsSchema } from "@oh-my-opencode/omo-config-core"
 import type { Message } from "@oh-my-opencode/team-core/types"
-import { WaitRegistry, createLeadDeliveryJournal, toTeamCoreConfig, type LeadInjection } from "@oh-my-opencode/senpi-task"
+import { createLeadDeliveryJournal, toTeamCoreConfig, type LeadInjection } from "@oh-my-opencode/senpi-task"
 
 import type { IdleInjection } from "../../extension/idle-injection-coordinator"
 import { createLeadPollerLifecycle, type LeadPollerFactoryInput, type LeadPollerPort } from "./lead-poller-lifecycle"
@@ -22,7 +22,6 @@ function harness() {
   const injected: IdleInjection[] = []
   let scheduled = 0
   let soon = 0
-  const removals: string[] = []
   const userMessages: string[] = []
   const journal = createLeadDeliveryJournal()
 
@@ -35,7 +34,6 @@ function harness() {
     },
     config: toTeamCoreConfig(OmoTaskSettingsSchema.parse({}), "/tmp/teams"),
     runtimeDir: (teamRunId) => `/tmp/runtime/${teamRunId}`,
-    waitRegistry: new WaitRegistry<Message>(),
     deliveryJournal: journal,
     appendTaskEvent: () => undefined,
     pi: { sendUserMessage: (content) => userMessages.push(String(content)) },
@@ -44,7 +42,6 @@ function harness() {
       enqueue: (injection) => injected.push(injection),
       scheduleFlush: () => { scheduled += 1 },
       flushSoon: () => { soon += 1 },
-      remove: (key) => { removals.push(key); return true },
     },
     createPoller: (input) => {
       const poller: FakePoller = {
@@ -73,7 +70,6 @@ function harness() {
     mapReads,
     intervals,
     injected,
-    removals,
     journal,
     userMessages,
     get scheduled() { return scheduled },
@@ -125,21 +121,6 @@ describe("lead poller lifecycle", () => {
     expect(h.created[0]?.poller.polls).toBe(1)
   })
 
-  test("#given a lead without a captured session file #when team_wait resolves its owned run #then no poller is available to reserve delivery", async () => {
-    // given
-    const h = harness()
-    h.setSessionFile(undefined)
-
-    // when
-    const resolved = await h.lifecycle.resolveTeamRunId()
-    const poller = h.lifecycle.resolveLeadPoller("run-owned")
-
-    // then
-    expect(resolved).toEqual({ ok: true, teamRunId: "run-owned" })
-    expect(h.created).toHaveLength(0)
-    expect(poller).toBeUndefined()
-  })
-
   test("#given a compacting parent #when the lifecycle ticks #then the owned poller is suspended", async () => {
     // given
     const h = harness()
@@ -181,20 +162,58 @@ describe("lead poller lifecycle", () => {
     expect(explicit).toEqual({ ok: true, teamRunId: "run-b" })
   })
 
-  test("#given a coordinator with removal support #when the sink removes a queued injection #then removal reaches the coordinator", async () => {
+  test("#given multiple owned teams #when no run id is resolved #then the reason lists the owned runs", async () => {
     // given
     const h = harness()
-    await h.lifecycle.tick()
-    const sink = h.created[0]?.input.coordinator
-    if (sink === undefined || sink.remove === undefined) throw new Error("expected a removable sink")
+    h.setTeams([ownedTeam("run-a"), ownedTeam("run-b")])
 
     // when
-    sink.enqueue(injection("team-message:m1"))
-    const removed = sink.remove("team-message:m1")
+    const missing = await h.lifecycle.resolveTeamRunId()
 
     // then
-    expect(removed).toBe(true)
-    expect(h.removals).toEqual(["team-message:m1"])
+    expect(missing.ok).toBe(false)
+    if (missing.ok) throw new Error("expected resolution failure")
+    expect(missing.reason).toContain("run-a")
+    expect(missing.reason).toContain("run-b")
+  })
+
+  test("#given one owned team #when resolveDefaultTeamRunId is called #then it resolves", async () => {
+    // given
+    const h = harness()
+    h.setTeams([ownedTeam("run-solo")])
+
+    // when
+    const resolved = await h.lifecycle.resolveDefaultTeamRunId()
+
+    // then
+    expect(resolved).toEqual({ kind: "resolved", teamRunId: "run-solo" })
+  })
+
+  test("#given no owned team #when resolveDefaultTeamRunId is called #then it reports none", async () => {
+    // given
+    const h = harness()
+    h.setTeams([ownedTeam("run-foreign", "session-b")])
+
+    // when
+    const resolved = await h.lifecycle.resolveDefaultTeamRunId()
+
+    // then
+    expect(resolved).toEqual({ kind: "none" })
+  })
+
+  test("#given multiple owned teams #when resolveDefaultTeamRunId is called #then it reports ambiguous with the owned runs", async () => {
+    // given
+    const h = harness()
+    h.setTeams([ownedTeam("run-a"), ownedTeam("run-b")])
+
+    // when
+    const resolved = await h.lifecycle.resolveDefaultTeamRunId()
+
+    // then
+    expect(resolved.kind).toBe("ambiguous")
+    if (resolved.kind !== "ambiguous") throw new Error("expected ambiguous")
+    expect(resolved.reason).toContain("run-a")
+    expect(resolved.reason).toContain("run-b")
   })
 
   test("#given a shared delivery journal #when the lifecycle creates a poller #then the journal reaches the poller deps", async () => {

@@ -33,6 +33,7 @@ import type { SenpiExtensionAPI } from "../../extension/types"
 import { createCompletionObservingStore } from "./completion-bridge"
 import { createParentNotifier } from "./parent-notifier"
 import { createTaskChildPlanner } from "./planner"
+import { createTeamMemberLivenessNotifier, type TeamMemberLivenessNotifier } from "./member-liveness"
 import { createManagerResidencyRegistry } from "./residency-registry"
 import { TaskRuntimeContext } from "./runtime-context"
 import { createMutationNotifyingStore } from "./store-mutation-observer"
@@ -47,6 +48,7 @@ export interface TaskEngine {
   readonly omoConfig: OmoConfig
   readonly settings: OmoTaskSettings
   readonly stateDir: string
+  readonly memberLiveness: TeamMemberLivenessNotifier
   readonly appendTaskEvent: (taskId: string, event: PersistedTaskEvent) => void
   // Subscribe to every store mutation (spawn/transition/replace/remove). The UI status sync attaches
   // here so the footer/widget refresh on background task activity. Returns an unsubscribe.
@@ -91,6 +93,11 @@ const DEFAULT_RUNNER_FACTORIES: TaskRunnerFactories = {
 export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   const settings: OmoTaskSettings = deps.omoConfig.task ?? OmoTaskSettingsSchema.parse({})
   const runtime = new TaskRuntimeContext(deps.cwd)
+  const memberLiveness = createTeamMemberLivenessNotifier({
+    pi: deps.pi,
+    ...(deps.coordinator === undefined ? {} : { coordinator: deps.coordinator }),
+    isStreaming: () => runtime.parentState().kind === "streaming",
+  })
   const agents = resolveAgents(deps.omoConfig)
 
   const baseStore = createTaskRecordStore({
@@ -102,6 +109,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
   const notifier = createCompletionNotifier({
     notifier: parentNotifier,
     store: baseStore,
+    stateDir: baseStore.stateDir,
     getParentState: () => runtime.parentState(),
     getCurrentSessionId: () => runtime.sessionId(),
   })
@@ -128,6 +136,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     notifier,
     parentState: () => runtime.parentState(),
     wasBackground: (taskId) => managerRef?.wasBackground(taskId) ?? false,
+    onTerminal: (record) => memberLiveness.notifyTerminal(record),
   })
 
   const mutationListeners = new Set<() => void>()
@@ -173,6 +182,7 @@ export function composeTaskEngine(deps: ComposeTaskEngineDeps): TaskEngine {
     omoConfig: deps.omoConfig,
     settings,
     stateDir: baseStore.stateDir,
+    memberLiveness,
     appendTaskEvent,
     onStoreMutation: (listener) => {
       mutationListeners.add(listener)

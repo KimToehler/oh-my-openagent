@@ -21,6 +21,7 @@ export interface SenpiExtensionAPI {
   getFlag(name: string): boolean | string | undefined
   sendMessage(message: Record<string, unknown>, options?: Record<string, unknown>): void
   sendUserMessage(content: string | readonly Record<string, unknown>[], options?: { deliverAs?: "steer" | "followUp" }): void
+  registerRemovedToolHint?(name: string, hint: string): void
   registerMessageRenderer?(customType: string, renderer: unknown): void
   registerMcpServer?(name: string, config: Record<string, unknown>): void
 }

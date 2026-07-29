@@ -68,7 +68,6 @@ describe("createTeam", () => {
       stateDir: join(stateDir.project_dir, ".omo", "senpi-task"),
       base_dir: join(stateDir.project_dir, ".omo", "senpi-task", "teams"),
       members: ["alpha"],
-      wait: settings.wait,
     })
     expect(started?.memberScopedTools).toBeUndefined()
   })
@@ -155,7 +154,7 @@ describe("createTeam", () => {
     })
   })
 
-  test("#given member prompts #when members start #then every bootstrap carries the team pull protocol before the role", async () => {
+  test("#given member prompts #when members start #then every bootstrap teaches injection-driven work after the role", async () => {
     // given
     const stateDir = stateDirConfig(tempProjectDir())
     const manager = new FakeTeamManager()
@@ -181,14 +180,14 @@ describe("createTeam", () => {
     // then
     const [alphaStart, betaStart] = manager.started
     for (const start of [alphaStart, betaStart]) {
-      expect(start?.prompt).toContain("team messages")
-      expect(start?.prompt).toContain("team_wait")
+      expect(start?.prompt).toContain("injected messages")
+      expect(start?.prompt).not.toContain("team_wait")
       expect(start?.prompt).toContain("task_send")
     }
     expect(alphaStart?.prompt).toContain("'alpha'")
     expect(alphaStart?.prompt).toContain("'squad'")
     expect(alphaStart?.prompt).toContain("task alpha")
-    expect(alphaStart?.prompt.indexOf("team_wait")).toBeLessThan(alphaStart?.prompt.indexOf("task alpha"))
+    expect(alphaStart?.prompt.indexOf("end your turn")).toBeLessThan(alphaStart?.prompt.indexOf("task alpha"))
     expect(betaStart?.prompt).toContain("'beta'")
     expect(betaStart?.prompt).toContain("'squad'")
   })
