@@ -1,0 +1,6 @@
+host_session_count_before=879
+host_session_count_after=879
+opencode_version=1.18.0
+opencode_run_exit=0
+fake_llm_port=60183
+captured_at=2026-07-29T10:02:58Z

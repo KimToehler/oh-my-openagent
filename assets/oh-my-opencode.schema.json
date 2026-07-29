@@ -6209,6 +6209,10 @@
           "type": "number",
           "minimum": 1
         },
+        "acquireTimeoutMs": {
+          "type": "number",
+          "minimum": 0
+        },
         "providerConcurrency": {
           "type": "object",
           "propertyNames": {

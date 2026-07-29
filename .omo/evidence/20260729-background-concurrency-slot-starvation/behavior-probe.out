@@ -1,0 +1,7 @@
+[probe] started 2026-07-29T10:03:09.663Z
+[probe] B1: task-a holds the only slot and never releases (stranded)
+[probe] PASS B1: stranded slot rejected the waiter after 1501ms
+[probe] B1: message = Timed out after 1500ms waiting for a concurrency slot on "openai/gpt-fake". This usually means a slot was not released by a previous task.
+[probe] PASS B2: acquire timeout is isolated - the queue still serves later waiters
+[probe] PASS B4: acquireTimeoutMs=0 disables the timeout (waiter still parked)
+[probe] BEHAVIOR PROBE PASS

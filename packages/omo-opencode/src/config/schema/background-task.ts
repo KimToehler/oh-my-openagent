@@ -8,6 +8,8 @@ const CircuitBreakerConfigSchema = z.object({
 
 export const BackgroundTaskConfigSchema = z.object({
   defaultConcurrency: z.number().min(1).optional(),
+  /** Max time a task waits for a concurrency slot before failing, in milliseconds (default: 600000 = 10 minutes; 0 disables the timeout). Guards against a slot that was never released stranding every later task on the same key. */
+  acquireTimeoutMs: z.number().min(0).optional(),
   providerConcurrency: z.record(z.string(), z.number().min(0)).optional(),
   modelConcurrency: z.record(z.string(), z.number().min(0)).optional(),
   maxDepth: z.number().int().min(1).optional(),

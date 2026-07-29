@@ -520,3 +520,46 @@ describe("ConcurrencyManager.cleanup", () => {
     await p
   })
 })
+
+describe("ConcurrencyManager.acquire timeout", () => {
+  test("should reject a waiter that never receives a slot", async () => {
+    // given a saturated key whose holder never releases
+    const manager = new ConcurrencyManager({ providerConcurrency: { onara: 1 }, acquireTimeoutMs: 20 })
+    await manager.acquire("onara/explore", "holder")
+
+    // when a second task waits past the acquire timeout
+    const waiter = manager.acquire("onara/explore", "starved")
+
+    // then it fails loudly instead of hanging forever
+    await expect(waiter).rejects.toThrow(/Timed out .* waiting for a concurrency slot/)
+  })
+
+  test("should not reject a waiter that is handed a slot before the timeout", async () => {
+    // given a saturated key with a waiter behind it
+    const manager = new ConcurrencyManager({ providerConcurrency: { onara: 1 }, acquireTimeoutMs: 60_000 })
+    await manager.acquire("onara/explore", "holder")
+    const waiter = manager.acquire("onara/explore", "waiter")
+
+    // when the holder releases its slot
+    manager.release("onara/explore")
+
+    // then the waiter resolves normally
+    await waiter
+    expect(manager.getQueueLength("onara")).toBe(0)
+  })
+
+  test("should never time out when acquireTimeoutMs is 0", async () => {
+    // given a manager configured to wait indefinitely
+    const manager = new ConcurrencyManager({ providerConcurrency: { onara: 1 }, acquireTimeoutMs: 0 })
+    await manager.acquire("onara/explore", "holder")
+
+    // when a waiter queues up
+    let settled = false
+    void manager.acquire("onara/explore", "waiter").then(() => { settled = true })
+    await new Promise(resolve => setTimeout(resolve, 20))
+
+    // then it stays pending rather than rejecting
+    expect(settled).toBe(false)
+    expect(manager.getQueueLength("onara")).toBe(1)
+  })
+})

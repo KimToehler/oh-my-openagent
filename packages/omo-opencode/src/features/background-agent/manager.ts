@@ -681,8 +681,32 @@ export class BackgroundManager {
             this.rollbackPreStartDescendantReservation(item.task)
             continue
           }
-          throw error
+
+          // Fail only this task: rethrowing would abandon the rest of the queue,
+          // which is the very starvation the acquire timeout exists to break.
+          this.rollbackPreStartDescendantReservation(item.task)
+          const message = error instanceof Error ? error.message : String(error)
+          if (item.task.currentAttemptID) {
+            finalizeAttempt(item.task, item.task.currentAttemptID, "error", message)
+          } else {
+            item.task.status = "error"
+            item.task.error = message
+            item.task.completedAt = new Date()
+          }
+          removeTaskToastTracking(item.task.id)
+          this.updateBackgroundTaskMarker(item.task.parentSessionId)
+          this.markForNotification(item.task)
+          this.enqueueNotificationForParent(item.task.parentSessionId, () => this.notifyParentSession(item.task)).catch(err => {
+            log("[background-agent] Failed to notify on acquire failure:", err)
+          })
+          continue
         }
+
+        // Ownership must be recorded here, not in startTask: every terminal
+        // handler releases via `if (task.concurrencyKey)`, and startTask only
+        // assigns it after several awaits (session.get/create/onSessionCreated).
+        // A task terminated inside that window would otherwise strand the slot.
+        item.task.concurrencyKey = item.rawConcurrencyKey ?? key
 
         if (item.task.status === "cancelled" || item.task.status === "error" || item.task.status === "interrupt") {
           this.rollbackPreStartDescendantReservation(item.task)
