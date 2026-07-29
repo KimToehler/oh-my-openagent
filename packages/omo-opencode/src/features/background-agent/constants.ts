@@ -11,6 +11,12 @@ export const DEFAULT_CIRCUIT_BREAKER_CONSECUTIVE_THRESHOLD = 20
 export const DEFAULT_CIRCUIT_BREAKER_ENABLED = true
 export const MIN_RUNTIME_BEFORE_STALE_MS = 30_000
 export const DEFAULT_SESSION_GONE_TIMEOUT_MS = 60_000
+/**
+ * How many consecutive failed activity lookups may defer a stale interrupt.
+ * Only reached once a task is ALREADY past its stale timeout, so this bounds
+ * the "lookup keeps failing" escape hatch rather than the timeout itself.
+ */
+export const MAX_ACTIVITY_UNAVAILABLE_POLLS = 5
 export const MIN_IDLE_TIME_MS = 5000
 export const POLLING_INTERVAL_MS = 3000
 export const TASK_CLEANUP_DELAY_MS = 10 * 60 * 1000

@@ -99,6 +99,8 @@ export interface BackgroundTask {
   stablePolls?: number
   /** Number of consecutive polls where session was missing from status map */
   consecutiveMissedPolls?: number
+  /** Number of consecutive polls where the session activity lookup failed */
+  consecutiveActivityUnavailablePolls?: number
 }
 
 export interface BackgroundTaskSnapshot {
