@@ -32,11 +32,15 @@ export type {
 } from "./store"
 export {
   composeStatusLine,
+  formatSpend,
   formatStatusTarget,
+  formatTargetIdentity,
+  formatTargetWithModel,
   taskIdentityLabel,
   toolCountSuffix,
 } from "./status-line"
 export type { StatusLineInput, StatusLineStats, StatusTargetInput, TaskIdentityInput } from "./status-line"
+export { TASK_SUMMARY_MAX_LENGTH, clampTaskSummary } from "./task-summary"
 export { assistantLastLine, formatToolActivity } from "./progress"
 export { createMinimalSenpiResourceLoader } from "./senpi/minimal-resource-loader"
 export type { MinimalSenpiResourceLoaderOptions } from "./senpi/minimal-resource-loader"
@@ -184,10 +188,15 @@ export type {
   TrustedRespawnLaunchResolver,
 } from "./manager"
 export {
+  AGENT_INVOCATION_CONDITIONS,
   BUILTIN_AGENTS,
   BUILTIN_AGENT_DEFAULTS,
   CURATED_READONLY_AGENT_NAMES,
+  EMPTY_SKILL_INVOCATIONS,
+  PLAN_GATED_AGENT_NAMES,
   defineAgent,
+  evaluateInvocationGuard,
+  invocationConditionForAgent,
   loadAgents,
   mapOmoConfigAgents,
   registerAgent,
@@ -195,6 +204,9 @@ export {
   resolveToolRule,
 } from "./agents"
 export type {
+  AgentInvocationCondition,
+  AgentModelCandidate,
+  AgentModelEntry,
   AgentModelUnavailableResult,
   AgentNotFoundResult,
   AgentResolutionResult,
@@ -203,10 +215,12 @@ export type {
   AgentLoaderDiagnostic,
   AgentLoaderDiagnosticKind,
   AgentToolRule,
+  InvocationGuardVerdict,
   LoadAgentsOptions,
   LoadAgentsResult,
   ResolveAgentOptions,
   ResolvedAgentResult,
+  SkillInvocationState,
 } from "./agents"
 export {
   buildCompletionDetails,
@@ -279,6 +293,7 @@ export {
   buildSkillPrepend,
   buildTaskExecute,
   buildTaskToolDescription,
+  resolvePromptCacheSafeWaitSeconds,
   createFsSkillLoader,
   createTaskTool,
   excerptRendererPromptText,
@@ -293,9 +308,14 @@ export {
   taskCallLines,
   taskResultLines,
   validateTaskTarget,
+  waitForForegroundTask,
 } from "./tools/task"
 export type {
+  ForegroundWaitInput,
+  ForegroundWaitOptions,
+  ForegroundWaitResult,
   ResolveAncestry,
+  ScheduleDeadline,
   SkillLoader,
   SkillResolution,
   TaskAgentInfo,
@@ -376,6 +396,7 @@ export {
   buildPeerMessageEnvelope,
   buildTeamMessage,
   createLeadPoller,
+  createIncrementalSessionMarkerIndex,
   DEFAULT_STALE_RESERVATION_TTL_MS,
   MEMBER_EXTENSION_BUNDLE_NAME,
   parseMemberExtensionEnv,
@@ -401,6 +422,9 @@ export type {
   ParsedMemberExtensionEnv,
   ReclaimResult,
   ReconcileTeamMailboxDeps,
+  SessionMarkerExtractor,
+  SessionMarkerIndex,
+  SessionSliceReader,
   SendTeamMessageInput,
   SendTeamMessageResult,
 } from "./team"
@@ -437,6 +461,8 @@ export type {
 export {
   createTeam,
   deleteTeam,
+  isOwnedTeamMemberTask,
+  parseTeamMemberTaskIdentity,
   readMemberTaskMap,
   refreshTeamMemberStatuses,
   SenpiTeamRuntimeError,
@@ -455,6 +481,8 @@ export type {
   SpawnMemberExtensionConfig,
   TeamCoreConfig,
   TeamMemberExtensionConfig,
+  TeamMemberOwnershipDeps,
+  TeamMemberTaskIdentity,
   TeamRuntimeManagerPort,
   TeamMemberRespawnLaunchResolverOptions,
   TeamMemberRespawnLaunchErrorCode,
