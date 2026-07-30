@@ -192,6 +192,20 @@ function getPendingParentWakes(manager: BackgroundManager): Map<string, PendingP
   return parentWakeNotifier.getPendingParentWakes()
 }
 
+function getDispatchedParentWakes(manager: BackgroundManager): Map<string, PendingParentWakeForTest> {
+  const parentWakeNotifier = Reflect.get(manager, "parentWakeNotifier") as {
+    getDispatchedParentWakes: () => Map<string, PendingParentWakeForTest>
+  }
+  return parentWakeNotifier.getDispatchedParentWakes()
+}
+
+function markParentWakeInFlight(manager: BackgroundManager, sessionID: string): void {
+  const parentWakeNotifier = Reflect.get(manager, "parentWakeNotifier") as {
+    dispatchedTracker: { markInFlight: (sessionID: string) => void }
+  }
+  parentWakeNotifier.dispatchedTracker.markInFlight(sessionID)
+}
+
 function getCompletionTimers(manager: BackgroundManager): Map<string, ReturnType<typeof setTimeout>> {
   return Reflect.get(manager, "completionTimers") as Map<string, ReturnType<typeof setTimeout>>
 }
@@ -253,5 +267,119 @@ describe("BackgroundManager completion cleanup retention guard", () => {
     // the task is reaped and background_output returns "Task not found".
     expect(getTasks(manager).has(task.id)).toBe(true)
     expect(manager.getTask(task.id)?.id).toBe(task.id)
+  })
+
+  test("#given only a dispatched shouldReply wake is owed #when the cleanup timer fires #then the task stays retrievable", async () => {
+    // given: a completed task whose wake has already left the pending queue.
+    // parent-wake-flush-runner deletes the pending wake BEFORE dispatching
+    // (parent-wake-flush-runner.ts:224-226) and only then tracks it as
+    // dispatched, so "dispatched, nothing pending" is the ordinary steady state
+    // of every reply dispatch - not an edge case.
+    const { manager } = createManager()
+    managerUnderTest = manager
+    const task = createTask({
+      id: "bg_retention_dispatched",
+      parentSessionId: "parent-dispatched",
+      description: "dispatched-only retention task",
+      status: "completed",
+      completedAt: new Date(),
+      sessionId: "ses_retention_dispatched",
+    })
+    getTasks(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+
+    await notifyParentSessionForTest(manager, task)
+
+    // when: the wake transitions from pending to dispatched, exactly as the
+    // flush runner does it
+    const pendingWake = getPendingParentWakes(manager).get(task.parentSessionId)
+    expect(pendingWake?.shouldReply).toBe(true)
+    if (pendingWake === undefined) throw new Error("Missing pending wake")
+    getPendingParentWakes(manager).delete(task.parentSessionId)
+    getDispatchedParentWakes(manager).set(task.parentSessionId, pendingWake)
+
+    // then: nothing is pending, but a shouldReply wake is still owed
+    expect(getPendingParentWakes(manager).has(task.parentSessionId)).toBe(false)
+    expect(getDispatchedParentWakes(manager).get(task.parentSessionId)?.shouldReply).toBe(true)
+
+    // when: the cleanup timer fires
+    const cleanupTimer = getRequiredTimer(manager, task.id)
+    await fakeTimers?.run(cleanupTimer)
+
+    // then: the task survives. The orchestrator has been woken but has not yet
+    // consumed the result, so reaping here reproduces the original
+    // "Task not found" bug one step later in the dispatch lifecycle.
+    expect(getTasks(manager).has(task.id)).toBe(true)
+    expect(manager.getTask(task.id)?.id).toBe(task.id)
+  })
+
+  test("#given a wake dispatch is in flight #when the cleanup timer fires #then the task stays retrievable", async () => {
+    // given: the flush runner has marked a dispatch in flight and removed the
+    // pending wake, but sendParentWakePrompt has not resolved yet, so the
+    // dispatched tracker is not populated. parent-wake-flush-runner.ts:216-222
+    // documents this window and markInFlight exists precisely to cover it.
+    const { manager } = createManager()
+    managerUnderTest = manager
+    const task = createTask({
+      id: "bg_retention_inflight",
+      parentSessionId: "parent-inflight",
+      description: "in-flight retention task",
+      status: "completed",
+      completedAt: new Date(),
+      sessionId: "ses_retention_inflight",
+    })
+    getTasks(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+
+    await notifyParentSessionForTest(manager, task)
+
+    // when: the dispatch enters the in-flight window - neither map reports a wake
+    markParentWakeInFlight(manager, task.parentSessionId)
+    getPendingParentWakes(manager).delete(task.parentSessionId)
+
+    expect(getPendingParentWakes(manager).has(task.parentSessionId)).toBe(false)
+    expect(getDispatchedParentWakes(manager).has(task.parentSessionId)).toBe(false)
+
+    // when: the cleanup timer fires inside that window
+    const cleanupTimer = getRequiredTimer(manager, task.id)
+    await fakeTimers?.run(cleanupTimer)
+
+    // then: the task survives - a wake is genuinely owed, it is merely
+    // unobservable through the two wake maps
+    expect(getTasks(manager).has(task.id)).toBe(true)
+    expect(manager.getTask(task.id)?.id).toBe(task.id)
+  })
+
+  test("#given the owed wake is consumed #when the cleanup timer fires again #then the task is removed", async () => {
+    // given: retention is a deferral, not a reprieve. Once no wake is owed the
+    // task must be reaped on the next cleanup pass, or the guard leaks tasks
+    // until TASK_TTL_MS for every completed task.
+    const { manager } = createManager()
+    managerUnderTest = manager
+    const task = createTask({
+      id: "bg_retention_released",
+      parentSessionId: "parent-released",
+      description: "released retention task",
+      status: "completed",
+      completedAt: new Date(),
+      sessionId: "ses_retention_released",
+    })
+    getTasks(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+
+    await notifyParentSessionForTest(manager, task)
+    expect(getPendingParentWakes(manager).get(task.parentSessionId)?.shouldReply).toBe(true)
+
+    // when: the first cleanup fires while the wake is still owed
+    await fakeTimers?.run(getRequiredTimer(manager, task.id))
+    expect(getTasks(manager).has(task.id)).toBe(true)
+
+    // when: the orchestrator consumes the wake, then cleanup fires again
+    getPendingParentWakes(manager).delete(task.parentSessionId)
+    getDispatchedParentWakes(manager).delete(task.parentSessionId)
+    await fakeTimers?.run(getRequiredTimer(manager, task.id))
+
+    // then: nothing is owed, so the task is finally removed
+    expect(getTasks(manager).has(task.id)).toBe(false)
   })
 })

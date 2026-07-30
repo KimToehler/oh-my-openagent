@@ -2370,10 +2370,21 @@ The task was re-queued on a fallback model after a retryable failure.
         // wake is consumed turns the notification into "Task not found". We cap
         // on TASK_TTL_MS so a wake that is never consumed cannot pin a task
         // forever. See HANDOVER-background-task-notification-bug.md D1/D3.
+        //
+        // The three states are checked independently because a wake is owed in
+        // each of them separately. `parent-wake-flush-runner` deletes the
+        // pending wake BEFORE dispatching and only tracks it as dispatched
+        // afterwards, so requiring a pending wake would miss every ordinary
+        // reply dispatch, and would miss the in-flight window between the two
+        // entirely.
         const pendingParentWake = this.parentWakeNotifier.getPendingParentWakes().get(task.parentSessionId)
+        const dispatchedParentWake = this.parentWakeNotifier.getDispatchedParentWakes().get(task.parentSessionId)
         const wakeStillOwed = !reachedTaskTtl
-          && pendingParentWake !== undefined
-          && (pendingParentWake.shouldReply || this.parentWakeNotifier.getDispatchedParentWakes().get(task.parentSessionId)?.shouldReply === true)
+          && (
+            pendingParentWake?.shouldReply === true
+            || dispatchedParentWake?.shouldReply === true
+            || this.parentWakeNotifier.hasInFlightParentWakeDispatch(task.parentSessionId)
+          )
         if ((runningOrPendingSiblings.length > 0 || wakeStillOwed) && rescheduleCount < MAX_TASK_REMOVAL_RESCHEDULES && !reachedTaskTtl) {
           this.scheduleTaskRemoval(taskId, rescheduleCount + 1)
           return
