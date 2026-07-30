@@ -1,4 +1,4 @@
-import { loadOmoConfig } from "@oh-my-opencode/omo-config-core"
+import { loadSenpiOmoConfig } from "../config-resolution"
 import {
   TEAM_LEAD_SENTINEL,
   buildLeadTeamTools,
@@ -17,17 +17,17 @@ import {
 } from "@oh-my-opencode/senpi-task"
 
 import type { ComponentContext, OmoSenpiComponent, SenpiExtensionAPI } from "../../extension/types"
-import { shouldWarnDualConfig } from "./coexistence"
+import { CATEGORY_UNAVAILABLE_MESSAGE_TYPE } from "./category-unavailable-warning"
 import { registerTaskCommands } from "./commands"
 import { composeTaskEngine, type TaskEngine } from "./engine"
 import { TASK_USAGE_HINT_FLAG, wireEventBridge } from "./event-bridge"
 import { createLeadPollerLifecycle, type LeadPollerLifecycle } from "./lead-poller-lifecycle"
-import { detectOpencodeConfig } from "./opencode-config"
 import { TEAM_MEMBER_LIVENESS_MESSAGE_TYPE } from "./member-liveness"
 import { TASK_COMPLETION_MESSAGE_TYPE } from "./parent-notifier"
-import { renderTaskCompletion, renderTeamMemberLiveness } from "./renderers"
+import { renderCategoryUnavailable, renderTaskCompletion, renderTeamMemberLiveness } from "./renderers"
 import { createTeamMailboxReconciler, createTeamService } from "./team-service"
 import { createSessionTransitionBridge } from "./session-transition-bridge"
+import { createSkillInvocationTracker, type SkillInvocationTracker } from "./skill-invocation-tracker"
 import { wireSessionStartProcessSweep } from "./process-sweep"
 import { createTaskStatusUi } from "./status-ui"
 import { missingTaskCapabilities } from "./surface"
@@ -39,10 +39,12 @@ export { wireEventBridge } from "./event-bridge"
 export interface TaskComponentOptions {
   // Project root the task engine anchors its state dir + omo.json load to. Defaults to the senpi
   // launch cwd; injectable so tests never write task state into the repo working tree.
+  readonly loadConfig?: typeof loadSenpiOmoConfig
   readonly resolveCwd?: () => string
 }
 
 export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenpiComponent {
+  const loadConfig = options.loadConfig ?? loadSenpiOmoConfig
   const resolveCwd = options.resolveCwd ?? (() => process.cwd())
   return {
     name: "task",
@@ -64,12 +66,7 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       }
 
       const cwd = resolveCwd()
-      const loaded = loadOmoConfig({ cwd })
-      if (loaded.diagnostics.length > 0) {
-        ctx.logger.warn("omo-senpi task component using default config after omo.json load issues", {
-          diagnostics: loaded.diagnostics.map((diagnostic) => diagnostic.message),
-        })
-      }
+      const loaded = loadConfig({ cwd })
 
       const engine = composeTaskEngine({
         pi,
@@ -81,8 +78,10 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
 
       pi.registerMessageRenderer?.(TASK_COMPLETION_MESSAGE_TYPE, renderTaskCompletion)
       pi.registerMessageRenderer?.(TEAM_MEMBER_LIVENESS_MESSAGE_TYPE, renderTeamMemberLiveness)
+      pi.registerMessageRenderer?.(CATEGORY_UNAVAILABLE_MESSAGE_TYPE, renderCategoryUnavailable)
       const teamTools = createTeamToolContext(pi, ctx, engine)
-      registerTaskTools(pi, engine, teamTools.service, teamTools.leadPollers.resolveDefaultTeamRunId)
+      const skillInvocations = createSkillInvocationTracker(pi)
+      registerTaskTools(pi, engine, teamTools.service, teamTools.leadPollers.resolveDefaultTeamRunId, skillInvocations)
       registerTeamTools(pi, teamTools)
       registerRemovedTeamWaitHint(pi)
       registerTaskCommands(pi, engine.manager)
@@ -92,7 +91,6 @@ export function createTaskComponent(options: TaskComponentOptions = {}): OmoSenp
       const transitions = createSessionTransitionBridge({ runtime: engine.runtime, notifier: engine.notifier })
 
       wireEventBridge(pi, ctx, engine, statusUi, transitions, {
-        warnDualConfig: shouldWarnDualConfig({ sources: loaded.sources, hasOpencodeConfig: detectOpencodeConfig(cwd) }),
         reconcileTeamMailbox: teamTools.reconcileTeamMailbox,
         leadPollers: teamTools.leadPollers,
       })
@@ -128,6 +126,7 @@ function registerTaskTools(
   engine: TaskEngine,
   teamService: TeamToolsService,
   resolveDefaultTeamRunId: TaskSendTeamRouting["resolveDefaultTeamRunId"],
+  skillInvocations: SkillInvocationTracker,
 ): void {
   const resolveCallerSessionId = defaultResolveCallerSessionId
   const manager = engine.manager
@@ -136,6 +135,7 @@ function registerTaskTools(
       manager,
       omoConfig: engine.omoConfig,
       agents: engine.agents,
+      resolveSkillInvocations: (sessionId: string) => skillInvocations.stateFor(sessionId),
     }),
   })
   pi.registerTool({
@@ -156,6 +156,7 @@ function createTeamToolContext(
 ): TeamToolContext {
   const serviceDeps = {
     manager: engine.manager,
+    destruction: engine.lifecycle,
     runtime: engine.runtime,
     settings: engine.settings,
     omoConfig: engine.omoConfig,

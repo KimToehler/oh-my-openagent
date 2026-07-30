@@ -1,4 +1,5 @@
 import { join } from "node:path"
+
 import { log } from "@oh-my-opencode/utils"
 
 import { registerLifecycleReattachPorts, type ReattachResult, type RespawnResult } from "../lifecycle/port"
@@ -6,6 +7,7 @@ import { RunnerError } from "../runners/in-process/runner-error"
 import { RpcProcessRunner } from "../runners/rpc-process"
 import type { RpcChildHandle, RpcRunnerSpec } from "../runners/types"
 import { createTaskRecord, parseTaskId, syncTaskIdFloor } from "../state"
+import { resolvedReasoningFields } from "../state/resolved-reasoning"
 import { TaskIdSpaceExhaustedError } from "../state/id"
 import type { TaskRecord, TaskRunStats } from "../state"
 import { createSteeringEngine } from "../steering"
@@ -25,6 +27,7 @@ import {
   recordSpawnedPid,
 } from "./manager-helpers"
 import { claimTaskRecord, TaskRecordCollisionError } from "../store"
+import { sessionTailNeedsContinuation } from "./interrupted-turn"
 import { NameRegistry } from "./names"
 import { createRunStatsTracker, type RunStatsTracker } from "../run-stats"
 import { subscribeTranscriptLog } from "./transcript-log"
@@ -44,6 +47,8 @@ type LiveTask = {
   readonly handle: ManagedChildHandle
   readonly model: string
   readonly unsubscribe: () => void
+  readonly managedSpec?: ManagedStartSpec
+  readonly runner?: ManagedRunner
 }
 
 type LaunchContext = {
@@ -77,6 +82,8 @@ type ReattachingTaskManager = TaskManager & {
 const NOOP_DESTRUCTION: DestructionPort = { destroyResidentTask: () => Promise.resolve() }
 const GENERIC_START_FAILURE_MESSAGE = "Task runner failed to start."
 const RESPAWN_CLEANUP_FAILURE_REASON = "rpc respawn cleanup failed"
+const CONTINUATION_MESSAGE =
+  "Your previous turn was interrupted by a host process restart. Resume your task from its current state and finish it - do not restart from scratch, and do not repeat work already recorded in this session."
 
 function publicStartFailureMessage(error: unknown): string {
   try {
@@ -390,6 +397,12 @@ class TaskManagerImpl implements TaskManager {
 
   residentTaskIds(): readonly string[] { return [...this.#live.keys()] }
 
+  promoteToBackground(taskId: string): boolean {
+    const promoted = !this.#background.has(taskId)
+    this.#background.add(taskId)
+    return promoted
+  }
+
   wasBackground(taskId: string): boolean { return this.#background.has(taskId) }
 
   async respawn(record: TaskRecord, resumeSessionPath: string): Promise<RespawnResult> {
@@ -421,6 +434,14 @@ class TaskManagerImpl implements TaskManager {
       if (switched.cancelled) {
         if (!(await this.#disposeFailedRespawn(handle))) return { ok: false, reason: RESPAWN_CLEANUP_FAILURE_REASON }
         return { ok: false, reason: "switch_session was cancelled" }
+      }
+      if (await sessionTailNeedsContinuation(resumeSessionPath)) {
+        try {
+          await handle.followUp(CONTINUATION_MESSAGE)
+        } catch {
+          if (!(await this.#disposeFailedRespawn(handle))) return { ok: false, reason: RESPAWN_CLEANUP_FAILURE_REASON }
+          return { ok: false, reason: "rpc respawn failed" }
+        }
       }
       return { ok: true, handle: adaptRpcHandle(handle) }
     } catch (error) { // no-excuse-ok: catch - RPC respawn boundary converts failures into a typed result.
@@ -560,7 +581,13 @@ class TaskManagerImpl implements TaskManager {
     }
 
     const unsubscribe = this.#subscribeChildFacts(handle, record.task_id)
-    this.#live.set(record.task_id, { handle, model, unsubscribe })
+    this.#live.set(record.task_id, {
+      handle,
+      model,
+      unsubscribe,
+      managedSpec,
+      runner,
+    })
     this.#attachChildSubscribers(record.task_id, handle)
     this.#recordSpawnFacts(record.task_id, handle)
     this.#trackOutcome(record.task_id, handle, model, record.notification.run_epoch)
@@ -621,26 +648,207 @@ class TaskManagerImpl implements TaskManager {
     handle
       .waitForOutcome()
       .then((outcome) => {
-        this.#releaseSlot(taskId, model, epoch)
         const timestamp = nowIso(this.#now)
         const runStats = this.#runStats.get(taskId)?.snapshot(this.#now())
+        if (outcome.status === "error") {
+          void this.#settleErrorOutcome({
+            taskId,
+            handle,
+            model,
+            epoch,
+            outcome,
+            runStats,
+            timestamp,
+          }).catch((error: unknown) => {
+            log("senpi-task manager error outcome tracking failed", {
+              taskId,
+              error: String(error),
+            })
+          })
+          return
+        }
+
+        this.#releaseSlot(taskId, model, epoch)
         const runStatsField = runStats === undefined ? {} : { run_stats: runStats }
         if (outcome.status === "completed") {
           this.#options.store.transition(taskId, { type: "complete", timestamp, final_response: outcome.finalResponse, ...runStatsField })
-        } else if (outcome.status === "cancelled") {
-          this.#options.store.transition(taskId, { type: "cancel", timestamp, ...runStatsField })
         } else {
-          this.#options.store.transition(taskId, {
-            type: "fail",
-            timestamp,
-            error_message: outcome.failure.message,
-            ...(outcome.killed === true ? { killed: true } : {}),
-            ...runStatsField,
-          })
+          this.#options.store.transition(taskId, { type: "cancel", timestamp, ...runStatsField })
         }
         this.#settleWaiters(taskId)
       })
       .catch((error: unknown) => log("senpi-task manager outcome tracking failed", { taskId, error: String(error) }))
+  }
+
+  async #settleErrorOutcome(input: {
+    readonly taskId: string
+    readonly handle: ManagedChildHandle
+    readonly model: string
+    readonly epoch: number
+    readonly outcome: Extract<
+      Awaited<ReturnType<ManagedChildHandle["waitForOutcome"]>>,
+      { readonly status: "error" }
+    >
+    readonly runStats: TaskRunStats | undefined
+    readonly timestamp: string
+  }): Promise<void> {
+    if (await this.#tryRuntimeFallback(input)) return
+
+    this.#releaseSlot(input.taskId, input.model, input.epoch)
+    this.#options.store.transition(input.taskId, {
+      type: "fail",
+      timestamp: input.timestamp,
+      error_message: input.outcome.failure.message,
+      ...(input.outcome.killed === true ? { killed: true } : {}),
+      ...(input.runStats === undefined ? {} : { run_stats: input.runStats }),
+    })
+    this.#settleWaiters(input.taskId)
+  }
+
+  async #tryRuntimeFallback(input: {
+    readonly taskId: string
+    readonly handle: ManagedChildHandle
+    readonly model: string
+    readonly epoch: number
+    readonly outcome: Awaited<ReturnType<ManagedChildHandle["waitForOutcome"]>>
+    readonly runStats: TaskRunStats | undefined
+    readonly timestamp: string
+  }): Promise<boolean> {
+    if (
+      input.outcome.status !== "error"
+      || input.outcome.killed === true
+      || (
+        input.outcome.failure.kind !== "child-turn-failed"
+        && input.outcome.failure.kind !== "child-prompt-failed"
+      )
+      || (input.runStats?.tool_calls ?? 0) > 0
+    ) {
+      return false
+    }
+
+    const record = this.#tryLoad(input.taskId)
+    const nextModel = record?.fallback_models?.[0]
+    const live = this.#live.get(input.taskId)
+    if (
+      record == null
+      || nextModel === undefined
+      || live?.handle !== input.handle
+      || live.managedSpec === undefined
+      || live.runner === undefined
+    ) {
+      return false
+    }
+    const managedSpec = live.managedSpec
+    const runner = live.runner
+
+    await (this.#options.destruction ?? NOOP_DESTRUCTION)
+      .destroyResidentTask(input.taskId, "fallback_handoff")
+
+    live.unsubscribe()
+    this.#live.delete(input.taskId)
+    this.#releaseSlot(input.taskId, input.model, input.epoch)
+
+    const remainingModels = record.fallback_models?.slice(1) ?? []
+    const fallbackAttempts = [
+      ...(record.fallback_attempts
+        ?? (record.resolved_model === undefined ? [] : [record.resolved_model])),
+      nextModel,
+    ]
+    const nextEpoch = record.notification.run_epoch + 1
+    const nextRecord: TaskRecord = {
+      ...record,
+      model: nextModel.display,
+      resolved_model: nextModel,
+      fallback_models: remainingModels,
+      fallback_attempts: fallbackAttempts,
+      updated_at: input.timestamp,
+      notification: {
+        ...record.notification,
+        run_epoch: nextEpoch,
+      },
+    }
+    this.#options.store.replace(nextRecord)
+    this.#options.store.appendEvent(input.taskId, {
+      type: "task_model_fallback",
+      payload: {
+        from_model: record.model,
+        to_model: nextModel.display,
+        error_message: input.outcome.failure.message,
+      },
+    })
+
+    const nextSpec: ManagedStartSpec = {
+      ...managedSpec,
+      model: nextModel.display,
+      requestedModel: record.requested_model,
+      fallbackModels: remainingModels,
+      ...resolvedReasoningFields(nextModel),
+    }
+    const launch = (): void => {
+      void this.#launchRuntimeFallback({
+        record: nextRecord,
+        managedSpec: nextSpec,
+        runner,
+        model: nextModel.display,
+      })
+    }
+
+    if (this.#concurrency.hasFreeSlot(nextModel.display)) {
+      this.#concurrency.acquire(nextModel.display, input.taskId)
+      launch()
+    } else {
+      this.#concurrency.enqueue(nextModel.display, input.taskId, launch)
+    }
+    return true
+  }
+
+  async #launchRuntimeFallback(context: LaunchContext): Promise<void> {
+    const current = this.#tryLoad(context.record.task_id)
+    if (current?.status !== "running") {
+      this.#releaseSlot(
+        context.record.task_id,
+        context.model,
+        context.record.notification.run_epoch,
+      )
+      this.#settleWaiters(context.record.task_id)
+      return
+    }
+
+    let handle: ManagedChildHandle
+    try {
+      handle = await context.runner.start(context.managedSpec)
+    } catch (error) {
+      const message = publicStartFailureMessage(error)
+      this.#releaseSlot(
+        context.record.task_id,
+        context.model,
+        context.record.notification.run_epoch,
+      )
+      this.#options.store.transition(context.record.task_id, {
+        type: "fail",
+        timestamp: nowIso(this.#now),
+        error_message: message,
+      })
+      this.#settleWaiters(context.record.task_id)
+      return
+    }
+
+    const unsubscribe = this.#subscribeChildFacts(handle, context.record.task_id)
+    this.#live.set(context.record.task_id, {
+      handle,
+      model: context.model,
+      unsubscribe,
+      managedSpec: context.managedSpec,
+      runner: context.runner,
+    })
+    this.#attachChildSubscribers(context.record.task_id, handle)
+    this.#recordSpawnFacts(context.record.task_id, handle)
+    this.#trackOutcome(
+      context.record.task_id,
+      handle,
+      context.model,
+      context.record.notification.run_epoch,
+    )
   }
 
   // A revived child is running again and SHOULD occupy a slot; re-acquire it and re-arm outcome
