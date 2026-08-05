@@ -1,6 +1,6 @@
 import type { AgentConfig } from "@opencode-ai/sdk"
 import type { AgentMode, AgentPromptMetadata } from "./types"
-import { createAgentToolRestrictions } from "../shared/permission-compat"
+import { createAgentToolRestrictions, READ_ONLY_FILE_TOOLS } from "../shared/permission-compat"
 
 const MODE: AgentMode = "subagent"
 
@@ -22,13 +22,10 @@ export const LIBRARIAN_PROMPT_METADATA: AgentPromptMetadata = {
 }
 
 export function createLibrarianAgent(model: string): AgentConfig {
-  const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
-    "apply_patch",
-    "task",
-    "call_omo_agent",
-  ])
+  const restrictions = createAgentToolRestrictions(
+    ["write", "edit", "apply_patch", "task", "call_omo_agent"],
+    [...READ_ONLY_FILE_TOOLS],
+  )
 
   return {
     description:

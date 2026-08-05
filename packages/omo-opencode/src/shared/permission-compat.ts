@@ -10,6 +10,23 @@ export interface PermissionFormat {
 }
 
 /**
+ * Read-only filesystem tools every research agent needs to do its job.
+ *
+ * These must be granted EXPLICITLY rather than left to default, because a user
+ * config may carry a global `permission` deny (e.g. `{"read":"deny","grep":"deny",
+ * "glob":"deny","bash":"deny"}`, which the lean-ctx installer writes to force the
+ * primary agent through its `ctx_*` MCP tools). A global deny applies to every
+ * agent, and subagents have no MCP tools attached to fall back on — so without an
+ * explicit allow, a research agent is left with no way to read a file at all.
+ *
+ * The failure is silent and looks like a model defect: the agent still runs, still
+ * reasons, and reports "blocked on tooling" or invents nothing — but every lane
+ * returns empty. Agent-level `allow` beats global `deny`, so listing them here is
+ * what keeps these agents functional under a restrictive user config.
+ */
+export const READ_ONLY_FILE_TOOLS = ["read", "grep", "glob"] as const
+
+/**
  * Creates tool restrictions that deny specified tools.
  */
 export function createAgentToolRestrictions(

@@ -1,7 +1,7 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
 import type { AgentMode, AgentPromptMetadata } from "./types";
 import { buildClaudeThinkingConfig, isGpt5_5Model, isGpt5_6Model, isGptModel } from "./types";
-import { createAgentToolRestrictions } from "../shared/permission-compat";
+import { createAgentToolRestrictions, READ_ONLY_FILE_TOOLS } from "../shared/permission-compat";
 
 const MODE: AgentMode = "subagent";
 
@@ -409,12 +409,10 @@ If the follow-up contradicts what you recommended and you still believe the orig
 
 
 export function createOracleAgent(model: string): AgentConfig {
-  const restrictions = createAgentToolRestrictions([
-    "write",
-    "edit",
-    "apply_patch",
-    "task",
-  ]);
+  const restrictions = createAgentToolRestrictions(
+    ["write", "edit", "apply_patch", "task"],
+    [...READ_ONLY_FILE_TOOLS],
+  );
 
   const base = {
     description:
