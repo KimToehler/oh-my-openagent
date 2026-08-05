@@ -98,6 +98,64 @@ describe("OhMyOpenCodeConfigSchema tui", () => {
     expect(result.tui?.sidebar.enabled).toBe(true)
   })
 
+  it("defaults the workflow cheatsheet to disabled", () => {
+    // given
+    const rawConfig = {}
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.parse(rawConfig)
+
+    // then
+    expect(result.tui?.sidebar.workflow_cheatsheet).toBe(false)
+  })
+
+  it("allows the workflow cheatsheet to be enabled", () => {
+    // given
+    const rawConfig = {
+      tui: {
+        sidebar: {
+          workflow_cheatsheet: true,
+        },
+      },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.parse(rawConfig)
+
+    // then
+    expect(result.tui?.sidebar.workflow_cheatsheet).toBe(true)
+    expect(result.tui?.sidebar.enabled).toBe(true)
+  })
+
+  it("defaults the workflow cheatsheet to disabled", () => {
+    // given
+    const rawConfig = {}
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.parse(rawConfig)
+
+    // then
+    expect(result.tui?.sidebar.workflow_cheatsheet).toBe(false)
+  })
+
+  it("allows the workflow cheatsheet to be enabled", () => {
+    // given
+    const rawConfig = {
+      tui: {
+        sidebar: {
+          workflow_cheatsheet: true,
+        },
+      },
+    }
+
+    // when
+    const result = OhMyOpenCodeConfigSchema.parse(rawConfig)
+
+    // then
+    expect(result.tui?.sidebar.workflow_cheatsheet).toBe(true)
+    expect(result.tui?.sidebar.enabled).toBe(true)
+  })
+
   it("allows the TUI sidebar to be disabled", () => {
     // given
     const rawConfig = {

@@ -98,7 +98,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
   websearch: WebsearchConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
-  tui: TuiConfigSchema.default({ sidebar: { enabled: true } }).optional(),
+  tui: TuiConfigSchema.default({ sidebar: { enabled: true, workflow_cheatsheet: false } }).optional(),
   sisyphus: SisyphusConfigSchema.optional(),
   start_work: StartWorkConfigSchema.optional(),
   /** Default mode auto-activation settings (ultrawork, goal) */
