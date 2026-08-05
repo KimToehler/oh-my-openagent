@@ -8507,24 +8507,31 @@
     "tui": {
       "default": {
         "sidebar": {
-          "enabled": true
+          "enabled": true,
+          "workflow_cheatsheet": false
         }
       },
       "type": "object",
       "properties": {
         "sidebar": {
           "default": {
-            "enabled": true
+            "enabled": true,
+            "workflow_cheatsheet": false
           },
           "type": "object",
           "properties": {
             "enabled": {
               "default": true,
               "type": "boolean"
+            },
+            "workflow_cheatsheet": {
+              "default": false,
+              "type": "boolean"
             }
           },
           "required": [
-            "enabled"
+            "enabled",
+            "workflow_cheatsheet"
           ],
           "additionalProperties": false
         }

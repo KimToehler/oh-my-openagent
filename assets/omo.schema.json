@@ -9072,6 +9072,10 @@
               "type": "number",
               "minimum": 1
             },
+            "acquireTimeoutMs": {
+              "type": "number",
+              "minimum": 0
+            },
             "providerConcurrency": {
               "type": "object",
               "propertyNames": {
@@ -9702,24 +9706,31 @@
         "tui": {
           "default": {
             "sidebar": {
-              "enabled": true
+              "enabled": true,
+              "workflow_cheatsheet": false
             }
           },
           "type": "object",
           "properties": {
             "sidebar": {
               "default": {
-                "enabled": true
+                "enabled": true,
+                "workflow_cheatsheet": false
               },
               "type": "object",
               "properties": {
                 "enabled": {
                   "default": true,
                   "type": "boolean"
+                },
+                "workflow_cheatsheet": {
+                  "default": false,
+                  "type": "boolean"
                 }
               },
               "required": [
-                "enabled"
+                "enabled",
+                "workflow_cheatsheet"
               ],
               "additionalProperties": false
             }
@@ -21065,6 +21076,10 @@
                     "type": "number",
                     "minimum": 1
                   },
+                  "acquireTimeoutMs": {
+                    "type": "number",
+                    "minimum": 0
+                  },
                   "providerConcurrency": {
                     "type": "object",
                     "propertyNames": {
@@ -21695,24 +21710,31 @@
               "tui": {
                 "default": {
                   "sidebar": {
-                    "enabled": true
+                    "enabled": true,
+                    "workflow_cheatsheet": false
                   }
                 },
                 "type": "object",
                 "properties": {
                   "sidebar": {
                     "default": {
-                      "enabled": true
+                      "enabled": true,
+                      "workflow_cheatsheet": false
                     },
                     "type": "object",
                     "properties": {
                       "enabled": {
                         "default": true,
                         "type": "boolean"
+                      },
+                      "workflow_cheatsheet": {
+                        "default": false,
+                        "type": "boolean"
                       }
                     },
                     "required": [
-                      "enabled"
+                      "enabled",
+                      "workflow_cheatsheet"
                     ],
                     "additionalProperties": false
                   }
