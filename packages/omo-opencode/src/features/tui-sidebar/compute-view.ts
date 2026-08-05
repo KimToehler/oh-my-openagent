@@ -11,6 +11,7 @@ import type {
 
 export type ComputeViewSections = {
   readonly config: ConfigState
+  readonly workflowCheatsheet?: boolean
   readonly roster: RosterState
   readonly agents: AgentsState
   readonly jobs: JobBoardState
@@ -22,6 +23,7 @@ export function computeView(sections: ComputeViewSections): SidebarView {
     return {
       kind: "active",
       loop: sections.loop,
+      ...(sections.workflowCheatsheet === true ? { workflowCheatsheet: true } : {}),
       agents: sections.agents,
       jobs: sections.jobs,
       configBanner: sections.config.kind === "invalid" ? { kind: "invalid" } : { kind: "none" },
@@ -41,6 +43,7 @@ export function viewKey(view: SidebarView): string {
       return stableKey([
         "active",
         loopKeyParts(view.loop),
+        ["workflowCheatsheet", view.workflowCheatsheet === true],
         agentsKeyParts(view.agents),
         jobsKeyParts(view.jobs),
         ["configBanner", view.configBanner.kind],

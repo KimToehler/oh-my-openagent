@@ -74,6 +74,7 @@ type PluginValidation = {
     readonly tui?: {
       readonly sidebar?: {
         readonly enabled?: boolean
+        readonly workflow_cheatsheet?: boolean
       }
     }
   }
@@ -96,6 +97,7 @@ async function readView(directory: string): Promise<SidebarView> {
   const roster = await loadRosterRows(directory)
   return computeView({
     config: deriveConfig(validation),
+    workflowCheatsheet: validation.config.tui?.sidebar?.workflow_cheatsheet === true,
     roster: deriveRoster(roster),
     agents: deriveAgents(mirror),
     jobs: deriveJobBoard(mirror),

@@ -56,6 +56,7 @@ export type SidebarView =
   | {
       readonly kind: "active"
       readonly loop: LoopState
+      readonly workflowCheatsheet?: boolean
       readonly agents: AgentsState
       readonly jobs: JobBoardState
       readonly configBanner: ConfigBanner

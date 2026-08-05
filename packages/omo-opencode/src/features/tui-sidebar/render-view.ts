@@ -29,6 +29,7 @@ export function buildViewNodes(view: SidebarView, theme: ThemeLike): ViewNode[] 
         box({ flexDirection: "column", gap: 1 }, [
           ...configBannerNodes(view.configBanner, theme),
           ...loopNodes(view.loop, theme),
+          ...workflowNodes(view.workflowCheatsheet === true, theme),
           ...agentNodes(view.agents, theme),
           ...jobNodes(view.jobs, theme),
         ]),
@@ -52,6 +53,7 @@ function linesForView(view: SidebarView): string[] {
       return [
         ...configBannerLines(view.configBanner),
         ...loopLines(view.loop),
+        ...workflowLines(view.workflowCheatsheet === true),
         ...agentLines(view.agents),
         ...jobLines(view.jobs),
       ]
@@ -121,6 +123,26 @@ function loopLines(loop: LoopState): string[] {
     default:
       return assertNever(loop)
   }
+}
+
+const WORKFLOW_CHEATSHEET = [
+  "ulw",
+  "ulw-plan",
+  "start-work",
+  "hyperplan",
+  "work-with-pr",
+  "review-work",
+  "full-code-review",
+] as const
+
+function workflowNodes(enabled: boolean, theme: ThemeLike): ViewNode[] {
+  return enabled
+    ? [section("Workflow", theme, WORKFLOW_CHEATSHEET.map((workflow) => text({ fg: theme.text }, workflow)))]
+    : []
+}
+
+function workflowLines(enabled: boolean): string[] {
+  return enabled ? ["Workflow", ...WORKFLOW_CHEATSHEET] : []
 }
 
 function agentNodes(agents: AgentsState, theme: ThemeLike): ViewNode[] {

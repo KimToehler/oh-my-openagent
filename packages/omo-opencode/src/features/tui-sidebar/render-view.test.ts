@@ -18,6 +18,7 @@ const theme = {
 
 const activeSections: ComputeViewSections = {
   config: { kind: "invalid", messages: ["agents.sisyphus.model: expected string"] },
+  workflowCheatsheet: true,
   roster: { kind: "empty" },
   agents: { kind: "list", agents: [{ name: "fixer", status: "busy" }] },
   jobs: { kind: "list", jobs: [{ title: "explore repo", status: "running", toolCalls: 3, lastTool: "grep" }] },
@@ -34,7 +35,7 @@ const activeSections: ComputeViewSections = {
 }
 
 describe("tui sidebar renderView", () => {
-  it("#given active view #when building nodes #then it renders ULW agents jobs and invalid banner in order", () => {
+  it("#given enabled workflow cheatsheet in active view #when building nodes #then it renders exact OpenCode workflows after ULW and before Agents", () => {
     // given
     const view = computeView(activeSections)
 
@@ -44,14 +45,50 @@ describe("tui sidebar renderView", () => {
 
     // then
     expect(description).toContain("config invalid")
-    expect(description.indexOf("ULW")).toBeLessThan(description.indexOf("Agents"))
+    expect(description.indexOf("ULW")).toBeLessThan(description.indexOf("Workflow"))
+    expect(description.indexOf("Workflow")).toBeLessThan(description.indexOf("Agents"))
     expect(description.indexOf("Agents")).toBeLessThan(description.indexOf("Jobs"))
+    expect(description.split("\n").slice(7, 15)).toEqual([
+      "Workflow",
+      "ulw",
+      "ulw-plan",
+      "start-work",
+      "hyperplan",
+      "work-with-pr",
+      "review-work",
+      "full-code-review",
+    ])
+    expect(description).not.toContain("codex-qa")
     expect(description).toContain("0/1")
     expect(description).toContain("pass 1")
     expect(description).toContain("fail 1")
     expect(description).toContain("fixer")
     expect(description).toContain("explore repo")
     expect(nodes[0]?.kind).toBe("box")
+  })
+
+  it("#given disabled workflow cheatsheet in active view #when describing #then it omits Workflow", () => {
+    // given
+    const view = computeView({ ...activeSections, workflowCheatsheet: false })
+
+    // when
+    const description = describeView(view)
+
+    // then
+    expect(description).not.toContain("Workflow")
+    expect(description).not.toContain("full-code-review")
+  })
+
+  it("#given disabled workflow cheatsheet in active view #when describing #then it omits Workflow", () => {
+    // given
+    const view = computeView({ ...activeSections, workflowCheatsheet: false })
+
+    // when
+    const description = describeView(view)
+
+    // then
+    expect(description).not.toContain("Workflow")
+    expect(description).not.toContain("full-code-review")
   })
 
   it("#given a redacted active goal #when describing #then it reports the active goal as private", () => {
