@@ -236,8 +236,13 @@ export class WorkspaceDocumentState {
 		for (const operation of operations) {
 			if (operation.kind === "text") {
 				const current = versions.get(operation.path);
-				if (operation.documentVersion !== null && current !== operation.documentVersion) {
-					const observed = current === undefined ? "closed document" : `open document version ${current}`;
+				// Only open documents can go stale: their in-memory buffer may have advanced past the
+				// version the edit was computed against. A closed document is planned straight from
+				// disk, so a reported version says nothing we need to verify -- and servers do report
+				// one (JetBrains kotlin-lsp sends 0 rather than the spec's null for unopened files),
+				// which would otherwise reject every multi-file rename that reaches beyond open files.
+				if (current !== undefined && operation.documentVersion !== null && current !== operation.documentVersion) {
+					const observed = `open document version ${current}`;
 					return {
 						changeIndex: operation.changeIndex,
 						message: `document version ${operation.documentVersion} does not match ${observed} for ${operation.path}`,

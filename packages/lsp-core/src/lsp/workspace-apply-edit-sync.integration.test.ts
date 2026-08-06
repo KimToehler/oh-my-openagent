@@ -64,6 +64,34 @@ describe("LspClient workspace edit synchronization", () => {
 		expect(readEvents(context.events).some((event) => event.method === "textDocument/didClose")).toBe(true);
 	});
 
+	it("#given a closed file whose edit carries a numeric version #when applyEdit commits #then it is applied from disk", async () => {
+		// Servers may report a concrete version (JetBrains kotlin-lsp sends 0) for documents the
+		// client never opened. Version matching only guards open documents against a stale buffer;
+		// a closed file is planned from disk, so a numeric version must not reject the whole edit.
+		const edit = renameTextEdit("closed", "after_", { version: 0, uri: "file:///closed" });
+		const context = await harness.makeClient({ renameSteps: [{ applyEdit: edit, renameResult: "null" }] });
+		await context.client.openFile(context.source);
+
+		const result = await context.client.rename(context.source, 1, 6, "after");
+
+		expect(result.apply.success).toBe(true);
+		expect(readFileSync(context.closed, "utf-8")).toBe("const after_ = 1;\n");
+	});
+
+	it("#given an open file whose edit carries a stale version #when applyEdit runs #then the edit is rejected", async () => {
+		// The open-document guard must survive the closed-document fix above.
+		const edit = renameTextEdit("closed", "after_", { version: 99, uri: "file:///closed" });
+		const context = await harness.makeClient({ renameSteps: [{ applyEdit: edit, renameResult: "null" }] });
+		await context.client.openFile(context.source);
+		await context.client.openFile(context.closed);
+
+		const result = await context.client.rename(context.source, 1, 6, "after");
+
+		expect(result.apply.success).toBe(false);
+		expect(result.apply.errors.join("\n")).toContain("does not match open document version");
+		expect(readFileSync(context.closed, "utf-8")).toBe("const closed = 1;\n");
+	});
+
 	it("#given a closed edited file #when applyEdit commits #then one changed watched-file event is emitted", async () => {
 		const edit = renameTextEdit("closed", "after_", { version: null, uri: "file:///closed" });
 		const context = await harness.makeClient({ renameSteps: [{ applyEdit: edit, renameResult: "null" }] });
