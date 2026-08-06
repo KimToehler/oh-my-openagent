@@ -65,4 +65,8 @@ No credentials, tokens, environment dumps, or private logs captured.
 
 ## Commit
 
-Pending local commit. Append commit SHA and `git show --stat` after commit.
+`acc0395bf8ac170fcd725eb827632598f5313d3e` — `fix(background-agent): balance root-descendant accounting and make adoption idempotent`
+
+```text
+12 files changed, 205 insertions(+), 12 deletions(-)
+```
