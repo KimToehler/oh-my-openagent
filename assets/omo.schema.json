@@ -9125,6 +9125,11 @@
               "type": "number",
               "minimum": 60000
             },
+            "syncWallClockTimeoutMs": {
+              "description": "Absolute wall-clock ceiling on synchronous task delegation in milliseconds (default: 600000 = 10 minutes, minimum: 60000 = 1 minute). When exceeded, the still-running child session is handed to the background manager rather than aborted, so none of its work is lost and the parent receives a background task handle instead of a result. Independent of and additional to the inactivity window governed by syncPollTimeoutMs, which any child activity resets.",
+              "type": "number",
+              "minimum": 60000
+            },
             "maxToolCalls": {
               "type": "integer",
               "minimum": 10,
@@ -21126,6 +21131,11 @@
                     "minimum": 60000
                   },
                   "syncPollTimeoutMs": {
+                    "type": "number",
+                    "minimum": 60000
+                  },
+                  "syncWallClockTimeoutMs": {
+                    "description": "Absolute wall-clock ceiling on synchronous task delegation in milliseconds (default: 600000 = 10 minutes, minimum: 60000 = 1 minute). When exceeded, the still-running child session is handed to the background manager rather than aborted, so none of its work is lost and the parent receives a background task handle instead of a result. Independent of and additional to the inactivity window governed by syncPollTimeoutMs, which any child activity resets.",
                     "type": "number",
                     "minimum": 60000
                   },

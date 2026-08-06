@@ -118,6 +118,7 @@ import type {
   BackgroundTask,
   BackgroundTaskAttempt,
   BackgroundTaskSnapshot,
+  AdoptRunningSessionInput,
   LaunchInput,
   ResumeInput,
 } from "./types"
@@ -283,6 +284,7 @@ export class BackgroundManager {
   private cachedCircuitBreakerSettings?: CircuitBreakerSettings
   private readonly scheduledFlushSettledCounts = new Map<string, number>()
   private readonly scheduledFlushSettledWaiters = new Map<string, Array<() => void>>()
+  private readonly completingTaskIds = new Set<string>()
 
   constructor(config: BackgroundManagerConfig) {
     const { pluginContext, ...options } = config
@@ -657,6 +659,42 @@ export class BackgroundManager {
       spawnReservation.rollback()
       throw error
     }
+  }
+
+  adoptRunningSession(input: AdoptRunningSessionInput): BackgroundTask {
+    const task: BackgroundTask = {
+      id: `bg_${crypto.randomUUID().slice(0, 8)}`,
+      sessionId: input.sessionId,
+      rootSessionId: input.rootSessionId,
+      parentSessionId: input.parentSessionId,
+      parentMessageId: input.parentMessageId,
+      description: input.description,
+      prompt: "[already prompted]",
+      agent: input.agent,
+      model: input.model,
+      status: "running",
+      startedAt: new Date(),
+      progress: {
+        toolCalls: 0,
+        lastUpdate: new Date(),
+      },
+    }
+
+    subagentSessions.add(input.sessionId)
+    setSessionAgent(input.sessionId, input.agent)
+    this.addTask(task)
+    this.taskHistory.record(input.parentSessionId, {
+      id: task.id,
+      sessionID: task.sessionId,
+      agent: task.agent,
+      description: task.description,
+      status: "running",
+      startedAt: task.startedAt,
+    })
+    this.startPolling()
+    this.updateBackgroundTaskMarker(input.parentSessionId)
+
+    return task
   }
 
   private async processKey(key: string): Promise<void> {
@@ -2410,15 +2448,17 @@ The task was re-queued on a fallback model after a retryable failure.
     options?: { source?: string; reason?: string; abortSession?: boolean; skipNotification?: boolean }
   ): Promise<boolean> {
     const task = this.tasks.get(taskId)
-    if (!task || (task.status !== "running" && task.status !== "pending")) {
+    if (!task || (task.status !== "running" && task.status !== "pending") || this.completingTaskIds.has(task.id)) {
       return false
     }
+    this.completingTaskIds.add(task.id)
 
-    const source = options?.source ?? "cancel"
-    const abortSession = options?.abortSession !== false
-    const reason = options?.reason
+     try {
+       const source = options?.source ?? "cancel"
+       const abortSession = options?.abortSession !== false
+       const reason = options?.reason
 
-    if (task.status === "pending") {
+       if (task.status === "pending") {
       const rawKey = this.getRawConcurrencyKeyFromTask(task)
       const key = this.concurrencyManager.getConcurrencyKey(rawKey)
       const queue = this.queuesByKey.get(key)
@@ -2498,7 +2538,10 @@ The task was re-queued on a fallback model after a retryable failure.
       log("[background-agent] Error in notifyParentSession for cancelled task:", { taskId: task.id, error: err })
     }
 
-    return true
+      return true
+    } finally {
+      this.completingTaskIds.delete(task.id)
+    }
   }
 
   /**
@@ -2559,10 +2602,11 @@ The task was re-queued on a fallback model after a retryable failure.
    */
   private async tryCompleteTask(task: BackgroundTask, source: string): Promise<boolean> {
     // Guard: Check if task is still running (could have been completed by another path)
-    if (task.status !== "running") {
+    if (task.status !== "running" || this.completingTaskIds.has(task.id)) {
       log("[background-agent] Task already completed, skipping:", { taskId: task.id, status: task.status, source })
       return false
     }
+    this.completingTaskIds.add(task.id)
 
     // Reserve a notification-preparation slot for the parent BEFORE flipping the
     // child to a terminal status. The instant status becomes "completed",
@@ -2642,6 +2686,7 @@ The task was re-queued on a fallback model after a retryable failure.
         this.parentWakeNotifier.releaseNotificationPreparation(notificationParentSessionID)
         this.updateBackgroundTaskMarker(notificationParentSessionID)
       }
+      this.completingTaskIds.delete(task.id)
     }
   }
 

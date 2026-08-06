@@ -135,6 +135,16 @@ export interface LaunchInput {
   userPermission?: Record<string, "ask" | "allow" | "deny">
 }
 
+export interface AdoptRunningSessionInput {
+  sessionId: string
+  parentSessionId: string
+  parentMessageId: string
+  description: string
+  agent: string
+  model: DelegatedModelConfig | undefined
+  rootSessionId: string
+}
+
 export interface ResumeInput {
   sessionId: string
   prompt: string
