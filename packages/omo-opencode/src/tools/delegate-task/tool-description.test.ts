@@ -16,6 +16,31 @@ describe("createDelegateTaskPresentation", () => {
     expect(description).toContain("not a total wall-clock limit")
   })
 
+  test("#given background delegation guidance #when description is rendered #then it does not gate background on parallel exploration or a query threshold", () => {
+    //#given
+    const presentation = createDelegateTaskPresentation({})
+
+    //#when
+    const description = presentation.description
+
+    //#then
+    expect(description).not.toContain("5+ independent queries")
+    expect(description).not.toContain("ONLY for parallel exploration")
+  })
+
+  test("#given background delegation guidance #when description is rendered #then it still documents the parameter and its default", () => {
+    //#given
+    const presentation = createDelegateTaskPresentation({})
+
+    //#when
+    const description = presentation.description
+
+    //#then
+    expect(description).toContain("run_in_background")
+    expect(description).toContain("Defaults to false")
+    expect(description).toContain("background_output")
+  })
+
   test("#given continuation usage #when description is rendered #then task_id is described as a session id", () => {
     //#given
     const presentation = createDelegateTaskPresentation({})

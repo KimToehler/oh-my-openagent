@@ -61,6 +61,34 @@ function createDelegateTask(...args: Parameters<typeof import("./tools").createD
 		expect(runInBackgroundSchema.description).toContain("background_output")
 		expect(runInBackgroundSchema.description).not.toContain("returns task_id")
 	})
+
+	test("#given task schema #when describing async mode #then it does not gate background on parallel exploration or a query threshold", () => {
+		//#given
+		const toolDefinition = createDelegateTask({ manager: {} as never, client: {} as never, directory: "/tmp/test" })
+
+		//#when
+		const runInBackgroundSchema = unsafeTestValue<{ description?: string }>(toolDefinition.args.run_in_background)
+
+		//#then
+		expect(runInBackgroundSchema.description).not.toContain("ONLY for parallel exploration")
+		expect(runInBackgroundSchema.description).not.toContain("5+ independent queries")
+	})
+
+	test("#given task schema #when run_in_background is omitted #then the field stays optional with a documented false default", () => {
+		//#given
+		const toolDefinition = createDelegateTask({ manager: {} as never, client: {} as never, directory: "/tmp/test" })
+
+		//#when
+		const runInBackgroundSchema = unsafeTestValue<{
+			def: { type: string; innerType: { def: { type: string } } }
+			description?: string
+		}>(toolDefinition.args.run_in_background)
+
+		//#then
+		expect(runInBackgroundSchema.def.type).toBe("optional")
+		expect(runInBackgroundSchema.def.innerType.def.type).toBe("boolean")
+		expect(runInBackgroundSchema.description).toContain("defaults to false")
+	})
 })
 
 export {}
