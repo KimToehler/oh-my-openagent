@@ -82,4 +82,15 @@ Interpretation:
 
 ## Commit
 
-Pending at evidence write time. SHA and `git show --stat` appended after commit.
+```text
+b448fee82 fix(delegate-task): share wall-clock budget across retries and bound continuations
+
+ .../review-work-blocker-fixes.txt                  | 85 +++++++++++++++++++
+ ...-08-06-bounded-sync-delegation-blocker-fixes.md | 60 +++++++++++++
+ .../tools/delegate-task/sync-continuation.test.ts  | 97 ++++++++++++++++++++-
+ .../src/tools/delegate-task/sync-continuation.ts   | 36 ++++++--
+ .../src/tools/delegate-task/sync-session-poller.ts |  9 +-
+ .../sync-session-poller.wall-clock.test.ts         | 53 +++++++++++-
+ .../src/tools/delegate-task/sync-task-runner.ts    |  4 +-
+ 7 files changed, 327 insertions(+), 17 deletions(-)
+```
