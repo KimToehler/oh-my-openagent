@@ -24,6 +24,8 @@ export const BackgroundTaskConfigSchema = z.object({
   /** Delay before removing completed/cancelled/errored tasks from memory in milliseconds (default: 600000 = 10 minutes, minimum: 60000 = 1 minute). */
   taskCleanupDelayMs: z.number().min(60000).optional(),
   syncPollTimeoutMs: z.number().min(60000).optional(),
+  /** Absolute wall-clock ceiling on synchronous task delegation in milliseconds (default: 600000 = 10 minutes, minimum: 60000 = 1 minute). When exceeded, the still-running child session is handed to the background manager rather than aborted, so its work is not lost and the parent receives a background task handle. Independent of and additional to the inactivity window governed by syncPollTimeoutMs, which any child activity resets. */
+  syncWallClockTimeoutMs: z.number().min(60000).optional(),
   /** Maximum tool calls per subagent task before circuit breaker triggers (default: 200, minimum: 10). Prevents runaway loops from burning unlimited tokens. */
   maxToolCalls: z.number().int().min(10).optional(),
   circuitBreaker: CircuitBreakerConfigSchema.optional(),

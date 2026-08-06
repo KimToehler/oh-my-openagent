@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import { ZodError } from "zod"
 import { BackgroundTaskConfigSchema } from "./background-task"
+import { OhMyOpenCodeConfigSchema } from "./oh-my-opencode-config"
 
 describe("BackgroundTaskConfigSchema", () => {
   describe("maxDepth", () => {
@@ -69,6 +70,79 @@ describe("BackgroundTaskConfigSchema", () => {
         }
 
         expect(thrownError).toBeInstanceOf(ZodError)
+      })
+    })
+  })
+
+  describe("syncWallClockTimeoutMs", () => {
+    describe("#given valid syncWallClockTimeoutMs (600000)", () => {
+      test("#when parsed #then returns correct value", () => {
+        const result = BackgroundTaskConfigSchema.parse({ syncWallClockTimeoutMs: 600000 })
+
+        expect(result.syncWallClockTimeoutMs).toBe(600000)
+      })
+    })
+
+    describe("#given syncWallClockTimeoutMs below minimum (59999)", () => {
+      test("#when parsed #then throws ZodError", () => {
+        let thrownError: unknown
+
+        try {
+          BackgroundTaskConfigSchema.parse({ syncWallClockTimeoutMs: 59999 })
+        } catch (error) {
+          thrownError = error
+        }
+
+        expect(thrownError).toBeInstanceOf(ZodError)
+      })
+    })
+
+    describe("#given syncWallClockTimeoutMs not provided", () => {
+      test("#when parsed #then field is undefined", () => {
+        const result = BackgroundTaskConfigSchema.parse({})
+
+        expect(result.syncWallClockTimeoutMs).toBeUndefined()
+      })
+    })
+
+    describe('#given syncWallClockTimeoutMs is non-number ("600000")', () => {
+      test("#when parsed #then throws ZodError", () => {
+        let thrownError: unknown
+
+        try {
+          BackgroundTaskConfigSchema.parse({ syncWallClockTimeoutMs: "600000" })
+        } catch (error) {
+          thrownError = error
+        }
+
+        expect(thrownError).toBeInstanceOf(ZodError)
+      })
+    })
+
+    describe("#given syncWallClockTimeoutMs is negative (-1)", () => {
+      test("#when parsed #then throws ZodError", () => {
+        let thrownError: unknown
+
+        try {
+          BackgroundTaskConfigSchema.parse({ syncWallClockTimeoutMs: -1 })
+        } catch (error) {
+          thrownError = error
+        }
+
+        expect(thrownError).toBeInstanceOf(ZodError)
+      })
+    })
+
+    describe("#given root config carrying background_task.syncWallClockTimeoutMs (600000)", () => {
+      test("#when safeParsed #then succeeds and preserves the value", () => {
+        const result = OhMyOpenCodeConfigSchema.safeParse({
+          background_task: { syncWallClockTimeoutMs: 600000 },
+        })
+
+        expect(result.success).toBe(true)
+        if (result.success) {
+          expect(result.data.background_task?.syncWallClockTimeoutMs).toBe(600000)
+        }
       })
     })
   })
