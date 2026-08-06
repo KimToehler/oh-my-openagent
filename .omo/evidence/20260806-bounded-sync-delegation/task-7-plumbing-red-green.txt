@@ -105,3 +105,27 @@ NO_FORBIDDEN_MATCHES
 
 ## Full suite
 bun test launched; current result unavailable before commit because suite remains running. Observed failures are unrelated skills-loader-core fixture precedence failures.
+
+## Commit
+d6f4b977c feat(delegate-task): thread wall-clock timeout from config to poller
+d6f4b977c feat(delegate-task): thread wall-clock timeout from config to poller
+ .../task-7-plumbing-red-green.txt                  | 107 +++++++++++++++++++++
+ .../src/plugin/tool-registry-core-tools.test.ts    |  43 +++++++++
+ .../src/plugin/tool-registry-core-tools.ts         |   1 +
+ .../src/tools/delegate-task/executor-types.ts      |   1 +
+ .../src/tools/delegate-task/sync-session-poller.ts |   1 +
+ .../src/tools/delegate-task/sync-task-runner.ts    |   3 +
+ .../src/tools/delegate-task/sync-task.ts           |   3 +-
+ .../omo-opencode/src/tools/delegate-task/types.ts  |   1 +
+ 8 files changed, 159 insertions(+), 1 deletion(-)
+
+## Dirty worktree proof after explicit-path staging
+ M .omo/evidence/20260806-bounded-sync-delegation/task-7-plumbing-red-green.txt
+ M assets/omo.schema.json
+ M packages/omo-codex/plugin/components/codegraph/dist/cli.js
+ M packages/omo-codex/scripts/install-dist/install-local.mjs
+ M packages/omo-opencode/src/features/background-agent/manager.ts
+ M packages/omo-opencode/src/features/background-agent/types.ts
+ M packages/omo-senpi/plugin/extensions/omo-member.js
+ M packages/omo-senpi/plugin/extensions/omo.js
+?? packages/omo-opencode/src/features/background-agent/manager.adopt.test.ts
