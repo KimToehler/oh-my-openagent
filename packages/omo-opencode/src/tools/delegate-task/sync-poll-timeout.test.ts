@@ -75,7 +75,7 @@ describe("syncPollTimeoutMs threading", () => {
             taskId: undefined,
           }, 120_000)
 
-          expect(result).toBe("Poll inactivity timeout reached after 120000ms without active OpenCode status for session ses_custom")
+          expect(result).toEqual({ kind: "error", message: "Poll inactivity timeout reached after 120000ms without active OpenCode status for session ses_custom" })
           expect(abortCount).toBe(1)
         })
       })
@@ -119,7 +119,7 @@ describe("syncPollTimeoutMs threading", () => {
             taskId: undefined,
           }, 120_000)
 
-          expect(result).toBeNull()
+          expect(result).toEqual({ kind: "ok" })
           expect(abortCount).toBe(0)
           expect(statusCallCount).toBe(3)
           expect(messageCallCount).toBe(1)
@@ -141,7 +141,7 @@ describe("syncPollTimeoutMs threading", () => {
             taskId: undefined,
           })
 
-          expect(result).toBe(`Poll inactivity timeout reached after ${MAX_POLL_TIME_MS}ms without active OpenCode status for session ses_default`)
+          expect(result).toEqual({ kind: "error", message: `Poll inactivity timeout reached after ${MAX_POLL_TIME_MS}ms without active OpenCode status for session ses_default` })
         })
       })
 
@@ -159,7 +159,7 @@ describe("syncPollTimeoutMs threading", () => {
             taskId: undefined,
           })
 
-          expect(result).toBe("Poll inactivity timeout reached after 120000ms without active OpenCode status for session ses_legacy")
+          expect(result).toEqual({ kind: "error", message: "Poll inactivity timeout reached after 120000ms without active OpenCode status for session ses_legacy" })
         })
       })
     })
@@ -177,7 +177,7 @@ describe("syncPollTimeoutMs threading", () => {
             taskId: undefined,
           }, 10)
 
-          expect(result).toBe("Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_guard")
+          expect(result).toEqual({ kind: "error", message: "Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_guard" })
         })
       })
     })

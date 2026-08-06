@@ -74,7 +74,7 @@ describe("delegate-task Oracle gap closure", () => {
         },
       },
     }, parentContext, {
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
     })
 
@@ -105,7 +105,7 @@ describe("delegate-task Oracle gap closure", () => {
         },
       },
     }, parentContext, {
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
     })
 
@@ -203,7 +203,7 @@ describe("delegate-task Oracle gap closure", () => {
         },
       },
     }, parentContext, {
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
     }, "skill instructions")
 

@@ -67,7 +67,7 @@ export function createDelegateTaskPresentation(options: DelegateTaskToolOptions)
   ${categoryList}
   - subagent_type: Use specific agent directly (explore, librarian, oracle, metis, momus)
   - run_in_background: Optional. Defaults to false (sync, waits). true=async: returns a background task ID like \`bg_...\` to collect later with \`background_output\`.
-    Prefer true whenever you do not consume the result in your very next step — fan-out work, long-running jobs, and anything you can keep working alongside. Blocking on a sync wait also blocks the user from typing.
+    Prefer true whenever you do not consume the result in your very next step, fan-out work, long-running jobs, and anything you can keep working alongside. Blocking on a sync wait also blocks the user from typing.
     Use false when your very next step depends on the result and you have nothing else to do until it lands.
     Sync waits use a 30-minute inactivity window: OpenCode busy/retry/running status resets the window, so this is not a total wall-clock limit.
   - task_id: Continuation session id (\`ses_...\`) from task metadata. Continues the same subagent session with FULL CONTEXT PRESERVED; not the background task id (\`bg_...\`).

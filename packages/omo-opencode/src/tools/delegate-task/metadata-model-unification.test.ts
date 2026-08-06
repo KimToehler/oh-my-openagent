@@ -39,7 +39,7 @@ describe("metadata model unification", () => {
         const deps = {
           createSyncSession: async () => ({ ok: true, sessionID: "ses_sync" }),
           sendSyncPrompt: async () => null,
-          pollSyncSession: async () => null,
+          pollSyncSession: async () => ({ kind: "ok" }),
           fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
         }
         const args: DelegateTaskArgs = {
@@ -152,7 +152,7 @@ describe("metadata model unification", () => {
         }
 
         const deps = {
-          pollSyncSession: async () => null,
+          pollSyncSession: async () => ({ kind: "ok" }),
           fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
         }
 
@@ -182,7 +182,7 @@ describe("metadata model unification", () => {
         const deps = {
           createSyncSession: async () => ({ ok: true, sessionID: "ses_sync" }),
           sendSyncPrompt: async () => null,
-          pollSyncSession: async () => null,
+          pollSyncSession: async () => ({ kind: "ok" }),
           fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
         }
         const args: DelegateTaskArgs = {
@@ -296,7 +296,7 @@ describe("metadata model unification", () => {
         }
 
         const deps = {
-          pollSyncSession: async () => null,
+          pollSyncSession: async () => ({ kind: "ok" }),
           fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
         }
 
@@ -323,7 +323,7 @@ describe("metadata model unification", () => {
       const deps = {
         createSyncSession: async () => ({ ok: true, sessionID: "ses_sync" }),
         sendSyncPrompt: async () => null,
-        pollSyncSession: async () => null,
+        pollSyncSession: async () => ({ kind: "ok" }),
         fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
       }
       const args: DelegateTaskArgs = {
@@ -357,7 +357,7 @@ describe("metadata model unification", () => {
         const deps = {
           createSyncSession: async () => ({ ok: true, sessionID: "ses_sync_variant" }),
           sendSyncPrompt: async () => null,
-          pollSyncSession: async () => null,
+          pollSyncSession: async () => ({ kind: "ok" }),
           fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
         }
         const args: DelegateTaskArgs = {
@@ -471,7 +471,7 @@ describe("metadata model unification", () => {
         }
 
         const deps = {
-          pollSyncSession: async () => null,
+          pollSyncSession: async () => ({ kind: "ok" }),
           fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
         }
 

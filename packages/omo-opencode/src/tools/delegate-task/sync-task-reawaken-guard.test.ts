@@ -13,7 +13,7 @@ function createDeps() {
   return {
     createSyncSession: async () => ({ ok: true as const, sessionID: CHILD_SESSION_ID, parentDirectory: "/tmp" }),
     sendSyncPrompt: async () => null,
-    pollSyncSession: async () => null,
+    pollSyncSession: async () => ({ kind: "ok" }),
     fetchSyncResult: async () => ({ ok: false as const, error: "Fetch failed" }),
   }
 }

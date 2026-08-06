@@ -61,7 +61,7 @@ describe("pollSyncSession", () => {
       })
 
       // then: returns error message
-      expect(result).toBe("Forbidden: Selected provider is forbidden")
+      expect(result).toEqual({ kind: "error", message: "Forbidden: Selected provider is forbidden" })
     })
 
     test("ignores stale prior-turn assistant errors after a new user turn starts", async () => {
@@ -100,7 +100,8 @@ describe("pollSyncSession", () => {
       }, 50)
 
       // then: times out (ignores stale error)
-      expect(result).toContain("Poll inactivity timeout reached")
+      expect(result.kind).toBe("error")
+      if (result.kind === "error") expect(result.message).toContain("Poll inactivity timeout reached")
     })
 
     test("detects completion when assistant message has terminal finish reason", async () => {
@@ -131,7 +132,7 @@ describe("pollSyncSession", () => {
       })
 
       // then: returns null (success)
-      expect(result).toBeNull()
+      expect(result).toEqual({ kind: "ok" })
     })
 
     test("keeps polling when assistant finish is tool-calls (non-terminal)", async () => {
@@ -182,7 +183,7 @@ describe("pollSyncSession", () => {
       })
 
       // then: returns null after polling continues
-      expect(result).toBeNull()
+      expect(result).toEqual({ kind: "ok" })
       expect(callCount).toBeGreaterThan(2)
     })
 
@@ -234,7 +235,7 @@ describe("pollSyncSession", () => {
       })
 
       // then: returns null after polling continues
-      expect(result).toBeNull()
+      expect(result).toEqual({ kind: "ok" })
       expect(callCount).toBeGreaterThan(1)
     })
 
@@ -286,7 +287,7 @@ describe("pollSyncSession", () => {
       })
 
       // then: returns null after polling continues
-      expect(result).toBeNull()
+      expect(result).toEqual({ kind: "ok" })
       expect(callCount).toBeGreaterThan(1)
     })
 
@@ -339,7 +340,7 @@ describe("pollSyncSession", () => {
       })
 
       // then: returns null after polling continues
-      expect(result).toBeNull()
+      expect(result).toEqual({ kind: "ok" })
       expect(callCount).toBeGreaterThan(1)
     })
   })
@@ -389,7 +390,7 @@ describe("pollSyncSession", () => {
       })
 
       // then: returns null with no abort
-      expect(result).toBeNull()
+      expect(result).toEqual({ kind: "ok" })
       expect(messageCallCount).toBe(1)
       expect(abortCount).toBe(0)
     })
@@ -417,8 +418,10 @@ describe("pollSyncSession", () => {
       })
 
       // then: returns abort message
-      expect(result).toContain("Task aborted")
-      expect(result).toContain("ses_abort")
+      expect(result.kind).toBe("error")
+      if (result.kind === "error") expect(result.message).toContain("Task aborted")
+      expect(result.kind).toBe("error")
+      if (result.kind === "error") expect(result.message).toContain("ses_abort")
       expect(abortCount).toBe(1)
     })
 
@@ -448,7 +451,8 @@ describe("pollSyncSession", () => {
       })
 
       // then
-      expect(result).toContain("Task aborted")
+      expect(result.kind).toBe("error")
+      if (result.kind === "error") expect(result.message).toContain("Task aborted")
       expect(messageCallCount).toBe(3)
       expect(abortCount).toBe(1)
     })
@@ -490,7 +494,7 @@ describe("pollSyncSession", () => {
       }, 0)
 
       // then: returns timeout error
-      expect(result).toBe("Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_timeout")
+      expect(result).toEqual({ kind: "error", message: "Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_timeout" })
       expect(abortCount).toBe(1)
     })
   })
@@ -535,7 +539,7 @@ describe("pollSyncSession", () => {
       })
 
       // then: waits for idle before checking messages
-      expect(result).toBeNull()
+      expect(result).toEqual({ kind: "ok" })
       expect(statusCallCount).toBeGreaterThanOrEqual(3)
     })
   })
@@ -724,7 +728,7 @@ describe("pollSyncSession", () => {
         hasActiveChildBackgroundTasks: () => ++childCheck === 1,
       })
 
-      expect(result).toBeNull()
+      expect(result).toEqual({ kind: "ok" })
       expect(childCheck).toBeGreaterThanOrEqual(3)
     })
 
@@ -766,7 +770,7 @@ describe("pollSyncSession", () => {
         },
       })
 
-      expect(result).toBeNull()
+      expect(result).toEqual({ kind: "ok" })
       // Without the wake gate the loop would have broken on the very first poll.
       expect(wakePolls).toBeGreaterThanOrEqual(3)
     })
@@ -789,7 +793,8 @@ describe("pollSyncSession", () => {
         hasActiveChildBackgroundTasks: () => true,
       }, 30)
 
-      expect(result).toContain("Poll inactivity timeout reached")
+      expect(result.kind).toBe("error")
+      if (result.kind === "error") expect(result.message).toContain("Poll inactivity timeout reached")
     })
   })
 })

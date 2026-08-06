@@ -96,7 +96,7 @@ describe("pollSyncSession wall-clock yield", () => {
       })
 
       // then
-      expect(outcome).toBe("Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_default")
+      expect(outcome).toEqual({ kind: "error", message: "Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_default" })
       expect(abortCount).toBe(1)
     })
   })

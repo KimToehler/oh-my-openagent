@@ -136,7 +136,7 @@ task(category="quick", load_skills=[], run_in_background=false, prompt="...task 
 task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
 ```
 
-Background vs foreground: exploration (`explore`, `librarian`) runs `run_in_background=true`; task execution (`category="..."`) may also run `run_in_background=true`, and that is the preferred default whenever your next step does not consume the result, with verification when you collect it. Reserve `run_in_background=false` for the case where the very next step you take depends on that result. Collect background results with `background_output(task_id="bg_...")`, continue a session with `task(task_id="ses_...")`, cancel disposable background tasks individually, and NEVER `background_cancel(all=true)` — it kills output you have not collected.
+Background vs foreground: exploration (`explore`, `librarian`) runs `run_in_background=true`; task execution (`category="..."`) may also run `run_in_background=true`, and that is the preferred default whenever your next step does not consume the result, with verification when you collect it. Reserve `run_in_background=false` for the case where the very next step you take depends on that result. Collect background results with `background_output(task_id="bg_...")`, continue a session with `task(task_id="ses_...")`, cancel disposable background tasks individually, and NEVER `background_cancel(all=true)`, it kills output you have not collected.
 </parallel_by_default>
 
 <workflow>

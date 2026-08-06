@@ -63,7 +63,7 @@ export async function pollSyncSession(
     syncWallClockTimeoutMs?: number
   },
   timeoutMs?: number
-): Promise<string | null | Extract<SyncPollOutcome, { kind: "wall_clock_yield" }>> {
+): Promise<SyncPollOutcome> {
   const syncTiming = getTimingConfig()
   const maxPollTimeMs = Math.max(timeoutMs ?? getDefaultSyncPollTimeoutMs(), 50)
   const wallClockTimeoutMs = input.syncWallClockTimeoutMs ?? getDefaultSyncWallClockTimeoutMs()
@@ -144,14 +144,14 @@ export async function pollSyncSession(
           input.anchorMessageCount === undefined || finalMessages.length > input.anchorMessageCount
         if (hasNewMessages && isSessionComplete(finalMessages)) {
           log("[task] Abort detected after session already completed", { sessionID: input.sessionID })
-          return null
+          return { kind: "ok" }
         }
       }
 
       log("[task] Aborted by user", { sessionID: input.sessionID })
       abortSyncSession(client, input.sessionID, "parent_abort")
       if (input.toastManager && input.taskId) input.toastManager.removeTask(input.taskId)
-      return `Task aborted.\n\nSession ID: ${input.sessionID}`
+      return { kind: "error", message: `Task aborted.\n\nSession ID: ${input.sessionID}` }
     }
 
     await wait(syncTiming.POLL_INTERVAL_MS)
@@ -198,7 +198,7 @@ export async function pollSyncSession(
     const sessionError = getTerminalSessionError(messages)
     if (sessionError) {
       log("[task] Poll detected terminal session error", { sessionID: input.sessionID, sessionError })
-      return sessionError
+      return { kind: "error", message: sessionError }
     }
 
     if (isSessionComplete(messages)) {
@@ -223,7 +223,7 @@ export async function pollSyncSession(
         })
         abortSyncSession(client, input.sessionID, "max_turns_exceeded")
         if (input.toastManager && input.taskId) input.toastManager.removeTask(input.taskId)
-        return `Task aborted: subagent exceeded ${maxTurns} assistant turns without completing. This usually indicates an infinite tool-call loop. Session ID: ${input.sessionID}`
+        return { kind: "error", message: `Task aborted: subagent exceeded ${maxTurns} assistant turns without completing. This usually indicates an infinite tool-call loop. Session ID: ${input.sessionID}` }
       }
     }
 
@@ -255,6 +255,6 @@ export async function pollSyncSession(
   }
 
   return timedOut
-    ? `Poll inactivity timeout reached after ${maxPollTimeMs}ms without active OpenCode status for session ${input.sessionID}`
-    : null
+    ? { kind: "error", message: `Poll inactivity timeout reached after ${maxPollTimeMs}ms without active OpenCode status for session ${input.sessionID}` }
+    : { kind: "ok" }
 }

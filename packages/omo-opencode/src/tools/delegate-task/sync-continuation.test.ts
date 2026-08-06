@@ -87,7 +87,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => {
         throw new Error("Network error")
       },
@@ -213,7 +213,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async () => "MessageAbortedError: aborted by user",
+      pollSyncSession: async () => ({ kind: "error", message: "MessageAbortedError: aborted by user" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Recovered result" }),
     }
 
@@ -272,7 +272,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async () => "The operation was aborted.",
+      pollSyncSession: async () => ({ kind: "error", message: "The operation was aborted." }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Recovered result" }),
     }
 
@@ -329,7 +329,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async () => "MessageAbortedError: aborted by user",
+      pollSyncSession: async () => ({ kind: "error", message: "MessageAbortedError: aborted by user" }),
       fetchSyncResult: async () => ({ ok: false as const, error: "No assistant response found" }),
     }
 
@@ -382,7 +382,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     let fetchSyncResultCalled = false
 
     const deps = {
-      pollSyncSession: async () => "The operation was aborted.",
+      pollSyncSession: async () => ({ kind: "error", message: "The operation was aborted." }),
       fetchSyncResult: async () => {
         fetchSyncResultCalled = true
         return { ok: true as const, textContent: "Recovered result" }
@@ -448,7 +448,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
@@ -516,7 +516,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
@@ -580,7 +580,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async () => "Task failed before handback",
+      pollSyncSession: async () => ({ kind: "error", message: "Task failed before handback" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
@@ -644,7 +644,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
         if (input.toastManager && input.taskId) {
           input.toastManager.removeTask(input.taskId)
         }
-        return "Task aborted.\n\nSession ID: ses_test_12345678"
+        return { kind: "error", message: "Task aborted.\n\nSession ID: ses_test_12345678" }
       },
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
@@ -704,7 +704,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
@@ -765,7 +765,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
@@ -820,7 +820,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
@@ -888,7 +888,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
@@ -963,7 +963,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
@@ -1038,7 +1038,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     const { executeSyncContinuation } = require("./sync-continuation")
 
     const deps = {
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 

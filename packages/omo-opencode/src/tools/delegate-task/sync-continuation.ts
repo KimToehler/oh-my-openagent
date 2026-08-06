@@ -187,45 +187,52 @@ export async function executeSyncContinuation(
    }
 
     try {
-      const pollError = await deps.pollSyncSession(ctx, client, {
+      const pollOutcome = await deps.pollSyncSession(ctx, client, {
         sessionID: continuationID,
         agentToUse: resumeAgent ?? "continue",
         toastManager,
         taskId,
         anchorMessageCount,
       }, syncPollTimeoutMs)
-      if (pollError !== null && typeof pollError !== "string") {
-        return "Sync continuation exceeded wall-clock limit before adoption support was available"
-      }
-      if (pollError && shouldAttemptPollErrorRecovery(pollError)) {
-        if (anchorMessageCount === undefined) {
-          return pollError
-        }
-        const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
-          strictAbortRecovery: true,
-          deliverableTag: getDeliverableTag(resumeAgent),
-        })
-        if (!recoveredResult.ok) {
-          return pollError
-        }
+      switch (pollOutcome.kind) {
+        // Continuation adoption needs separate lifecycle design.
+        case "wall_clock_yield":
+          return "Sync continuation exceeded wall-clock limit before adoption support was available"
+        case "error": {
+          const pollError = pollOutcome.message
+          if (shouldAttemptPollErrorRecovery(pollError)) {
+            if (anchorMessageCount === undefined) {
+              return pollError
+            }
+            const recoveredResult = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {
+              strictAbortRecovery: true,
+              deliverableTag: getDeliverableTag(resumeAgent),
+            })
+            if (!recoveredResult.ok) {
+              return pollError
+            }
 
-        const duration = formatDuration(startTime)
-        handedBackToParent = true
+            const duration = formatDuration(startTime)
+            handedBackToParent = true
 
-        return `Task continued and completed in ${duration}.
+            return `Task continued and completed in ${duration}.
 
 ---
 
 ${recoveredResult.textContent || "(No text output)"}
 
 ${buildTaskMetadataBlock({
-          sessionId: continuationID,
-          taskId: continuationID,
-          agent: resumeAgent,
-          category: args.category,
-        })}`
-      } else if (pollError) {
-        return pollError
+              sessionId: continuationID,
+              taskId: continuationID,
+              agent: resumeAgent,
+              category: args.category,
+            })}`
+          }
+
+          return pollError
+        }
+        case "ok":
+          break
       }
 
       const result = await deps.fetchSyncResult(client, continuationID, anchorMessageCount, {

@@ -83,7 +83,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const deps = {
       createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
       sendSyncPrompt: async () => null,
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: false as const, error: "Fetch failed" }),
     }
 
@@ -142,7 +142,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const deps = {
       createSyncSession: async () => ({ ok: false as const, error: "Failed to create session" }),
       sendSyncPrompt: async () => null,
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
@@ -192,7 +192,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const deps = {
       createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
       sendSyncPrompt: async () => null,
-      pollSyncSession: async () => "MessageAbortedError: aborted by user",
+      pollSyncSession: async () => ({ kind: "error", message: "MessageAbortedError: aborted by user" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
@@ -243,7 +243,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const deps = {
       createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
       sendSyncPrompt: async () => null,
-      pollSyncSession: async () => "The operation was aborted.",
+      pollSyncSession: async () => ({ kind: "error", message: "The operation was aborted." }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Recovered result" }),
     }
 
@@ -291,7 +291,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const deps = {
       createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
       sendSyncPrompt: async () => null,
-      pollSyncSession: async () => "Task aborted: subagent exceeded 5 assistant turns without completing",
+      pollSyncSession: async () => ({ kind: "error", message: "Task aborted: subagent exceeded 5 assistant turns without completing" }),
       fetchSyncResult: async () => {
         fetchSyncResultCalled = true
         return { ok: true as const, textContent: "unexpected" }
@@ -343,7 +343,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const deps = {
       createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
       sendSyncPrompt: async () => null,
-      pollSyncSession: async () => "MessageAbortedError: aborted by user",
+      pollSyncSession: async () => ({ kind: "error", message: "MessageAbortedError: aborted by user" }),
       fetchSyncResult: async () => {
         fetchSyncResultCalled = true
         return { ok: false as const, error: "No assistant response found" }
@@ -400,7 +400,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
         attemptedModels.push(input.categoryModel)
         return attemptedModels.length === 1 ? "Initial failure" : null
       },
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
@@ -467,7 +467,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
         attemptedModels.push(input.categoryModel)
         return promptErrors[attemptedModels.length - 1] ?? "Unexpected extra retry"
       },
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
@@ -557,7 +557,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const deps = {
       createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
       sendSyncPrompt: async () => null,
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
@@ -634,8 +634,8 @@ describe("executeSyncTask - cleanup on error paths", () => {
       pollSyncSession: async (_ctx: unknown, _client: unknown, input: { sessionID: string }) => {
         polledSessions.push(input.sessionID)
         return input.sessionID === "ses_first"
-          ? "Forbidden: Selected provider is forbidden"
-          : null
+          ? { kind: "error", message: "Forbidden: Selected provider is forbidden" }
+          : { kind: "ok" }
       },
       fetchSyncResult: async (_client: unknown, sessionID: string) => ({ ok: true as const, textContent: `Result from ${sessionID}` }),
     }
@@ -725,8 +725,8 @@ describe("executeSyncTask - cleanup on error paths", () => {
       },
       pollSyncSession: async (_ctx: unknown, _client: unknown, input: { sessionID: string }) => {
         return input.sessionID === "ses_quota_primary"
-          ? pollError
-          : null
+          ? { kind: "error", message: pollError }
+          : { kind: "ok" }
       },
       fetchSyncResult: async (_client: unknown, sessionID: string) => ({
         ok: true as const,
@@ -803,7 +803,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
       sendSyncPrompt: async () => null,
       pollSyncSession: async (_ctx: unknown, _client: unknown, input: { sessionID: string }) => {
         polledSessions.push(input.sessionID)
-        return "Forbidden: Selected provider is forbidden"
+        return { kind: "error", message: "Forbidden: Selected provider is forbidden" }
       },
       fetchSyncResult: async () => ({ ok: true as const, textContent: "unused" }),
     }
@@ -863,7 +863,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
         observedBootstrapTools.push(bootstrap?.tools)
         return null
       },
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "sync result" }),
     }
 
@@ -924,8 +924,8 @@ describe("executeSyncTask - cleanup on error paths", () => {
       sendSyncPrompt: async () => null,
       pollSyncSession: async (_ctx: unknown, _client: unknown, input: { sessionID: string }) => {
         return input.sessionID === "ses_first"
-          ? "Forbidden: Selected provider is forbidden"
-          : null
+          ? { kind: "error", message: "Forbidden: Selected provider is forbidden" }
+          : { kind: "ok" }
       },
       fetchSyncResult: async (_client: unknown, sessionID: string) => ({ ok: true as const, textContent: `Result from ${sessionID}` }),
     }
@@ -998,8 +998,8 @@ describe("executeSyncTask - cleanup on error paths", () => {
       sendSyncPrompt: async () => null,
       pollSyncSession: async (_ctx: unknown, _client: unknown, input: { sessionID: string }) => {
         return input.sessionID === "ses_first"
-          ? "Forbidden: Selected provider is forbidden"
-          : "Final retry failed"
+          ? { kind: "error", message: "Forbidden: Selected provider is forbidden" }
+          : { kind: "error", message: "Final retry failed" }
       },
       fetchSyncResult: async () => ({ ok: true as const, textContent: "unused" }),
     }
@@ -1073,7 +1073,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const deps = {
       createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
       sendSyncPrompt: async () => null,
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 
@@ -1138,7 +1138,7 @@ describe("executeSyncTask - cleanup on error paths", () => {
     const deps = {
       createSyncSession: async () => ({ ok: true, sessionID: "ses_test_12345678" }),
       sendSyncPrompt: async () => null,
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
 

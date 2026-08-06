@@ -36,7 +36,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
       const deps = {
         createSyncSession: async () => ({ ok: true, sessionID: "ses_sync" }),
         sendSyncPrompt: async () => null,
-        pollSyncSession: async () => null,
+        pollSyncSession: async () => ({ kind: "ok" }),
         fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
       }
       const args: DelegateTaskArgs = {
@@ -215,7 +215,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
       }
 
       const deps = {
-        pollSyncSession: async () => null,
+        pollSyncSession: async () => ({ kind: "ok" }),
         fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
       }
 
@@ -245,7 +245,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
       }
 
       const deps = {
-        pollSyncSession: async () => null,
+        pollSyncSession: async () => ({ kind: "ok" }),
         fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
       }
 
@@ -274,7 +274,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
       }
 
       const deps = {
-        pollSyncSession: async () => null,
+        pollSyncSession: async () => ({ kind: "ok" }),
         fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
       }
 
@@ -308,7 +308,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
       }
 
       const deps = {
-        pollSyncSession: async () => null,
+        pollSyncSession: async () => ({ kind: "ok" }),
         fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
       }
 
@@ -336,7 +336,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
       const deps = {
         createSyncSession: async () => ({ ok: true, sessionID: "ses_sync" }),
         sendSyncPrompt: async () => null,
-        pollSyncSession: async () => null,
+        pollSyncSession: async () => ({ kind: "ok" }),
         fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
       }
       const args = {
@@ -473,7 +473,7 @@ describe("taskId and backgroundTaskId metadata consistency", () => {
           },
         },
       }), parentContext, {
-        pollSyncSession: async () => null,
+        pollSyncSession: async () => ({ kind: "ok" }),
         fetchSyncResult: async () => ({ ok: true as const, textContent: "done" }),
       })
 

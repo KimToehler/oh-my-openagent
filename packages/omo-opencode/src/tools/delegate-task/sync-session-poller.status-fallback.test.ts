@@ -46,6 +46,6 @@ describe("pollSyncSession status fallback", () => {
     }, 50)
 
     // then
-    expect(result).toBeNull()
+    expect(result).toEqual({ kind: "ok" })
   })
 })

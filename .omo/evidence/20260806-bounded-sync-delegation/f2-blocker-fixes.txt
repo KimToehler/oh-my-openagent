@@ -1,0 +1,66 @@
+F2 BLOCKER FIXES
+================
+
+F2 findings
+-----------
+1. `pollSyncSession` still exposed legacy `string | null` sentinel values. `sync-task-runner.ts` tested truthiness and routed error strings through recovery/fallback handling, leaving wall-clock yield swallowing one refactor away.
+2. Existing delegate-task tests and fixtures still asserted or returned legacy sentinel values, causing 54 failing assertions from the incomplete migration.
+
+Union refactor
+--------------
+`pollSyncSession` now returns `Promise<SyncPollOutcome>`:
+- `{ kind: "ok" }`
+- `{ kind: "error", message: string }`
+- `{ kind: "wall_clock_yield" }`
+
+Consumers `sync-task-runner.ts` and `sync-continuation.ts` switch on `kind`. Wall-clock logic, `sync-task.ts` adoption path, and `completingTaskIds` guard were not changed.
+
+Test adaptation
+---------------
+Adapted files:
+- packages/omo-opencode/src/tools/delegate-task/metadata-model-unification.test.ts
+- packages/omo-opencode/src/tools/delegate-task/metadata-task-id-consistency.test.ts
+- packages/omo-opencode/src/tools/delegate-task/oracle-gap-closure.test.ts
+- packages/omo-opencode/src/tools/delegate-task/sync-continuation.test.ts
+- packages/omo-opencode/src/tools/delegate-task/sync-poll-timeout.test.ts
+- packages/omo-opencode/src/tools/delegate-task/sync-session-lifecycle.test.ts
+- packages/omo-opencode/src/tools/delegate-task/sync-session-poller.internal-wake.test.ts
+- packages/omo-opencode/src/tools/delegate-task/sync-session-poller.test.ts
+- packages/omo-opencode/src/tools/delegate-task/sync-session-poller.wall-clock.test.ts
+- packages/omo-opencode/src/tools/delegate-task/sync-task-reawaken-guard.test.ts
+- packages/omo-opencode/src/tools/delegate-task/sync-task.test.ts
+
+Only expected/fixture SHAPE changed. Every expected message string was preserved verbatim. No test deleted, skipped, marked todo, or weakened.
+
+Manual QA
+---------
+Temporary script: /tmp/f2-sync-poller-qa.ts (deleted after run)
+
+normal completion: {"kind":"ok"}
+inactivity timeout: {"kind":"error","message":"Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_timeout"} abortCount: 1
+wall-clock yield: {"kind":"wall_clock_yield"} abortCount: 0
+
+Observed all three distinct kinds. Inactivity error text matches legacy text. Wall-clock yield did not call `session.abort`.
+
+Before/after delegate-task test counts
+---------------------------------------
+Before recovery: 455 pass, 41 fail; 496 tests total.
+After adaptation: 496 pass, 0 fail; 496 tests total.
+
+Verification
+------------
+- `bun run typecheck`: exit 0.
+- `bun test packages/omo-opencode/src/tools/delegate-task/`: 496 pass, 0 fail, 1165 expect() calls, 43 files.
+- `bun test packages/omo-opencode/src/features/background-agent/`: 762 pass, 0 fail, 1955 expect() calls, 63 files.
+- `rg -n "\.skip\(|\.todo\(" packages/omo-opencode/src/tools/delegate-task/*.test.ts`: no matches. No new skips/todos.
+- `rg -n "Promise<SyncPollOutcome>" packages/omo-opencode/src/tools/delegate-task/sync-session-poller.ts`: line 66 matched.
+- `rg -n "as any|@ts-ignore|@ts-expect-error" packages/omo-opencode/src/tools/delegate-task/`: no matches.
+- `git diff --check -- packages/omo-opencode/src/tools/delegate-task/ packages/prompts-core/prompts/atlas/`: clean.
+
+Post-commit section
+-------------------
+Pending commit. Add commit SHA, git show --stat, and em-dash addition count after commit.
+
+Omitted
+-------
+No secret-bearing logs, environment dumps, auth headers, or credentials copied into this evidence.

@@ -155,63 +155,66 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
       hasPendingParentWake,
       syncWallClockTimeoutMs,
     }, syncPollTimeoutMs)
-    if (pollOutcome !== null && typeof pollOutcome !== "string") {
-      return pollOutcome
-    }
-    if (pollOutcome) {
-      const pollError = pollOutcome
-      if (shouldAttemptPollErrorRecovery(pollError)) {
-        const recoveredResult = await deps.fetchSyncResult(client, activeSessionID, undefined, {
-          strictAbortRecovery: true,
-          deliverableTag,
-        })
-        if (recoveredResult.ok) {
-          return buildRecoveredSyncTaskCompletion({
-            activeSessionID,
-            agentToUse,
-            args,
-            effectiveCategoryModel,
-            parentContext,
-            startTime,
-            textContent: recoveredResult.textContent,
+    switch (pollOutcome.kind) {
+      case "wall_clock_yield":
+        return pollOutcome
+      case "error": {
+        const pollError = pollOutcome.message
+        if (shouldAttemptPollErrorRecovery(pollError)) {
+          const recoveredResult = await deps.fetchSyncResult(client, activeSessionID, undefined, {
+            strictAbortRecovery: true,
+            deliverableTag,
           })
+          if (recoveredResult.ok) {
+            return buildRecoveredSyncTaskCompletion({
+              activeSessionID,
+              agentToUse,
+              args,
+              effectiveCategoryModel,
+              parentContext,
+              startTime,
+              textContent: recoveredResult.textContent,
+            })
+          }
         }
+
+        const nextFallbackModel = shouldRetryPollErrorWithFallback(pollError, deps)
+          ? getNextSyncFallbackModel(activeSessionID, fallbackState)
+          : null
+        if (!nextFallbackModel) {
+          return pollError
+        }
+
+        cleanupRetrySession(activeSessionID)
+
+        const retrySessionResult = await deps.createSyncSession(client, {
+          parentSessionID: parentContext.sessionID,
+          agentToUse,
+          description: args.description,
+          defaultDirectory: directory,
+          categoryModel: nextFallbackModel,
+        })
+        if (!retrySessionResult.ok) {
+          return retrySessionResult.error
+        }
+
+        activeSessionID = retrySessionResult.sessionID
+        setSyncSessionID(activeSessionID)
+        effectiveCategoryModel = nextFallbackModel
+        await registerSyncSession(activeSessionID)
+        addRetryTaskToast({
+          args,
+          agentToUse,
+          sessionID: activeSessionID,
+          taskId,
+          toastManager,
+          modelInfo,
+        })
+        await publishSyncMetadata(activeSessionID, effectiveCategoryModel, spawnDepth)
+        continue
       }
-
-      const nextFallbackModel = shouldRetryPollErrorWithFallback(pollError, deps)
-        ? getNextSyncFallbackModel(activeSessionID, fallbackState)
-        : null
-      if (!nextFallbackModel) {
-        return pollError
-      }
-
-      cleanupRetrySession(activeSessionID)
-
-      const retrySessionResult = await deps.createSyncSession(client, {
-        parentSessionID: parentContext.sessionID,
-        agentToUse,
-        description: args.description,
-        defaultDirectory: directory,
-        categoryModel: nextFallbackModel,
-      })
-      if (!retrySessionResult.ok) {
-        return retrySessionResult.error
-      }
-
-      activeSessionID = retrySessionResult.sessionID
-      setSyncSessionID(activeSessionID)
-      effectiveCategoryModel = nextFallbackModel
-      await registerSyncSession(activeSessionID)
-      addRetryTaskToast({
-        args,
-        agentToUse,
-        sessionID: activeSessionID,
-        taskId,
-        toastManager,
-        modelInfo,
-      })
-      await publishSyncMetadata(activeSessionID, effectiveCategoryModel, spawnDepth)
-      continue
+      case "ok":
+        break
     }
 
     const result = await deps.fetchSyncResult(client, activeSessionID, undefined, { deliverableTag })

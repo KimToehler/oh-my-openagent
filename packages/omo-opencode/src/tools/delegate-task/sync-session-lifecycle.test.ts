@@ -54,7 +54,7 @@ describe("executeSyncTask - sync session lifecycle ordering", () => {
     const deps = {
       createSyncSession: async () => ({ ok: true as const, sessionID: "ses_ready_gate_sync" }),
       sendSyncPrompt,
-      pollSyncSession: async () => null,
+      pollSyncSession: async () => ({ kind: "ok" }),
       fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
     }
     const mockCtx = {

@@ -66,7 +66,7 @@ describe("pollSyncSession internal all-complete wakes", () => {
     }, 50)
 
     // then
-    expect(result).toBeNull()
+    expect(result).toEqual({ kind: "ok" })
   })
 
   test("#given terminal assistant error followed by internal all-complete wake #when polling #then the error is returned", async () => {
@@ -102,7 +102,7 @@ describe("pollSyncSession internal all-complete wakes", () => {
     }, 50)
 
     // then
-    expect(result).toBe("child failed after stale output")
+    expect(result).toEqual({ kind: "error", message: "child failed after stale output" })
   })
 
   test("#given terminal assistant turn followed by ordinary user turn #when polling #then the sync task remains incomplete", async () => {
@@ -132,7 +132,7 @@ describe("pollSyncSession internal all-complete wakes", () => {
     }, 50)
 
     // then
-    expect(result).toBe("Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_test")
+    expect(result).toEqual({ kind: "error", message: "Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_test" })
   })
 
   test("#given user task text collides with internal markers before terminal assistant turn #when polling #then the sync task completes", async () => {
@@ -161,7 +161,7 @@ describe("pollSyncSession internal all-complete wakes", () => {
     }, 50)
 
     // then
-    expect(result).toBeNull()
+    expect(result).toEqual({ kind: "ok" })
   })
 
   test("#given latest user turn collides with internal markers but is not no-reply #when polling #then completion is not reported early", async () => {
@@ -191,6 +191,6 @@ describe("pollSyncSession internal all-complete wakes", () => {
     }, 50)
 
     // then
-    expect(result).toBe("Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_test")
+    expect(result).toEqual({ kind: "error", message: "Poll inactivity timeout reached after 50ms without active OpenCode status for session ses_test" })
   })
 })
