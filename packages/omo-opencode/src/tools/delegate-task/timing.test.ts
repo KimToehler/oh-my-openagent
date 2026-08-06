@@ -1,6 +1,12 @@
 declare const require: (name: string) => any
 const { describe, expect, test } = require("bun:test")
-import { __resetTimingConfig, __setTimingConfig, getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
+import {
+  __resetTimingConfig,
+  __setTimingConfig,
+  getDefaultSyncPollTimeoutMs,
+  getDefaultSyncWallClockTimeoutMs,
+  getTimingConfig,
+} from "./timing"
 
 describe("timing sync poll timeout defaults", () => {
   test("default sync inactivity timeout is 30 minutes", () => {
@@ -25,6 +31,52 @@ describe("timing sync poll timeout defaults", () => {
     expect(getDefaultSyncPollTimeoutMs()).toBe(123_456)
 
     __resetTimingConfig()
+  })
+})
+
+describe("timing sync wall-clock timeout defaults", () => {
+  test("default sync wall-clock timeout is inert", () => {
+    // #given
+    __resetTimingConfig()
+
+    // #when
+    const timeout = getDefaultSyncWallClockTimeoutMs()
+
+    // #then
+    expect(timeout).toBe(Infinity)
+  })
+
+  test("sync wall-clock timeout accessor follows MAX_WALL_CLOCK_MS config", () => {
+    // #given
+    __resetTimingConfig()
+
+    // #when
+    __setTimingConfig({ MAX_WALL_CLOCK_MS: 1234 })
+
+    // #then
+    expect(getDefaultSyncWallClockTimeoutMs()).toBe(1234)
+  })
+
+  test("reset restores inert sync wall-clock timeout", () => {
+    // #given
+    __setTimingConfig({ MAX_WALL_CLOCK_MS: 1234 })
+
+    // #when
+    __resetTimingConfig()
+
+    // #then
+    expect(getDefaultSyncWallClockTimeoutMs()).toBe(Infinity)
+  })
+
+  test("timing config includes sync wall-clock timeout", () => {
+    // #given
+    __resetTimingConfig()
+
+    // #when
+    const config = getTimingConfig()
+
+    // #then
+    expect(config.MAX_WALL_CLOCK_MS).toBe(Infinity)
   })
 })
 

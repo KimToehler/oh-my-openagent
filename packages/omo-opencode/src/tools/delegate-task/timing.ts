@@ -5,12 +5,17 @@ let WAIT_FOR_SESSION_INTERVAL_MS = 100
 let WAIT_FOR_SESSION_TIMEOUT_MS = 60000
 const DEFAULT_POLL_TIMEOUT_MS = 30 * 60 * 1000
 let MAX_POLL_TIME_MS = DEFAULT_POLL_TIMEOUT_MS
+let MAX_WALL_CLOCK_MS = Infinity
 let SESSION_CONTINUATION_STABILITY_MS = 5000
 
 export const DEFAULT_SYNC_POLL_TIMEOUT_MS = DEFAULT_POLL_TIMEOUT_MS
 
 export function getDefaultSyncPollTimeoutMs(): number {
   return MAX_POLL_TIME_MS
+}
+
+export function getDefaultSyncWallClockTimeoutMs(): number {
+  return MAX_WALL_CLOCK_MS
 }
 
 export function getTimingConfig() {
@@ -21,6 +26,7 @@ export function getTimingConfig() {
     WAIT_FOR_SESSION_INTERVAL_MS,
     WAIT_FOR_SESSION_TIMEOUT_MS,
     MAX_POLL_TIME_MS,
+    MAX_WALL_CLOCK_MS,
     SESSION_CONTINUATION_STABILITY_MS,
   }
 }
@@ -32,6 +38,7 @@ export function __resetTimingConfig(): void {
   WAIT_FOR_SESSION_INTERVAL_MS = 100
   WAIT_FOR_SESSION_TIMEOUT_MS = 60000
   MAX_POLL_TIME_MS = DEFAULT_POLL_TIMEOUT_MS
+  MAX_WALL_CLOCK_MS = Infinity
   SESSION_CONTINUATION_STABILITY_MS = 5000
 }
 
@@ -42,5 +49,6 @@ export function __setTimingConfig(overrides: Partial<ReturnType<typeof getTiming
   if (overrides.WAIT_FOR_SESSION_INTERVAL_MS !== undefined) WAIT_FOR_SESSION_INTERVAL_MS = overrides.WAIT_FOR_SESSION_INTERVAL_MS
   if (overrides.WAIT_FOR_SESSION_TIMEOUT_MS !== undefined) WAIT_FOR_SESSION_TIMEOUT_MS = overrides.WAIT_FOR_SESSION_TIMEOUT_MS
   if (overrides.MAX_POLL_TIME_MS !== undefined) MAX_POLL_TIME_MS = overrides.MAX_POLL_TIME_MS
+  if (overrides.MAX_WALL_CLOCK_MS !== undefined) MAX_WALL_CLOCK_MS = overrides.MAX_WALL_CLOCK_MS
   if (overrides.SESSION_CONTINUATION_STABILITY_MS !== undefined) SESSION_CONTINUATION_STABILITY_MS = overrides.SESSION_CONTINUATION_STABILITY_MS
 }
