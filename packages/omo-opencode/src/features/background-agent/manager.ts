@@ -662,6 +662,16 @@ export class BackgroundManager {
   }
 
   adoptRunningSession(input: AdoptRunningSessionInput): BackgroundTask {
+    for (const task of this.tasks.values()) {
+      if (task.sessionId === input.sessionId && !TERMINAL_BACKGROUND_TASK_STATUSES.has(task.status)) {
+        return task
+      }
+    }
+
+    if (!input.rootDescendantAlreadyReserved) {
+      this.registerRootDescendant(input.rootSessionId)
+    }
+
     const task: BackgroundTask = {
       id: `bg_${crypto.randomUUID().slice(0, 8)}`,
       sessionId: input.sessionId,

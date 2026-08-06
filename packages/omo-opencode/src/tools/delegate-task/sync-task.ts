@@ -148,6 +148,7 @@ export async function executeSyncTask(
           agent: agentToUse,
           model: categoryModel,
           rootSessionId: spawnContext.rootSessionID,
+          rootDescendantAlreadyReserved: true,
         })
         yieldedToBackground = true
         return `Sync task moved to background.

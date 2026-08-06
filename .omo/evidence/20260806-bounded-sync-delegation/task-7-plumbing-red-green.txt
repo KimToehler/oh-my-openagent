@@ -7,7 +7,7 @@ packages/omo-opencode/src/plugin/tool-registry-core-tools.test.ts:
 142 |       availableCategories: [],
 143 |       factories: { ...createFactories(createSkillTool), createDelegateTask },
 144 |     })
-145 | 
+145 |
 146 |     // then
 147 |     expect(createDelegateTask.mock.calls[0]?.[0].syncWallClockTimeoutMs).toBe(600_000)
                                                                                ^
@@ -21,7 +21,7 @@ Received: undefined
 164 |       availableCategories: [],
 165 |       factories: { ...createFactories(createSkillTool), createDelegateTask },
 166 |     })
-167 | 
+167 |
 168 |     // then
 169 |     expect(createDelegateTask.mock.calls[0]?.[0].syncWallClockTimeoutMs).toBe(120_000)
                                                                                ^

@@ -1,0 +1,68 @@
+# FCR blocker fixes
+
+## Findings and changes
+
+1. Continuation adoption passed a root session ID without owning a prior descendant reservation. Added required `rootDescendantAlreadyReserved`. `executeSyncContinuation` passes `false`; `adoptRunningSession()` registers before `addTask()` only for that branch. `executeSyncTask` passes `true`, preserving its committed spawn reservation.
+2. Repeated adoption could mint two `bg_` tasks for one live session. `adoptRunningSession()` now returns existing nonterminal task before any root registration, history recording, or parent marker update.
+3. Poller checked automatic wall-clock yield before user abort. Abort handling now executes first; expired deadline yields only when parent was not aborted.
+4. Removed trailing whitespace from lines 10 and 24 of `task-7-plumbing-red-green.txt`.
+
+## RED
+
+Command:
+
+```sh
+bun test packages/omo-opencode/src/features/background-agent/manager.adopt.test.ts packages/omo-opencode/src/tools/delegate-task/sync-task.yield.test.ts packages/omo-opencode/src/tools/delegate-task/sync-continuation.test.ts packages/omo-opencode/src/tools/delegate-task/sync-session-poller.wall-clock.test.ts
+```
+
+Observed expected failures:
+
+- continuation completion decremented root count: expected `3`, received `2`;
+- repeated adoption minted distinct IDs;
+- sync adoption omitted `rootDescendantAlreadyReserved: true`;
+- continuation adoption omitted `rootDescendantAlreadyReserved: false`;
+- expired aborted poll returned `wall_clock_yield`, not abort error.
+
+Result: `26 pass`, `5 fail`, `87 expect()` calls, 31 tests across 4 files.
+
+## GREEN
+
+Same focused command after implementation:
+
+```text
+31 pass
+0 fail
+96 expect() calls
+Ran 31 tests across 4 files. [97.00ms]
+```
+
+## Manual QA
+
+Temporary `/tmp/fcr-bounded-sync-manual-qa.ts` invoked with `bun`, then deleted:
+
+```text
+continuation adoption root count: 3 -> 3 (balanced)
+sync adoption root count: 2 -> 1 (balanced)
+duplicate adoption ids: bg_a34b00a4 / bg_a34b00a4 (identical=true)
+expired + aborted outcome: error (session.abort calls=1)
+```
+
+## Full verification
+
+```text
+bun run typecheck: PASS
+bun test packages/omo-opencode/src/tools/delegate-task/: 500 pass, 0 fail, 1176 expect() calls, 43 files
+bun test packages/omo-opencode/src/features/background-agent/: 764 pass, 0 fail, 1960 expect() calls, 63 files
+rg -n "as any|@ts-ignore|@ts-expect-error" packages/omo-opencode/src/tools/delegate-task/ packages/omo-opencode/src/features/background-agent/manager.ts: no matches
+git diff --check: clean
+```
+
+LSP diagnostics unavailable: configured TypeScript server fails initialization because workspace has no valid TypeScript installation. `bun run typecheck` passed instead.
+
+## Omitted
+
+No credentials, tokens, environment dumps, or private logs captured.
+
+## Commit
+
+Pending local commit. Append commit SHA and `git show --stat` after commit.

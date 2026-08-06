@@ -71,6 +71,29 @@ describe("pollSyncSession wall-clock yield", () => {
     })
   })
 
+  test("#given expired wall-clock deadline and aborted parent #when poll starts #then aborts child instead of yielding", async () => {
+    // given
+    const controller = new AbortController()
+    controller.abort()
+    let abortCount = 0
+    const client = createAlwaysRunningClient("ses_aborted", () => {
+      abortCount++
+    })
+
+    // when
+    const outcome = await pollSyncSession({ ...toolContext, abort: controller.signal }, client, {
+      sessionID: "ses_aborted",
+      agentToUse: "sisyphus",
+      toastManager: null,
+      taskId: undefined,
+      wallClockDeadline: 0,
+    })
+
+    // then
+    expect(outcome).toEqual({ kind: "error", message: "Task aborted.\n\nSession ID: ses_aborted" })
+    expect(abortCount).toBe(1)
+  })
+
   test("#given Infinity wall-clock default #when inactivity bound elapses #then returns normal error outcome", async () => {
     // given
     __setTimingConfig({ POLL_INTERVAL_MS: 1, MAX_POLL_TIME_MS: 50 })

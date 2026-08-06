@@ -595,7 +595,7 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
 
       // then
       expect(result).toContain("Background Task ID: bg_resumed")
-      expect(adoptionCalls).toHaveLength(1)
+      expect(adoptionCalls).toEqual([expect.objectContaining({ rootDescendantAlreadyReserved: false })])
       expect(handedBackSyncSessions.has("ses_test_12345678")).toBe(false)
       expect(abortCalls).toEqual([])
     } finally {

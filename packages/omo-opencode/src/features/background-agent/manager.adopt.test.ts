@@ -94,6 +94,7 @@ describe("BackgroundManager.adoptRunningSession", () => {
       agent: "atlas",
       model: { providerID: "openai", modelID: "gpt-5" },
       rootSessionId: "root",
+      rootDescendantAlreadyReserved: true,
     })
 
     // then
@@ -125,6 +126,7 @@ describe("BackgroundManager.adoptRunningSession", () => {
       agent: "atlas",
       model: undefined,
       rootSessionId: "root",
+      rootDescendantAlreadyReserved: true,
     })
 
     // then
@@ -150,6 +152,7 @@ describe("BackgroundManager.adoptRunningSession", () => {
       agent: "atlas",
       model: undefined,
       rootSessionId,
+      rootDescendantAlreadyReserved: true,
     })
 
     // when
@@ -160,6 +163,82 @@ describe("BackgroundManager.adoptRunningSession", () => {
     expect(getRootDescendantCounts(manager).has(rootSessionId)).toBe(false)
     expect(release).not.toHaveBeenCalled()
     release.mockRestore()
+  })
+
+  test("#given continuation adoption without a pre-reserved root descendant #when completion follows adoption #then root count returns to its original value", async () => {
+    // given
+    const recorder = createClient()
+    const manager = createManager(recorder)
+    const rootSessionId = "continuation-root"
+    const rootDescendantCounts = getRootDescendantCounts(manager)
+    rootDescendantCounts.set(rootSessionId, 3)
+    const adopt = Reflect.get(manager, "adoptRunningSession") as (input: {
+      sessionId: string
+      parentSessionId: string
+      parentMessageId: string
+      description: string
+      agent: string
+      model: undefined
+      rootSessionId: string
+      rootDescendantAlreadyReserved: boolean
+    }) => BackgroundTask
+
+    // when
+    const task = adopt.call(manager, {
+      sessionId: "continuation-child",
+      parentSessionId: "parent",
+      parentMessageId: "message",
+      description: "continued work",
+      agent: "atlas",
+      model: undefined,
+      rootSessionId,
+      rootDescendantAlreadyReserved: false,
+    })
+    await completeTask(manager, task)
+
+    // then
+    expect(rootDescendantCounts.get(rootSessionId)).toBe(3)
+  })
+
+  test("#given repeated adoption of one live child #when adopt is called twice #then it returns one task without duplicate history or root ownership", () => {
+    // given
+    const recorder = createClient()
+    const manager = createManager(recorder)
+    const rootSessionId = "root"
+    const rootDescendantCounts = getRootDescendantCounts(manager)
+    rootDescendantCounts.set(rootSessionId, 3)
+    const updateMarker = spyOn(manager as never, "updateBackgroundTaskMarker" as never)
+    const adopt = Reflect.get(manager, "adoptRunningSession") as (input: {
+      sessionId: string
+      parentSessionId: string
+      parentMessageId: string
+      description: string
+      agent: string
+      model: undefined
+      rootSessionId: string
+      rootDescendantAlreadyReserved: boolean
+    }) => BackgroundTask
+    const input = {
+      sessionId: "duplicate-child",
+      parentSessionId: "parent",
+      parentMessageId: "message",
+      description: "adopted work",
+      agent: "atlas",
+      model: undefined,
+      rootSessionId,
+      rootDescendantAlreadyReserved: false,
+    }
+
+    // when
+    const first = adopt.call(manager, input)
+    const second = adopt.call(manager, input)
+
+    // then
+    expect(second.id).toBe(first.id)
+    expect(manager.getTasksByParentSession(input.parentSessionId)).toHaveLength(1)
+    expect(rootDescendantCounts.get(rootSessionId)).toBe(4)
+    expect(updateMarker).toHaveBeenCalledTimes(1)
+    updateMarker.mockRestore()
   })
 
   test("#given cancellation awaits abort #when completion wins race #then only completion terminal effects run", async () => {
@@ -183,6 +262,7 @@ describe("BackgroundManager.adoptRunningSession", () => {
       agent: "atlas",
       model: undefined,
       rootSessionId,
+      rootDescendantAlreadyReserved: true,
     })
 
     // when

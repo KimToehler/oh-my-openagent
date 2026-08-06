@@ -143,6 +143,7 @@ export interface AdoptRunningSessionInput {
   agent: string
   model: DelegatedModelConfig | undefined
   rootSessionId: string
+  rootDescendantAlreadyReserved: boolean
 }
 
 export interface ResumeInput {

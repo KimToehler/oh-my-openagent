@@ -116,11 +116,6 @@ export async function pollSyncSession(
       break
     }
 
-    if (Date.now() >= wallClockDeadline) {
-      log("[task] Poll wall-clock timeout reached", { sessionID: input.sessionID, pollCount })
-      return { kind: "wall_clock_yield" }
-    }
-
     if (ctx.abort?.aborted) {
       let finalMessages: SessionMessage[] | null = null
       const abortFetchAttempts = 3
@@ -155,6 +150,11 @@ export async function pollSyncSession(
       abortSyncSession(client, input.sessionID, "parent_abort")
       if (input.toastManager && input.taskId) input.toastManager.removeTask(input.taskId)
       return { kind: "error", message: `Task aborted.\n\nSession ID: ${input.sessionID}` }
+    }
+
+    if (Date.now() >= wallClockDeadline) {
+      log("[task] Poll wall-clock timeout reached", { sessionID: input.sessionID, pollCount })
+      return { kind: "wall_clock_yield" }
     }
 
     await wait(syncTiming.POLL_INTERVAL_MS)

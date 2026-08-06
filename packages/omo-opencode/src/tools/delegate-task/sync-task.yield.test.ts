@@ -40,11 +40,11 @@ describe("executeSyncTask wall-clock yield", () => {
   test("#given poller yield #when adoption succeeds #then returns handle without sync teardown", async () => {
     // given
     let abortCount = 0
-    const adopted: Array<{ sessionId: string }> = []
+    const adopted: Array<{ sessionId: string; rootDescendantAlreadyReserved: boolean }> = []
     const executorCtx = createExecutorContext({
       abort: () => { abortCount++ },
-      adopt: () => {
-        adopted.push({ sessionId: childSessionID })
+      adopt: (input: { sessionId: string; rootDescendantAlreadyReserved: boolean }) => {
+        adopted.push(input)
         return { id: "bg_wallclock", description: "wall-clock task", agent: "sisyphus" }
       },
     })
@@ -66,7 +66,10 @@ describe("executeSyncTask wall-clock yield", () => {
     // then
     expect(result).toContain("Background Task ID: bg_wallclock")
     expect(result).toContain("Status: still running")
-    expect(adopted).toEqual([{ sessionId: childSessionID }])
+    expect(adopted).toEqual([expect.objectContaining({
+      sessionId: childSessionID,
+      rootDescendantAlreadyReserved: true,
+    })])
     expect(abortCount).toBe(0)
     expect(handedBackSyncSessions.has(childSessionID)).toBe(false)
     expect(subagentSessions.has(childSessionID)).toBe(true)

@@ -207,6 +207,7 @@ export async function executeSyncContinuation(
             agent: resumeAgent ?? "continue",
             model: resumeModel,
             rootSessionId: parentContext.sessionID,
+            rootDescendantAlreadyReserved: false,
           })
           // Successful adoption transfers lifecycle ownership to BackgroundManager.
           // Do not mark or abort here: those guards belong only to sync handback exits.
