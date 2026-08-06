@@ -59,7 +59,10 @@ Verification
 
 Post-commit section
 -------------------
-Pending commit. Add commit SHA, git show --stat, and em-dash addition count after commit.
+Commit SHA: 13b0c388c9463b792c5424bd26f11e1636041400
+Commit: `refactor(delegate-task): return a full discriminated union from the sync poller`
+`git show --stat --oneline --summary HEAD`: 19 files changed, 252 insertions(+), 171 deletions(-); evidence file created.
+`git diff aa44f8048..HEAD -- packages/omo-opencode/src/tools/delegate-task/ packages/prompts-core/prompts/atlas/ | grep '^+' | grep -c '—'`: 0.
 
 Omitted
 -------
