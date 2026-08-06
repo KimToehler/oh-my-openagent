@@ -1,0 +1,42 @@
+TODO 10 yield adoption RED -> GREEN evidence
+
+Initial focused test harness RED:
+- First run failed with `TypeError: spawnReservation?.rollback is not a function`, caused by incomplete test mock shape. Harness corrected before behavior verification.
+
+GREEN:
+$ bun test packages/omo-opencode/src/tools/delegate-task/sync-session-poller.wall-clock.test.ts packages/omo-opencode/src/tools/delegate-task/sync-task.yield.test.ts
+5 pass, 0 fail, 14 expect() calls.
+
+Manual sync-path output:
+yield.result Sync task moved to background.
+Background Task ID: bg_manual
+Description: manual wall-clock task
+Agent: sisyphus
+Status: still running
+Do NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it.
+yield.abortCalled false
+yield.adoptCalls [{"sessionId":"ses_manual_child"}]
+yield.handedBack false
+infinity.outcome "Poll inactivity timeout reached after 100ms without active OpenCode status for session ses_infinity"
+infinity.abortCalled true
+
+Anti-deadlock result:
+- Successful adoption skips `handedBackSyncSessions.add(childID)`.
+- Successful adoption skips cleanupSyncSessionSideEffects and session.abort.
+- Adoption throw leaves flag false, enters normal finalizer, test proves abortCalled true.
+
+Background manager regression:
+$ bun test packages/omo-opencode/src/features/background-agent/
+762 pass, 0 fail, 1955 expect() calls.
+
+Typecheck:
+$ bun run typecheck
+exit 0.
+
+Full suite:
+$ bun test
+MCP transport timed out. Captured log shows exactly four unrelated skills-loader-core ulw-plan fixture failures and no TODO 9/10 failure. No unrelated fixture was edited.
+
+Dirty worktree baseline:
+- Unrelated dirty artifacts remain: packages/omo-codex/plugin/components/codegraph/dist/cli.js, packages/omo-codex/scripts/install-dist/install-local.mjs, packages/omo-senpi/plugin/extensions/omo-member.js, packages/omo-senpi/plugin/extensions/omo.js.
+- Only explicit delegate-task paths staged for this unit.

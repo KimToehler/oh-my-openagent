@@ -1,0 +1,25 @@
+TODO 9 poller RED -> GREEN evidence
+
+RED before wall-clock check:
+- Active-session test timed out after 5000ms: `this test timed out after 5000ms.` Continuously running status reset inactivity forever.
+- Runner relay test failed: `TypeError: pollError.trim is not a function` at shouldAttemptPollErrorRecovery. Yield object reached forbidden poll-error recovery before relay existed.
+
+GREEN:
+$ bun test packages/omo-opencode/src/tools/delegate-task/sync-session-poller.wall-clock.test.ts packages/omo-opencode/src/tools/delegate-task/sync-task.yield.test.ts
+5 pass, 0 fail, 14 expect() calls.
+
+Full delegate suite:
+$ bun test packages/omo-opencode/src/tools/delegate-task/
+496 pass, 0 fail, 1160 expect() calls.
+
+Manual poller control:
+- Infinity default returned normal inactivity timeout, not wall_clock_yield:
+  `Poll inactivity timeout reached after 100ms without active OpenCode status for session ses_infinity`
+- Infinity control abortCalled true.
+
+Determinism:
+- Tests use stepwise mocked Date.now; no real elapsed-time assertions.
+
+Scope:
+- No existing test files modified.
+- Static scan for `as any|@ts-ignore|@ts-expect-error` returned NO_MATCHES.

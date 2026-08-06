@@ -1,6 +1,6 @@
 import type { ToolContextWithMetadata, OpencodeClient } from "./types"
 import type { SessionMessage } from "./executor-types"
-import { getDefaultSyncPollTimeoutMs, getTimingConfig } from "./timing"
+import { getDefaultSyncPollTimeoutMs, getDefaultSyncWallClockTimeoutMs, getTimingConfig } from "./timing"
 import { getTerminalSessionError, isSessionComplete } from "./sync-session-turns"
 import { log } from "../../shared/logger"
 import { normalizeSDKResponse } from "../../shared"
@@ -41,6 +41,12 @@ async function fetchSessionMessages(
 
 const DEFAULT_MAX_ASSISTANT_TURNS = 300
 
+
+export type SyncPollOutcome =
+  | { kind: "ok" }
+  | { kind: "error"; message: string }
+  | { kind: "wall_clock_yield" }
+
 export async function pollSyncSession(
   ctx: ToolContextWithMetadata,
   client: OpencodeClient,
@@ -57,9 +63,10 @@ export async function pollSyncSession(
     syncWallClockTimeoutMs?: number
   },
   timeoutMs?: number
-): Promise<string | null> {
+): Promise<string | null | Extract<SyncPollOutcome, { kind: "wall_clock_yield" }>> {
   const syncTiming = getTimingConfig()
   const maxPollTimeMs = Math.max(timeoutMs ?? getDefaultSyncPollTimeoutMs(), 50)
+  const wallClockTimeoutMs = input.syncWallClockTimeoutMs ?? getDefaultSyncWallClockTimeoutMs()
   const maxTurns = input.maxAssistantTurns ?? DEFAULT_MAX_ASSISTANT_TURNS
   const pollStart = Date.now()
   let inactiveStart = pollStart
@@ -104,6 +111,11 @@ export async function pollSyncSession(
     if (inactiveElapsedMs >= maxPollTimeMs) {
       timedOut = true
       break
+    }
+
+    if (Date.now() - pollStart >= wallClockTimeoutMs) {
+      log("[task] Poll wall-clock timeout reached", { sessionID: input.sessionID, pollCount })
+      return { kind: "wall_clock_yield" }
     }
 
     if (ctx.abort?.aborted) {

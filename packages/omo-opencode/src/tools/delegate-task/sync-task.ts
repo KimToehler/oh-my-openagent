@@ -32,6 +32,7 @@ export async function executeSyncTask(
     | Awaited<ReturnType<ExecutorContext["manager"]["reserveSubagentSpawn"]>>
     | undefined
 
+  let yieldedToBackground = false
   try {
     const spawn = await reserveSyncSubagentSpawn(executorCtx, parentContext)
     spawnReservation = spawn.reservation
@@ -112,7 +113,7 @@ export async function executeSyncTask(
     }
 
     try {
-      return await runSyncTaskLoop({
+      const result = await runSyncTaskLoop({
         args,
         ctx,
         executorCtx: {
@@ -138,6 +139,30 @@ export async function executeSyncTask(
         cleanupRetrySession,
         setSyncSessionID,
       })
+      if (typeof result === "object" && result.kind === "wall_clock_yield") {
+        const backgroundTask = executorCtx.manager.adoptRunningSession({
+          sessionId: syncSessionID,
+          parentSessionId: parentContext.sessionID,
+          parentMessageId: parentContext.messageID,
+          description: args.description,
+          agent: agentToUse,
+          model: categoryModel,
+          rootSessionId: spawnContext.rootSessionID,
+        })
+        yieldedToBackground = true
+        return `Sync task moved to background.
+
+Background Task ID: ${backgroundTask.id}
+Description: ${backgroundTask.description}
+Agent: ${backgroundTask.agent}
+Status: still running
+
+Do NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it.`
+      }
+      if (result !== null && typeof result !== "string") {
+        throw new Error("Unexpected sync poll outcome")
+      }
+      return result ?? ""
     } finally {
       if (toastManager && taskId !== undefined) {
         toastManager.removeTask(taskId)
@@ -154,7 +179,7 @@ export async function executeSyncTask(
       category: args.category,
     })
   } finally {
-    if (syncSessionID) {
+    if (syncSessionID && !yieldedToBackground) {
       cleanupSyncSessionSideEffects(syncSessionID, executorCtx)
       handedBackSyncSessions.add(syncSessionID)
 

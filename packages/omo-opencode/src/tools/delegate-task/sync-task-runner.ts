@@ -6,6 +6,7 @@ import { shouldRetryError } from "../../shared/model-error-classifier"
 import { getDeliverableTag } from "./constants"
 import type { ExecutorContext, ParentContext } from "./executor-types"
 import { buildRecoveredSyncTaskCompletion, buildSyncTaskCompletion } from "./sync-completion-message"
+import type { SyncPollOutcome } from "./sync-session-poller"
 import { shouldAttemptPollErrorRecovery } from "./sync-poll-error-recovery"
 import type { SyncTaskDeps } from "./sync-task-deps"
 import { getNextSyncFallbackModel, retrySyncPromptWithFallbacks } from "./sync-task-fallback"
@@ -65,7 +66,7 @@ function shouldRetryPollErrorWithFallback(pollError: string, deps: SyncTaskDeps)
   return shouldRetryError(errorInfo) || (deps.isProviderExhaustionFallbackEligible?.(errorInfo) ?? false)
 }
 
-export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<string> {
+export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<string | Extract<SyncPollOutcome, { kind: "wall_clock_yield" }>> {
   const {
     args,
     ctx,
@@ -145,7 +146,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
       }
     }
 
-    const pollError = await deps.pollSyncSession(ctx, client, {
+    const pollOutcome = await deps.pollSyncSession(ctx, client, {
       sessionID: activeSessionID,
       agentToUse,
       toastManager,
@@ -154,7 +155,11 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
       hasPendingParentWake,
       syncWallClockTimeoutMs,
     }, syncPollTimeoutMs)
-    if (pollError) {
+    if (pollOutcome !== null && typeof pollOutcome !== "string") {
+      return pollOutcome
+    }
+    if (pollOutcome) {
+      const pollError = pollOutcome
       if (shouldAttemptPollErrorRecovery(pollError)) {
         const recoveredResult = await deps.fetchSyncResult(client, activeSessionID, undefined, {
           strictAbortRecovery: true,

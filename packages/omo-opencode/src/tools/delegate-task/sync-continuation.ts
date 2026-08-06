@@ -194,6 +194,9 @@ export async function executeSyncContinuation(
         taskId,
         anchorMessageCount,
       }, syncPollTimeoutMs)
+      if (pollError !== null && typeof pollError !== "string") {
+        return "Sync continuation exceeded wall-clock limit before adoption support was available"
+      }
       if (pollError && shouldAttemptPollErrorRecovery(pollError)) {
         if (anchorMessageCount === undefined) {
           return pollError
