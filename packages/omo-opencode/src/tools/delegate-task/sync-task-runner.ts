@@ -103,6 +103,8 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
       }
     : undefined
   let activeSessionID = input.sessionID
+  const wallClockTimeoutMs = syncWallClockTimeoutMs ?? Infinity
+  const wallClockDeadline = wallClockTimeoutMs === Infinity ? Infinity : Date.now() + wallClockTimeoutMs
 
   while (true) {
     let promptError = await deps.sendSyncPrompt(client, {
@@ -153,7 +155,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
       taskId,
       hasActiveChildBackgroundTasks,
       hasPendingParentWake,
-      syncWallClockTimeoutMs,
+      wallClockDeadline,
     }, syncPollTimeoutMs)
     switch (pollOutcome.kind) {
       case "wall_clock_yield":

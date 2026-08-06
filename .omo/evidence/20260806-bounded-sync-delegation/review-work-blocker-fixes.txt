@@ -1,0 +1,85 @@
+# Bounded sync delegation blocker fixes
+
+## Findings and changes
+
+1. **Shared wall-clock budget across fallback retries.**
+   - Cause: `pollSyncSession()` created its start timestamp per poll invocation, while `runSyncTaskLoop()` retries after fallback.
+   - Change: `runSyncTaskLoop()` computes one `wallClockDeadline` before its retry loop and supplies it to every poll attempt. `pollSyncSession()` compares `Date.now()` with that deadline. Inactivity tracking remains local to each poll attempt.
+
+2. **Unbounded sync continuation.**
+   - Cause: `executeSyncContinuation()` did not pass configured wall-clock timing to the shared poller, leaving its `Infinity` default active.
+   - Change: continuation computes same absolute deadline and passes it to `pollSyncSession()`.
+
+3. **Continuation yield ownership race (#5112 class).**
+   - Choice: **option (a), adoption**. On a continuation `wall_clock_yield`, `executeSyncContinuation()` calls `manager.adoptRunningSession()`, sets `yieldedToBackground` only after successful adoption, and returns its `bg_...` handle. Cleanup skips handback marking/abort only after ownership transfer. Every non-adopted exit now marks `handedBackSyncSessions` and sends abort, so no live unmarked child can escape.
+   - Why: preserves child work and matches working `sync-task.ts` adoption semantics. Comment records ownership rule.
+
+## TDD evidence
+
+### RED
+
+Command:
+
+```sh
+bun test packages/omo-opencode/src/tools/delegate-task/sync-session-poller.wall-clock.test.ts packages/omo-opencode/src/tools/delegate-task/sync-continuation.test.ts
+```
+
+Observed expected failures before production edits:
+
+```text
+Expected: 130
+Received: undefined
+```
+
+- Runner regression received `undefined` for both retry poll deadlines.
+- Continuation regression received `undefined` for its deadline.
+- Initial fallback fixture was corrected from invalid fallback entry shape before final RED run; final RED had 19 pass, 2 fail, 57 expectations.
+
+### GREEN
+
+```text
+bun test packages/omo-opencode/src/tools/delegate-task/
+499 pass, 0 fail
+Ran 499 tests across 43 files.
+
+bun test packages/omo-opencode/src/features/background-agent/
+762 pass, 0 fail
+Ran 762 tests across 63 files.
+
+bun run typecheck
+exit 0
+
+rg -n "as any|@ts-ignore|@ts-expect-error" packages/omo-opencode/src/tools/delegate-task/
+NO_MATCHES
+
+git diff --check -- <touched paths>
+DIFF_CHECK_CLEAN
+```
+
+## Manual QA
+
+Script: `/tmp/bounded-sync-manual-qa.ts`
+
+```text
+case1 true
+case2 true true
+case3 true true
+case4 true
+```
+
+Interpretation:
+
+1. Single attempt below bound completes normally.
+2. First attempt errors, second yields; same absolute deadline captured across retry.
+3. Continuation yield returns `Background Task ID: bg_manual`; adoption called once.
+4. `Infinity` default reaches normal completion rather than yielding.
+
+## Scope and omissions
+
+- Did not change failed-adoption cleanup, concurrency accounting, inactivity settings, polling interval, turn cap, schema defaults, parent wake, dedupe, or flush runner internals.
+- No secrets, tokens, headers, or local session IDs copied into this evidence.
+- Existing unrelated dirty artifacts in `packages/omo-codex/` and `packages/omo-senpi/` were not staged.
+
+## Commit
+
+Pending at evidence write time. SHA and `git show --stat` appended after commit.

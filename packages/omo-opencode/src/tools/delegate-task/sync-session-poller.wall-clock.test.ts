@@ -62,7 +62,7 @@ describe("pollSyncSession wall-clock yield", () => {
         agentToUse: "sisyphus",
         toastManager: null,
         taskId: undefined,
-        syncWallClockTimeoutMs: 30,
+        wallClockDeadline: 30,
       })
 
       // then
@@ -101,6 +101,57 @@ describe("pollSyncSession wall-clock yield", () => {
     })
   })
 
+
+  test("#given fallback retry #when shared wall-clock deadline is reached #then second poll keeps original deadline", async () => {
+    // given
+    const deadlines: Array<number | undefined> = []
+    let pollAttempt = 0
+    const originalDateNow = Date.now
+    Date.now = () => 100
+
+    try {
+      // when
+      const outcome = await runSyncTaskLoop(unsafeTestValue({
+        args: { description: "shared wall-clock task", prompt: "work", load_skills: [], run_in_background: false },
+        ctx: toolContext,
+        executorCtx: { client: { session: { abort: async () => ({ data: {} }) } }, directory: "/tmp", sisyphusAgentConfig: undefined },
+        parentContext: { sessionID: "ses_parent", messageID: "msg_parent" },
+        agentToUse: "sisyphus",
+        categoryModel: { providerID: "openai", modelID: "first" },
+        fallbackChain: [{ model: "second", providers: ["openai"] }],
+        deps: {
+          sendSyncPrompt: async () => null,
+          pollSyncSession: async (_ctx: unknown, _client: unknown, input: { wallClockDeadline?: number }) => {
+            deadlines.push(input.wallClockDeadline)
+            pollAttempt++
+            return pollAttempt === 1 ? { kind: "error" as const, message: "rate limit" } : { kind: "wall_clock_yield" as const }
+          },
+          fetchSyncResult: async () => ({ ok: false as const, error: "unexpected" }),
+          createSyncSession: async () => ({ ok: true as const, sessionID: "ses_retry" }),
+          isProviderExhaustionFallbackEligible: () => true,
+        },
+        sessionID: "ses_child",
+        spawnDepth: 1,
+        taskId: "sync_ses_child",
+        startTime: new Date(0),
+        syncPollTimeoutMs: undefined,
+        syncWallClockTimeoutMs: 30,
+        systemContent: undefined,
+        toastManager: undefined,
+        modelInfo: undefined,
+        registerSyncSession: async () => {},
+        publishSyncMetadata: async () => {},
+        cleanupRetrySession: () => {},
+        setSyncSessionID: () => {},
+      }))
+
+      // then
+      expect(outcome).toEqual({ kind: "wall_clock_yield" })
+      expect(deadlines).toEqual([130, 130])
+    } finally {
+      Date.now = originalDateNow
+    }
+  })
 
   test("#given poller yields #when runner handles outcome #then bypasses recovery and fallback", async () => {
     // given

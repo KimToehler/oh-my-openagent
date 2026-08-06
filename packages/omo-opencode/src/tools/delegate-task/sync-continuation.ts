@@ -99,7 +99,7 @@ export async function executeSyncContinuation(
   deps: SyncContinuationDeps = syncContinuationDeps,
   systemContent?: string
 ): Promise<string> {
-  const { client, syncPollTimeoutMs, sisyphusAgentConfig } = executorCtx
+  const { client, manager, syncPollTimeoutMs, syncWallClockTimeoutMs, sisyphusAgentConfig } = executorCtx
   const toastManager = getTaskToastManager()
   const continuationID = getTaskID(args)
   if (!continuationID) {
@@ -107,6 +107,8 @@ export async function executeSyncContinuation(
   }
   const taskId = `resume_sync_${continuationID.slice(0, 8)}`
   const startTime = new Date()
+  const wallClockTimeoutMs = syncWallClockTimeoutMs ?? Infinity
+  const wallClockDeadline = wallClockTimeoutMs === Infinity ? Infinity : Date.now() + wallClockTimeoutMs
 
   if (toastManager) {
     toastManager.addTask({
@@ -121,7 +123,7 @@ export async function executeSyncContinuation(
   let resumeModel: ResumeModel | undefined
   let resumeVariant: string | undefined
   let anchorMessageCount: number | undefined
-  let handedBackToParent = false
+  let yieldedToBackground = false
 
   try {
     const resumeContext = await resolveResumeContext(client, continuationID)
@@ -193,11 +195,31 @@ export async function executeSyncContinuation(
         toastManager,
         taskId,
         anchorMessageCount,
+        wallClockDeadline,
       }, syncPollTimeoutMs)
       switch (pollOutcome.kind) {
-        // Continuation adoption needs separate lifecycle design.
-        case "wall_clock_yield":
-          return "Sync continuation exceeded wall-clock limit before adoption support was available"
+        case "wall_clock_yield": {
+          const backgroundTask = manager.adoptRunningSession({
+            sessionId: continuationID,
+            parentSessionId: parentContext.sessionID,
+            parentMessageId: parentContext.messageID,
+            description: args.description,
+            agent: resumeAgent ?? "continue",
+            model: resumeModel,
+            rootSessionId: parentContext.sessionID,
+          })
+          // Successful adoption transfers lifecycle ownership to BackgroundManager.
+          // Do not mark or abort here: those guards belong only to sync handback exits.
+          yieldedToBackground = true
+          return `Sync continuation moved to background.
+
+Background Task ID: ${backgroundTask.id}
+Description: ${backgroundTask.description}
+Agent: ${backgroundTask.agent}
+Status: still running
+
+Do NOT call background_output now. Wait for <system-reminder> notification first.`
+        }
         case "error": {
           const pollError = pollOutcome.message
           if (shouldAttemptPollErrorRecovery(pollError)) {
@@ -213,7 +235,6 @@ export async function executeSyncContinuation(
             }
 
             const duration = formatDuration(startTime)
-            handedBackToParent = true
 
             return `Task continued and completed in ${duration}.
 
@@ -243,7 +264,6 @@ ${buildTaskMetadataBlock({
       }
 
      const duration = formatDuration(startTime)
-     handedBackToParent = true
 
      return `Task continued and completed in ${duration}.
 
@@ -261,7 +281,7 @@ ${buildTaskMetadataBlock({
      if (toastManager) {
        toastManager.removeTask(taskId)
      }
-     if (handedBackToParent) {
+     if (!yieldedToBackground) {
        handedBackSyncSessions.add(continuationID)
        if (typeof client.session.abort === "function") {
          void client.session.abort({ path: { id: continuationID } }).catch((error: unknown) => {

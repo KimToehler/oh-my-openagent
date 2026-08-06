@@ -549,7 +549,62 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     handedBackSyncSessions.clear()
   })
 
-  test("does not mark or abort resumed sync session when handback fails", async () => {
+  test("#given continuation wall-clock yield #when adopted #then returns background handle without sync cleanup", async () => {
+    // given
+    const { handedBackSyncSessions } = require("../../features/claude-code-session-state")
+    handedBackSyncSessions.clear()
+    const abortCalls: Array<{ path: { id: string } }> = []
+    const adoptionCalls: unknown[] = []
+    const mockClient = {
+      session: {
+        messages: async () => ({ data: [{ info: { role: "assistant", agent: "explore" } }] }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async (input: { path: { id: string } }) => {
+          abortCalls.push(input)
+          return {}
+        },
+      },
+    }
+    const deps = {
+      pollSyncSession: async (_ctx: unknown, _client: unknown, input: { wallClockDeadline?: number }) => {
+        expect(input.wallClockDeadline).toBe(130)
+        return { kind: "wall_clock_yield" as const }
+      },
+      fetchSyncResult: async () => ({ ok: false as const, error: "unexpected" }),
+    }
+    const manager = {
+      adoptRunningSession: (input: unknown) => {
+        adoptionCalls.push(input)
+        return { id: "bg_resumed", description: "resumed task", agent: "explore" }
+      },
+    }
+    const originalDateNow = Date.now
+    Date.now = () => 100
+
+    try {
+      // when
+      const { executeSyncContinuation } = require("./sync-continuation")
+      const result = await executeSyncContinuation(
+        { task_id: "ses_test_12345678", prompt: "continue", description: "resumed task", load_skills: [], run_in_background: false },
+        { sessionID: "parent-session", callID: "call-123", metadata: () => {} },
+        { client: mockClient, manager, syncWallClockTimeoutMs: 30 },
+        { sessionID: "parent-session", messageID: "parent-message" },
+        deps,
+      )
+
+      // then
+      expect(result).toContain("Background Task ID: bg_resumed")
+      expect(adoptionCalls).toHaveLength(1)
+      expect(handedBackSyncSessions.has("ses_test_12345678")).toBe(false)
+      expect(abortCalls).toEqual([])
+    } finally {
+      Date.now = originalDateNow
+      handedBackSyncSessions.clear()
+    }
+  })
+
+  test("marks and aborts resumed sync session when handback fails", async () => {
     //#given - a resumed sync continuation returns a poll error instead of a handback result
     const { handedBackSyncSessions } = require("../../features/claude-code-session-state")
     handedBackSyncSessions.clear()
@@ -605,10 +660,10 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     //#when - executeSyncContinuation cannot hand a result back to the parent
     const result = await executeSyncContinuation(args, mockCtx, mockExecutorCtx, { sessionID: "parent-session", messageID: "parent-message" }, deps)
 
-    //#then - todo-continuation wake paths are not told to ignore a still-unreturned child
+    //#then - any non-adopted sync exit marks and aborts the child to prevent a second worker
     expect(result).toBe("Task failed before handback")
-    expect(handedBackSyncSessions.has("ses_test_87654321")).toBe(false)
-    expect(abortCalls).toEqual([])
+    expect(handedBackSyncSessions.has("ses_test_87654321")).toBe(true)
+    expect(abortCalls).toEqual([{ path: { id: "ses_test_87654321" } }])
 
     handedBackSyncSessions.clear()
   })
@@ -849,6 +904,40 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     expect(result).toContain("<task_metadata>")
     expect(result).toContain("session_id: ses_test_12345678")
     expect(result).not.toContain("subagent:")
+  })
+
+  test("#given Infinity default #when continuation completes #then it supplies inert deadline and returns normal result", async () => {
+    // given
+    const observedDeadlines: Array<number | undefined> = []
+    const mockClient = {
+      session: {
+        messages: async () => ({ data: [{ info: { role: "assistant", agent: "explore" } }] }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const deps = {
+      pollSyncSession: async (_ctx: unknown, _client: unknown, input: { wallClockDeadline?: number }) => {
+        observedDeadlines.push(input.wallClockDeadline)
+        return { kind: "ok" as const }
+      },
+      fetchSyncResult: async () => ({ ok: true as const, textContent: "Result" }),
+    }
+
+    // when
+    const { executeSyncContinuation } = require("./sync-continuation")
+    const result = await executeSyncContinuation(
+      { task_id: "ses_infinity", prompt: "continue", description: "inert deadline", load_skills: [], run_in_background: false },
+      { sessionID: "parent-session", callID: "call-123", metadata: () => {} },
+      { client: mockClient },
+      { sessionID: "parent-session", messageID: "parent-message" },
+      deps,
+    )
+
+    // then
+    expect(observedDeadlines).toEqual([Infinity])
+    expect(result).toContain("Task continued and completed")
   })
 
   test("preserves restricted tool permissions for resumed explore sessions", async () => {

@@ -60,13 +60,16 @@ export async function pollSyncSession(
     hasActiveChildBackgroundTasks?: (sessionID: string) => boolean
     hasPendingParentWake?: (sessionID: string) => boolean
     childWakeGraceMs?: number
-    syncWallClockTimeoutMs?: number
+    wallClockDeadline?: number
   },
   timeoutMs?: number
 ): Promise<SyncPollOutcome> {
   const syncTiming = getTimingConfig()
   const maxPollTimeMs = Math.max(timeoutMs ?? getDefaultSyncPollTimeoutMs(), 50)
-  const wallClockTimeoutMs = input.syncWallClockTimeoutMs ?? getDefaultSyncWallClockTimeoutMs()
+  const wallClockDeadline = input.wallClockDeadline ?? (() => {
+    const wallClockTimeoutMs = getDefaultSyncWallClockTimeoutMs()
+    return wallClockTimeoutMs === Infinity ? Infinity : Date.now() + wallClockTimeoutMs
+  })()
   const maxTurns = input.maxAssistantTurns ?? DEFAULT_MAX_ASSISTANT_TURNS
   const pollStart = Date.now()
   let inactiveStart = pollStart
@@ -113,7 +116,7 @@ export async function pollSyncSession(
       break
     }
 
-    if (Date.now() - pollStart >= wallClockTimeoutMs) {
+    if (Date.now() >= wallClockDeadline) {
       log("[task] Poll wall-clock timeout reached", { sessionID: input.sessionID, pollCount })
       return { kind: "wall_clock_yield" }
     }
