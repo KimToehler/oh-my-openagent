@@ -54,6 +54,7 @@ export async function pollSyncSession(
     hasActiveChildBackgroundTasks?: (sessionID: string) => boolean
     hasPendingParentWake?: (sessionID: string) => boolean
     childWakeGraceMs?: number
+    syncWallClockTimeoutMs?: number
   },
   timeoutMs?: number
 ): Promise<string | null> {

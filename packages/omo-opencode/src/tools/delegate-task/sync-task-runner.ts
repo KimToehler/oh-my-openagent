@@ -25,6 +25,7 @@ type SyncTaskRunnerInput = {
   readonly taskId: string
   readonly startTime: Date
   readonly syncPollTimeoutMs: number | undefined
+  readonly syncWallClockTimeoutMs: number | undefined
   readonly systemContent: string | undefined
   readonly toastManager: TaskToastManager | undefined
   readonly modelInfo: ModelFallbackInfo | undefined
@@ -77,6 +78,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
     taskId,
     startTime,
     syncPollTimeoutMs,
+    syncWallClockTimeoutMs,
     systemContent,
     toastManager,
     modelInfo,
@@ -150,6 +152,7 @@ export async function runSyncTaskLoop(input: SyncTaskRunnerInput): Promise<strin
       taskId,
       hasActiveChildBackgroundTasks,
       hasPendingParentWake,
+      syncWallClockTimeoutMs,
     }, syncPollTimeoutMs)
     if (pollError) {
       if (shouldAttemptPollErrorRecovery(pollError)) {

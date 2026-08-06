@@ -24,7 +24,7 @@ export async function executeSyncTask(
   fallbackChain?: FallbackEntry[],
   deps: SyncTaskDeps = syncTaskDeps
 ): Promise<string> {
-  const { client, directory, syncPollTimeoutMs } = executorCtx
+  const { client, directory, syncPollTimeoutMs, syncWallClockTimeoutMs } = executorCtx
   const toastManager = getTaskToastManager()
   let taskId: string | undefined
   let syncSessionID: string | undefined
@@ -129,6 +129,7 @@ export async function executeSyncTask(
         taskId,
         startTime,
         syncPollTimeoutMs,
+        syncWallClockTimeoutMs,
         systemContent,
         toastManager: toastManager ?? undefined,
         modelInfo,

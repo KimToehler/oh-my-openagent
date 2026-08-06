@@ -126,3 +126,46 @@ describe("#given core skill tools are registered", () => {
     expect(createSkillMcpTool.mock.calls[0]?.[0].getLoadedSkills).toBe(skillResolver)
   })
 })
+
+describe("#given sync wall-clock timeout config", () => {
+  test("#when config omits value #then delegate-task receives ten-minute production default", () => {
+    // given
+    const createSkillTool = mock((options: SkillLoadOptions) => fakeTool)
+    const createDelegateTask = mock((options: Parameters<ToolRegistryFactories["createDelegateTask"]>[0]) => fakeTool)
+
+    // when
+    createCoreTools({
+      ctx: unsafeTestValue({ directory: "/tmp/project" }),
+      pluginConfig: unsafeTestValue({ disabled_agents: ["multimodal-looker"] }),
+      managers: unsafeTestValue({ backgroundManager: {}, tmuxSessionManager: {}, skillMcpManager: {}, modelFallbackControllerAccessor: {} }),
+      skillContext: { mergedSkills: [], availableSkills: [], browserProvider: "playwright", disabledSkills: new Set() },
+      availableCategories: [],
+      factories: { ...createFactories(createSkillTool), createDelegateTask },
+    })
+
+    // then
+    expect(createDelegateTask.mock.calls[0]?.[0].syncWallClockTimeoutMs).toBe(600_000)
+  })
+
+  test("#when config supplies value #then delegate-task receives configured wall-clock bound", () => {
+    // given
+    const createSkillTool = mock((options: SkillLoadOptions) => fakeTool)
+    const createDelegateTask = mock((options: Parameters<ToolRegistryFactories["createDelegateTask"]>[0]) => fakeTool)
+
+    // when
+    createCoreTools({
+      ctx: unsafeTestValue({ directory: "/tmp/project" }),
+      pluginConfig: unsafeTestValue({
+        disabled_agents: ["multimodal-looker"],
+        background_task: { syncWallClockTimeoutMs: 120_000 },
+      }),
+      managers: unsafeTestValue({ backgroundManager: {}, tmuxSessionManager: {}, skillMcpManager: {}, modelFallbackControllerAccessor: {} }),
+      skillContext: { mergedSkills: [], availableSkills: [], browserProvider: "playwright", disabledSkills: new Set() },
+      availableCategories: [],
+      factories: { ...createFactories(createSkillTool), createDelegateTask },
+    })
+
+    // then
+    expect(createDelegateTask.mock.calls[0]?.[0].syncWallClockTimeoutMs).toBe(120_000)
+  })
+})

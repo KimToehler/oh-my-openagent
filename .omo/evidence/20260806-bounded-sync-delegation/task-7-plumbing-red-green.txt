@@ -1,0 +1,107 @@
+# Task 7 config plumbing evidence
+
+## RED
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/plugin/tool-registry-core-tools.test.ts:
+142 |       availableCategories: [],
+143 |       factories: { ...createFactories(createSkillTool), createDelegateTask },
+144 |     })
+145 | 
+146 |     // then
+147 |     expect(createDelegateTask.mock.calls[0]?.[0].syncWallClockTimeoutMs).toBe(600_000)
+                                                                               ^
+error: expect(received).toBe(expected)
+
+Expected: 600000
+Received: undefined
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/plugin/tool-registry-core-tools.test.ts:147:74)
+(fail) #given sync wall-clock timeout config > #when config omits value #then delegate-task receives ten-minute production default [0.18ms]
+164 |       availableCategories: [],
+165 |       factories: { ...createFactories(createSkillTool), createDelegateTask },
+166 |     })
+167 | 
+168 |     // then
+169 |     expect(createDelegateTask.mock.calls[0]?.[0].syncWallClockTimeoutMs).toBe(120_000)
+                                                                               ^
+error: expect(received).toBe(expected)
+
+Expected: 120000
+Received: undefined
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/plugin/tool-registry-core-tools.test.ts:169:74)
+(fail) #given sync wall-clock timeout config > #when config supplies value #then delegate-task receives configured wall-clock bound [0.10ms]
+
+ 2 pass
+ 2 fail
+ 7 expect() calls
+Ran 4 tests across 1 file. [95.00ms]
+
+## GREEN
+bun test v1.3.14 (d1632b29)
+
+ 4 pass
+ 0 fail
+ 7 expect() calls
+Ran 4 tests across 1 file. [91.00ms]
+
+## Scoped delegate-task suite
+bun test v1.3.14 (d1632b29)
+
+ 491 pass
+ 0 fail
+ 1146 expect() calls
+Ran 491 tests across 41 files. [2.18s]
+
+## Typecheck
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+
+## Manual QA
+Factory-path interception prints constructed DelegateTaskToolOptions because reaching pollSyncSession requires a real child session.
+empty background_task: 600000
+configured background_task: 120000
+
+## timing.ts inert default unchanged
+8:let MAX_WALL_CLOCK_MS = Infinity
+41:  MAX_WALL_CLOCK_MS = Infinity
+
+## Malformed input
+BackgroundTaskConfigSchema rejects values below 60000 with ZodError before tool registry reads configuration; 0 is below same minimum.
+  describe("syncWallClockTimeoutMs", () => {
+    describe("#given valid syncWallClockTimeoutMs (600000)", () => {
+      test("#when parsed #then returns correct value", () => {
+        const result = BackgroundTaskConfigSchema.parse({ syncWallClockTimeoutMs: 600000 })
+
+        expect(result.syncWallClockTimeoutMs).toBe(600000)
+      })
+    })
+
+    describe("#given syncWallClockTimeoutMs below minimum (59999)", () => {
+      test("#when parsed #then throws ZodError", () => {
+        let thrownError: unknown
+
+        try {
+          BackgroundTaskConfigSchema.parse({ syncWallClockTimeoutMs: 59999 })
+        } catch (error) {
+          thrownError = error
+        }
+
+        expect(thrownError).toBeInstanceOf(ZodError)
+      })
+    })
+
+    describe("#given syncWallClockTimeoutMs not provided", () => {
+      test("#when parsed #then field is undefined", () => {
+        const result = BackgroundTaskConfigSchema.parse({})
+
+        expect(result.syncWallClockTimeoutMs).toBeUndefined()
+      })
+
+## Forbidden-cast scan
+NO_FORBIDDEN_MATCHES
+
+## Full suite
+bun test launched; current result unavailable before commit because suite remains running. Observed failures are unrelated skills-loader-core fixture precedence failures.
