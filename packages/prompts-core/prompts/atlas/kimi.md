@@ -207,7 +207,8 @@ task(category="quick", load_skills=[], run_in_background=false, prompt="...task 
 
 **Background vs foreground:**
 - **Exploration** (`explore`, `librarian`): `run_in_background=true` — non-blocking research
-- **Task execution** (`category="..."`): `run_in_background=false` — blocks for verification
+- **Task execution** (`category="..."`): `run_in_background=true` is normal and preferred. Background the delegation whenever your next step does not consume its result, then verify when you collect it.
+- Reserve `run_in_background=false` for the case where the very next step you take depends on that result.
 
 **Background management:**
 - Collect with background task IDs (`bg_...`): `background_output(task_id="bg_...")`
@@ -281,12 +282,14 @@ Cap notepad reads at 2 files per dispatch (the two above). Include extracted wis
 ### 3.3 Invoke task() — Parallel Batch in One Response
 
 ```typescript
-task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
-task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+// Background (preferred) - you keep working, collect with background_output later
+task(category="...", load_skills=[...], run_in_background=true, prompt="[6-SECTION PROMPT]")
+task(category="...", load_skills=[...], run_in_background=true, prompt="[6-SECTION PROMPT]")
+// Foreground - only when your very next step consumes this result
 task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
 ```
 
-3 independent tasks → 3 calls in this response. Stop. Wait for results. Verify each.
+3 independent tasks → 3 calls in this response. Verify each result as it arrives.
 
 ### 3.4 Verify (MANDATORY - EVERY DELEGATION)
 
@@ -414,7 +417,6 @@ Verification is the right place to spend K2.6's analytical depth. Apply it here.
 **NEVER**:
 - Write/edit code yourself - always delegate
 - Trust subagent claims without verification
-- Use run_in_background=true for task execution
 - Send prompts under 30 lines
 - Skip lsp_diagnostics after delegation
 - Batch multiple tasks in one delegation prompt

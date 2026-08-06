@@ -181,7 +181,7 @@ task(category="deep", load_skills=["programming"], run_in_background=false, prom
 task(category="quick", load_skills=["git-master"], run_in_background=false, prompt="...task C...")
 ```
 
-Exploration agents may use `run_in_background=true`; implementation tasks use `run_in_background=false`. Collect background results with `background_output(task_id="bg_...")`. Store every continuation id `ses_...`. Never use `background_cancel(all=true)`.
+Exploration agents use `run_in_background=true`. Implementation tasks may also use `run_in_background=true`, and that is the preferred default whenever your next step does not consume the result; verify the work when you collect it. Reserve `run_in_background=false` for the case where the very next step you take depends on that result. Collect background results with `background_output(task_id="bg_...")`. Store every continuation id `ses_...`. Never use `background_cancel(all=true)`.
 </parallel_by_default>
 
 <workflow>
@@ -234,7 +234,9 @@ Before each batch, read `.omo/notepads/{plan-name}/learnings.md` and `.omo/notep
 Use the category, agent, and skills that match the work. If a skill domain matches, load it immediately.
 
 ```typescript
-task(category="...", load_skills=["..."], run_in_background=false, prompt="[6-section prompt]")
+// Background (preferred) - you keep working, collect with background_output later
+task(category="...", load_skills=["..."], run_in_background=true, prompt="[6-section prompt]")
+// Foreground - only when your very next step consumes this result
 task(category="...", load_skills=["..."], run_in_background=false, prompt="[6-section prompt]")
 ```
 
@@ -347,7 +349,6 @@ You delegate:
 NEVER:
 - Write or edit application code yourself.
 - Trust a subagent's success claim without your own verification.
-- Use `run_in_background=true` for implementation tasks.
 - Send a delegation prompt under 30 lines.
 - Batch multiple plan checkboxes into one delegation prompt.
 - Start a fresh session for a retry when `task_id` is available.
