@@ -246,15 +246,26 @@ describe("createBackgroundOutput cross-instance lookup", () => {
   })
 
   describe("#given the global background task registry is empty (simulating a foreign realm)", () => {
-    describe("#when background_output looks up a bg id", () => {
-      test("#then it returns the not-found message", async () => {
+    describe("#when background_output looks up a bg id and no transcript pairing exists", () => {
+      test("#then the not-found message names the runtime split and offers session_read", async () => {
         const manager = createManager()
         clearBackgroundTaskRegistryForTesting()
 
-        const outputTool = createBackgroundOutput(manager, createOutputClient())
+        const client: BackgroundOutputClient = {
+          session: {
+            messages: async () => ({ data: [] }),
+          },
+        }
+
+        const outputTool = createBackgroundOutput(manager, client)
         const output = await outputTool.execute({ task_id: "bg_missing_realm" }, mockContext)
 
-        expect(output).toBe("Task not found: bg_missing_realm")
+        expect(output).toContain("Task not found in this runtime: bg_missing_realm")
+        expect(output).toContain("different runtime")
+        expect(output).toContain("session_read(session_id=")
+        expect(output).toContain("never existed")
+        expect(output).toMatch(/this runtime is `rt:[^`]+`/)
+        expect(output).toContain("NOT a retention/cleanup race")
       })
     })
   })

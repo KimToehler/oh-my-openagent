@@ -1,3 +1,4 @@
+import { RUNTIME_ID } from "@oh-my-opencode/utils"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { BackgroundTask } from "../../features/background-agent"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
@@ -144,16 +145,38 @@ async function recoverFromParentTranscript(
 ${output}`
 }
 
-function formatTaskNotFoundMessage(taskId: string): string {
-  if (!isSessionId(taskId)) {
-    return `Task not found: ${taskId}`
+function resolveRuntimeIdLabel(): string {
+  // RUNTIME_ID identifies the process + module realm. Guarded so the message
+  // still renders if the shared logger export is ever unavailable at runtime.
+  try {
+    return typeof RUNTIME_ID === "string" && RUNTIME_ID.length > 0 ? ` (this runtime is \`rt:${RUNTIME_ID}\`)` : ""
+  } catch {
+    return ""
   }
+}
 
-  return `Task not found: ${taskId}
+function formatTaskNotFoundMessage(taskId: string): string {
+  if (isSessionId(taskId)) {
+    return `Task not found: ${taskId}
 
 background_output expects a background task ID such as \`bg_...\`, not a session ID.
 Use the \`background_task_id\` / \`Background Task ID\` from the task launch output or completion notification.
 To inspect this session directly, use \`session_read(session_id="${taskId}")\`, \`session_info\`, or \`session_search\`.`
+  }
+
+  if (isBackgroundTaskId(taskId)) {
+    return `Task not found in this runtime: ${taskId}
+
+Two possibilities:
+1. The task id never existed — check the launch output for the exact \`bg_...\` id.
+2. The task is owned by a different runtime (process/realm) than the one serving this tool call${resolveRuntimeIdLabel()}. Background task state is per-runtime memory; when terminal opencode, \`opencode serve\`, and IDE-embedded opencode run side by side, a task launched in one is invisible to the others. This is NOT a retention/cleanup race — the owning runtime may still hold the task.
+
+Recovery: use \`session_read(session_id="ses_...")\` with the session id from the task's launch output or completion notification (the \`| session: \`ses_...\`\` suffix). Session transcripts are server-backed and readable from every runtime.`
+  }
+
+  return `Task not found: ${taskId}
+
+background_output expects a background task ID such as \`bg_...\` from the task launch output or completion notification.`
 }
 
 export function createBackgroundOutput(manager: BackgroundOutputManager, client: BackgroundOutputClient): ToolDefinition {
