@@ -117,9 +117,15 @@ ${resultCollectionInstruction}${hasFailures ? `\n\n**ACTION REQUIRED:** ${failed
   const isFailure = statusText !== "COMPLETED"
   const header = isFailure ? `[BACKGROUND TASK ${statusText}]` : "[BACKGROUND TASK RESULT READY]"
 
+  // The `| session: \`ses_...\`` suffix is the machine-parsable handle the
+  // cross-runtime transcript scanner recognizes (parent-transcript-pairing.ts
+  // summary-line shape). Without it, the mid-batch notification promises a
+  // session_read fallback its own format defeats.
+  const sessionHandle = task.sessionId ? ` | session: \`${task.sessionId}\`` : ""
+
   return `<system-reminder>
 ${header}
-**ID:** \`${task.id}\`
+**ID:** \`${task.id}\`${sessionHandle}
 **Description:** ${safeDescription(task)}
 **Duration:** ${duration}${errorInfo}
 

@@ -1,8 +1,26 @@
 // allow: SIZE_OK - notification template tests cover one rendering contract with shared cases; this release adds narrow status cases and future additions should split by template section.
 
 import { describe, expect, test } from "bun:test"
+import type { BackgroundOutputClient } from "../../tools/background-task/clients"
+import { findSessionIdInParentTranscript } from "../../tools/background-task/parent-transcript-pairing"
 import { buildBackgroundTaskNotificationText } from "./background-task-notification-template"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
+
+function clientWithNotificationText(text: string): BackgroundOutputClient {
+  return {
+    session: {
+      messages: async () => ({
+        data: [
+          {
+            id: "m-notification",
+            info: { role: "assistant", time: "2026-08-07T00:00:10.000Z" },
+            parts: [{ type: "text", text }],
+          },
+        ],
+      }),
+    },
+  }
+}
 
 describe("buildBackgroundTaskNotificationText", () => {
   describe("#given one task still running after a completed task notification", () => {
@@ -349,6 +367,90 @@ All sibling background tasks are complete. Your next action should be to call \`
       // then
       expect(notification).toContain("ses_child_2")
       expect(notification).toContain("session_read(session_id=\"ses_child_2\")")
+    })
+  })
+
+  describe("#given a mid-batch notification recorded in the parent transcript", () => {
+    test("#when the transcript scanner reads the success variant #then it recovers the child session id", async () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "bg_alpha",
+          description: "Mid-batch success task",
+          status: "completed",
+          sessionId: "ses_mid",
+        },
+        duration: "5s",
+        statusText: "COMPLETED",
+        allComplete: false,
+        remainingCount: 1,
+        completedTasks: [],
+      })
+
+      // when
+      const recovered = await findSessionIdInParentTranscript(
+        clientWithNotificationText(notification),
+        "ses_parent",
+        "bg_alpha",
+      )
+
+      // then
+      expect(recovered).toBe("ses_mid")
+    })
+
+    test("#when the transcript scanner reads the failure variant #then it recovers the child session id", async () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "bg_beta",
+          description: "Mid-batch failed task",
+          status: "error",
+          error: "Timed out",
+          sessionId: "ses_mf",
+        },
+        duration: "3m 4s",
+        statusText: "ERROR",
+        allComplete: false,
+        remainingCount: 2,
+        completedTasks: [],
+      })
+
+      // when
+      const recovered = await findSessionIdInParentTranscript(
+        clientWithNotificationText(notification),
+        "ses_parent",
+        "bg_beta",
+      )
+
+      // then
+      expect(recovered).toBe("ses_mf")
+    })
+
+    test("#when a DIFFERENT task id is requested against the notification #then no session is recovered", async () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "bg_alpha",
+          description: "Mid-batch success task",
+          status: "completed",
+          sessionId: "ses_mid",
+        },
+        duration: "5s",
+        statusText: "COMPLETED",
+        allComplete: false,
+        remainingCount: 1,
+        completedTasks: [],
+      })
+
+      // when
+      const recovered = await findSessionIdInParentTranscript(
+        clientWithNotificationText(notification),
+        "ses_parent",
+        "bg_other",
+      )
+
+      // then
+      expect(recovered).toBeUndefined()
     })
   })
 
