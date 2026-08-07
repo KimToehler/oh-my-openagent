@@ -14,6 +14,7 @@ export type PendingParentWake = {
   queuedAt?: number
   dispatchedAt?: number
   noReplyAdmittedAt?: number
+  lastAdmitOnlyDepositAt?: number
   toolCallDeferralStartedAt?: number
   allowEmptyAssistantTurnRetry?: boolean
   noAssistantOutputRetryCount?: number
@@ -38,6 +39,7 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
     ...(wake.queuedAt !== undefined ? { queuedAt: wake.queuedAt } : {}),
     ...(wake.dispatchedAt !== undefined ? { dispatchedAt: wake.dispatchedAt } : {}),
     ...(wake.noReplyAdmittedAt !== undefined ? { noReplyAdmittedAt: wake.noReplyAdmittedAt } : {}),
+    ...(wake.lastAdmitOnlyDepositAt !== undefined ? { lastAdmitOnlyDepositAt: wake.lastAdmitOnlyDepositAt } : {}),
     ...(wake.toolCallDeferralStartedAt !== undefined
       ? { toolCallDeferralStartedAt: wake.toolCallDeferralStartedAt }
       : {}),
@@ -48,6 +50,18 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
       ? { noAssistantOutputRetryCount: wake.noAssistantOutputRetryCount }
       : {}),
   }
+}
+
+// The admission timestamp a consumed-deposit drop may key on. A reply-required
+// wake is only droppable on an admission it earned itself (noReplyAdmittedAt) —
+// never on an admit-only deposit made before a reply-required wake merged in
+// (issues #4874/#5086). A shouldReply:false wake is droppable on its
+// admit-only deposit: once the live turn consumed it, nothing is owed.
+export function getParentWakeConsumedAdmissionAt(wake: PendingParentWake): number | undefined {
+  if (wake.shouldReply) {
+    return wake.noReplyAdmittedAt
+  }
+  return wake.noReplyAdmittedAt ?? wake.lastAdmitOnlyDepositAt
 }
 
 export function isRedundantParentWake(latestWake: PendingParentWake, dispatchedWake: PendingParentWake): boolean {

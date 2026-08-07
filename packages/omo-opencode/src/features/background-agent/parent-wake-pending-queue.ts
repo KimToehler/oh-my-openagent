@@ -61,6 +61,7 @@ export class ParentWakePendingQueue {
       pendingWake.shouldReply = pendingWake.shouldReply || shouldReply
       if (notificationsChanged) {
         delete pendingWake.noReplyAdmittedAt
+        delete pendingWake.lastAdmitOnlyDepositAt
         delete pendingWake.noAssistantOutputRetryCount
       }
       return
@@ -88,6 +89,7 @@ export class ParentWakePendingQueue {
       pendingWake.shouldReply = pendingWake.shouldReply || latestWake.shouldReply
       pendingWake.promptContext = latestWake.promptContext
       pendingWake.noReplyAdmittedAt ??= latestWake.noReplyAdmittedAt
+      pendingWake.lastAdmitOnlyDepositAt ??= latestWake.lastAdmitOnlyDepositAt
       pendingWake.toolCallDeferralStartedAt ??= latestWake.toolCallDeferralStartedAt
       pendingWake.allowEmptyAssistantTurnRetry ||= latestWake.allowEmptyAssistantTurnRetry
       const noAssistantOutputRetryCount = Math.max(

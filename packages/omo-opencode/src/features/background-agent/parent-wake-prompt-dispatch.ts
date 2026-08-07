@@ -115,10 +115,15 @@ function markRetainedNoReplyAdmission(input: ParentWakePromptDispatchInput, disp
   if (input.retainPendingWake !== true || input.forceNoReply !== true) {
     return
   }
-  // Also marked for retained shouldReply:false deposits: the admission marker
-  // both restarts the bounded re-admission ceiling and lets
-  // dropAdmittedWakeConsumedByParent drop a deposit the live turn consumed.
-  input.latestWake.noReplyAdmittedAt = dispatchStartedAt
+  // Two distinct markers so an admit-only deposit can never alias a reply
+  // admission (issues #4874/#5086): noReplyAdmittedAt means a REPLY-REQUIRED
+  // wake was admitted as noReply and its reply is still owed;
+  // lastAdmitOnlyDepositAt only restarts the bounded re-admission ceiling for
+  // retained shouldReply:false deposits.
+  if (input.latestWake.shouldReply) {
+    input.latestWake.noReplyAdmittedAt = dispatchStartedAt
+  }
+  input.latestWake.lastAdmitOnlyDepositAt = dispatchStartedAt
   input.scheduleFlush()
 }
 

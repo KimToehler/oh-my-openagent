@@ -1,6 +1,11 @@
 import { log } from "../../shared"
 import { isSessionActive as isOpenCodeSessionActive, settleAfterSessionIdle } from "../../hooks/shared/session-idle-settle"
-import { isFailureParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"
+import {
+  getParentWakeConsumedAdmissionAt,
+  isFailureParentWake,
+  isRedundantParentWake,
+  type PendingParentWake,
+} from "./parent-wake-dedupe"
 import type { ParentWakeDispatchedTracker } from "./parent-wake-dispatched-tracker"
 import type { ParentWakePendingQueue } from "./parent-wake-pending-queue"
 import { sendParentWakePrompt } from "./parent-wake-prompt-dispatch"
@@ -232,7 +237,7 @@ export class ParentWakeFlushRunner {
   // the live turn consumed the deposit — re-dispatching it would inject a
   // duplicate notification and fork a concurrent assistant chain.
   private async dropAdmittedWakeConsumedByParent(sessionID: string, latestWake: PendingParentWake): Promise<boolean> {
-    if (latestWake.noReplyAdmittedAt === undefined) {
+    if (getParentWakeConsumedAdmissionAt(latestWake) === undefined) {
       return false
     }
     if (!(await this.deps.sessionInspector.hasAssistantOutputAfterAdmittedWake(sessionID, latestWake))) {
@@ -304,7 +309,7 @@ export class ParentWakeFlushRunner {
   // ceiling, and an admitted retained wake restarts its clock from the last
   // admission. Only ever produces another noReply admission — never a reply.
   private shouldAdmitRetainedWakeAfterCeiling(wake: PendingParentWake): boolean {
-    const referenceAt = wake.noReplyAdmittedAt ?? wake.queuedAt
+    const referenceAt = wake.lastAdmitOnlyDepositAt ?? wake.noReplyAdmittedAt ?? wake.queuedAt
     if (referenceAt === undefined) {
       return false
     }

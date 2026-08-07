@@ -9,7 +9,7 @@ import {
   latestAssistantTurnHasToolBlock,
   latestAssistantTurnIsCompletedEmptyNoProgress,
 } from "./parent-wake-history-state"
-import type { PendingParentWake } from "./parent-wake-dedupe"
+import { getParentWakeConsumedAdmissionAt, type PendingParentWake } from "./parent-wake-dedupe"
 import { getParentWakeMessageCreatedAt } from "./parent-wake-message-activity"
 import type { ParentWakeSessionMessage } from "./parent-wake-session-message"
 
@@ -68,7 +68,7 @@ export function getParentWakeSessionHistoryDeferralDecision(input: {
   }
   const messages = [...input.messages]
   let strippedOwnAdmittedDeposit = false
-  if (input.wake.noReplyAdmittedAt !== undefined) {
+  if (input.wake.noReplyAdmittedAt !== undefined || input.wake.lastAdmitOnlyDepositAt !== undefined) {
     while (messages.length > 0) {
       const last = messages[messages.length - 1]
       if (
@@ -157,7 +157,7 @@ export function hasAssistantOutputAfterParentWakeAdmission(input: {
   readonly messages: readonly ParentWakeSessionMessage[] | undefined
   readonly wake: PendingParentWake
 }): boolean {
-  const admittedAt = input.wake.noReplyAdmittedAt
+  const admittedAt = getParentWakeConsumedAdmissionAt(input.wake)
   if (admittedAt === undefined || !input.messages) {
     return false
   }
