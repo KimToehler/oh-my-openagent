@@ -2724,6 +2724,7 @@ The task was re-queued on a fallback model after a retryable failure.
       status: task.status,
       error: task.error,
       attempts: cloneAttempts(task),
+      sessionId: task.sessionId,
     })
 
     // Update pending tracking and check if all tasks complete
@@ -2745,7 +2746,7 @@ The task was re-queued on a fallback model after a retryable failure.
     }
 
     const completedTasks = allComplete
-      ? (this.completedTaskSummaries.get(task.parentSessionId) ?? [{ id: task.id, description: task.description, status: task.status, error: task.error, attempts: cloneAttempts(task) }])
+      ? (this.completedTaskSummaries.get(task.parentSessionId) ?? [{ id: task.id, description: task.description, status: task.status, error: task.error, attempts: cloneAttempts(task), sessionId: task.sessionId }])
       : []
 
     if (allComplete) {

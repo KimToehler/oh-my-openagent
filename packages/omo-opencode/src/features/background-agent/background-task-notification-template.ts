@@ -8,6 +8,7 @@ export interface BackgroundTaskNotificationTask {
   status: BackgroundTaskStatus
   error?: string
   attempts?: BackgroundTaskAttempt[]
+  sessionId?: string
 }
 
 function formatAttemptModel(attempt: BackgroundTaskAttempt): string {
@@ -49,7 +50,8 @@ function formatAttemptTimeline(task: BackgroundTaskNotificationTask): string {
 }
 
 function formatTaskSummaryLine(task: BackgroundTaskNotificationTask): string {
-  const baseLine = `- \`${task.id}\`: ${task.description || task.id}`
+  const sessionSuffix = task.sessionId ? ` | session: \`${task.sessionId}\`` : ""
+  const baseLine = `- \`${task.id}\`: ${task.description || task.id}${sessionSuffix}`
   const statusSuffix = task.status === "completed"
     ? ""
     : ` [${task.status.toUpperCase()}]${task.error ? ` - ${task.error}` : ""}`
@@ -98,7 +100,10 @@ export function buildBackgroundTaskNotificationText(input: {
       body = `${formatTaskSummaryLine(task)}\n`
     }
 
-    const resultCollectionInstruction = "All sibling background tasks are complete. Your next action should be to call `background_output(task_id=\"<id>\")` for each task ID above."
+    const hasSessionHandles = completedTasks.some((t) => t.sessionId) || Boolean(task.sessionId)
+    const resultCollectionInstruction = hasSessionHandles
+      ? "All sibling background tasks are complete. Your next action should be to call `background_output(task_id=\"<id>\")` for each task ID above. If a task ID returns not-found, fall back to `session_read(session_id=\"<session>\")` using the session id on that task's line."
+      : "All sibling background tasks are complete. Your next action should be to call `background_output(task_id=\"<id>\")` for each task ID above."
 
     return `<system-reminder>
 ${header}
@@ -121,6 +126,6 @@ ${header}
 **${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.** You WILL be notified when ALL complete.
 ${isFailure ? "**ACTION REQUIRED:** This task failed. Check the error and decide whether to retry, cancel remaining tasks, or continue." : "Do NOT poll - continue productive work."}
 
-Use \`background_output(task_id="${task.id}")\` to retrieve this result when ready.
+Use \`background_output(task_id="${task.id}")\` to retrieve this result when ready.${task.sessionId ? ` If that returns not-found, fall back to \`session_read(session_id="${task.sessionId}")\`.` : ""}
 </system-reminder>`
 }

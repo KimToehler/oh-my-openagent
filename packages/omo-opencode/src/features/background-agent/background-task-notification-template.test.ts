@@ -301,6 +301,57 @@ All sibling background tasks are complete. Your next action should be to call \`
     })
   })
 
+  describe("#given a completed task with a child session id", () => {
+    test("#when the completion notification is built #then the summary line carries the session id as a fallback handle", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "bg_a4f323d2",
+          description: "Cross-process repro task",
+          status: "completed",
+          sessionId: "ses_child_1",
+        },
+        duration: "9s",
+        statusText: "COMPLETED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [
+          {
+            id: "bg_a4f323d2",
+            description: "Cross-process repro task",
+            status: "completed",
+            sessionId: "ses_child_1",
+          },
+        ],
+      })
+
+      // then
+      expect(notification).toContain("- `bg_a4f323d2`: Cross-process repro task | session: `ses_child_1`")
+      expect(notification).toContain("session_read(session_id=")
+    })
+
+    test("#when a partial completion notification is built #then it offers the session id as a fallback handle", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "bg_partial_1",
+          description: "Mid-batch task",
+          status: "completed",
+          sessionId: "ses_child_2",
+        },
+        duration: "5s",
+        statusText: "COMPLETED",
+        allComplete: false,
+        remainingCount: 1,
+        completedTasks: [],
+      })
+
+      // then
+      expect(notification).toContain("ses_child_2")
+      expect(notification).toContain("session_read(session_id=\"ses_child_2\")")
+    })
+  })
+
   describe("#given a single task notification with undefined description", () => {
     test("#when building the partial notification #then it uses task ID as fallback", () => {
       // given
