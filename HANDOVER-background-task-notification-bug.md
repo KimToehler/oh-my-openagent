@@ -8,6 +8,31 @@
 This is a read-only diagnosis handover. Everything below was observed live in a
 real Sisyphus session, then traced to specific lines. Reproduce before fixing.
 
+## Status update (Wave 5, `bg-wake-and-crossprocess-lookup` plan)
+
+This file is being read after the fix work landed. Three corrections follow, so the
+next reader is not misled the way a later investigation was: the `formatTaskNotFoundMessage`
+text below was read as a retention/reaper race and burned two days chasing it. See
+`.omo/plans/HANDOFF-PROMPT-mid-batch-wake-starvation.md` for that investigation's own
+record of the misdirection, and `.omo/plans/bg-wake-and-crossprocess-lookup.md` sections 1
+and 11 for the full corrected root cause.
+
+- **D1 is FIXED.** `scheduleTaskRemoval` now defers cleanup while a wake is still owed.
+  Landed on `dev` as `82b32ac08` / `0b4ef28fc`, cherry-picked into `fix/bg-wake-crossproc`
+  as `4d070dafe` / `4214bcb25`. Pinned by `task-completion-retention-guard.test.ts` (4
+  tests, green). See the annotated D1 paragraph below.
+- **D3 is FALSIFIED.** The retention-race framing below is wrong. See the annotated D3
+  paragraph below for the disproof, drawn from the n=6 production log ledger.
+- **D2 is real but narrower than the paragraph below describes.** It self-heals whenever
+  the batch reaches `allComplete` on a busy-but-safe parent. The residual is a specific
+  unbounded-defer path, now closed by a 300-second bounded re-admission ceiling that
+  deposits `noReply` only, never a forced reply. See the annotated D2 paragraph below.
+- The **"no existing test"** claim under *Reproduce first* is also stale:
+  `task-completion-retention-guard.test.ts` now covers exactly the D1/D3 contract.
+
+The original analysis below is left intact and annotated inline, not deleted, so the
+reasoning trail, right and wrong, survives.
+
 ---
 
 ## What was observed (two separate symptoms, one session)
@@ -80,6 +105,12 @@ getTask(id: string): BackgroundTask | undefined {
 All three are per-process. `formatTaskNotFoundMessage`
 (`create-background-output.ts:81-98`) already documents the multi-instance case —
 but that is **not** what happened here: one opencode instance, one orchestrator.
+
+> **UPDATE (Wave 5):** that last line was itself wrong. `formatTaskNotFoundMessage`'s
+> multi-instance framing was dismissed here as inapplicable to a single opencode
+> instance. It turned out to be pointing at the right family of problem with the wrong
+> scope: not "one opencode instance" but one opencode *process* versus the terminal
+> client process the tool call actually runs in. See the D3 annotation below.
 
 ### Removal — the 10-minute timer
 
@@ -164,11 +195,31 @@ the time the reminder reaches the parent, the task may be at or past removal. No
 extends retention on delivery, and `recordBackgroundOutputConsumption` does not
 influence it.
 
+> **UPDATE (Wave 5): FIXED.** `scheduleTaskRemoval` now checks three independently
+> owed-wake states (`pendingParentWake.shouldReply`, `dispatchedParentWake.shouldReply`,
+> `hasInFlightParentWakeDispatch`) and defers cleanup while any is true, capped by
+> `TASK_TTL_MS`. Landed on `dev` as `82b32ac08` / `0b4ef28fc`, cherry-picked into
+> `fix/bg-wake-crossproc` as `4d070dafe` / `4214bcb25`
+> (`manager.ts:2405-2440` on this branch). Covered by
+> `task-completion-retention-guard.test.ts` (4 tests, green). This diagnosis was correct.
+
 **D2 — mid-batch wakes have no defer ceiling.**
 `shouldReply === false` for a non-final success (`manager.ts:2705`), and
 `shouldForceDispatchAfterActiveDefer` (`parent-wake-flush-runner.ts:256-258`) only
 forces `shouldReply` wakes. A continuously busy parent can starve those wakes
 indefinitely. Fits batch 1 exactly.
+
+> **UPDATE (Wave 5): NARROWED, not wrong.** Unit characterization
+> (`parent-wake-midbatch-starvation.test.ts`) shows this defect self-heals whenever
+> the batch reaches `allComplete` on a busy-but-safe parent: `queuePendingParentWake`
+> keeps `queuedAt` first-wins and ORs `shouldReply`, so the final wake's merge makes
+> `shouldForceDispatchAfterActiveDefer` fire on the very next flush. The true residual
+> is narrower — a `noReplyAdmittedAt` deposit followed by a persistently-unsafe
+> history, which short-circuits before any re-admission path and produces an
+> unbounded defer with zero further deliveries. Fixed with a 300-second bounded
+> re-admission ceiling that deposits `noReply` only, never forces a reply — it does
+> not touch the deliberate "do not interrupt a busy parent" decision pinned by
+> `parent-wake-active-defer-ceiling.test.ts:145`.
 
 **D3 — the notification's own instruction is not honoured by the store.**
 The `[ALL BACKGROUND TASKS COMPLETE]` text tells the agent to call
@@ -183,9 +234,39 @@ retained/requeued-wake logic (`dropAdmittedWakeConsumedByParent` at `:192-203`,
 `deferReplyWakeWhileUnsafe` at `:170-182`) re-firing a wake whose tasks are already
 gone — worth confirming as a fourth defect once D1–D3 are pinned.
 
+> **UPDATE (Wave 5): FALSIFIED.** This was the wrong target and the reason a later
+> investigation lost two days. The disproof, from a live n=6 production log ledger
+> (`.omo/evidence/20260807-bg-wake-crossproc/WAVE1-FINDINGS.md`):
+>
+> - `bg_a4f323d2` completed at 14:47:01 and was already missing at 14:47:09 (**8.8
+>   seconds** after completion, against a 10-minute `TASK_CLEANUP_DELAY_MS`), with **no
+>   `Removed completed task from memory` line ever logged for it**.
+> - Across all 6 observed ids, the `Removed completed task from memory` line lands
+>   **6 to 8 minutes AFTER** the failed lookup, never before it. Removal never
+>   precedes the miss.
+> - `bg_f3c12652` specifically: missing at 14:24:17, removed at **14:32:28** (8
+>   minutes later).
+>
+> No retention timer, however tuned, produces a miss 8.8 seconds after completion
+> with zero removal log. **No in-process retention fix could have closed this gap.**
+> A committed test (`create-background-output.cross-instance.test.ts` Test 1, green)
+> further proves two `BackgroundManager` instances in ONE realm still share the
+> `globalThis` registry, ruling out a same-realm two-manager split. The actual root
+> cause is a **process/realm boundary** between the tool call and the owning
+> manager: `background_output` runs in a different OS process than the one that
+> owns the task. That boundary, not retention timing, is what
+> `formatTaskNotFoundMessage`'s original multi-instance framing was gesturing at
+> (see the annotation on the storage-tiers table above); it was dismissed here as
+> inapplicable and that dismissal was the misdirection.
+
 ---
 
 ## Reproduce first
+
+> **UPDATE (Wave 5):** the claim below that no test exists is stale.
+> `task-completion-retention-guard.test.ts` now covers the D1/D3 owed-wake contract
+> directly (4 tests, green). Use it as the harness shape for any further work on this
+> file; the fake-timer rig it uses is the same one referenced in point 2 below.
 
 There is no existing test for "notification names a task that is then unretrievable".
 Coverage today is `task-completion-cleanup.test.ts` (asserts the timer *delay* is
@@ -226,10 +307,14 @@ type — reuse them rather than building new ones.
   *never-existed* — it currently blames cross-instance state, which sent this
   investigation down a wrong path initially.
 
-**Do not** simply raise `TASK_CLEANUP_DELAY_MS`. It converts a loud failure into a
-rare one and leaves the ordering bug intact.
-
----
+> **UPDATE (Wave 5):** that last bullet undersold `formatTaskNotFoundMessage`. It was
+> not sent down a wrong path by blaming cross-instance state; the earlier
+> investigation on this page was sent down a wrong path by *dismissing* that framing
+> and chasing retention timing instead. The shipped fix goes further than
+> "distinguish evicted from never-existed": on a `getTask` miss, the tool now falls
+> back to scanning the calling session's transcript for the `bg_ -> ses_` pairing and
+> recovers the child session result directly (see
+> `packages/omo-opencode/src/tools/background-task/AGENTS.md`).
 
 ## Constraints
 

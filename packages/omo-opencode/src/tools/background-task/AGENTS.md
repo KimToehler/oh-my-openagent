@@ -50,4 +50,18 @@ tools/background-task/  ← LLM tool interface
 features/background-agent/  ← execution engine (BackgroundManager)
 ```
 
-`createBackgroundOutput` queries `BackgroundManager.getTask(task_id)` — it does not manage task state.
+`createBackgroundOutput` queries `BackgroundManager.getTask(task_id)` for the primary path; it does not manage task state.
+
+### Cross-runtime fallback (transcript scan)
+
+Task state lives in per-process memory (`BackgroundManager.tasks`, its bounded archive, and the `globalThis` registry, see `features/background-agent/AGENTS.md`). When the calling runtime is not the one that owns the task (a different `opencode serve` instance, a separate terminal process, JetBrains-ACP opencode, and so on), `getTask` legitimately misses on all three tiers even though the task is alive and complete elsewhere.
+
+On a `getTask` miss, `create-background-output.ts` does not return a bare `Task not found`. It scans the CALLING session's messages for the `bg_id -> ses_id` pairing that ties the task to its child session, looking for any of:
+
+- `<task_metadata>` blocks
+- `| session: \`ses_...\`` summary lines
+- `Session ID:` launch text
+
+If a pairing is found, it renders the recovered child session via `formatFullSession` and tells the caller the result was recovered from the transcript, not the live task registry.
+
+**Why this works when the primary path cannot:** task state is per-runtime and in-memory, so it is invisible across a process boundary. Session transcripts are server-backed (OpenCode's session store) and readable by any runtime that can reach the server, including the one that made the original background call. The fallback trades "ask the process that ran it" for "ask the server for what it wrote down," which survives the exact process/realm split that defeats `getTask`.
