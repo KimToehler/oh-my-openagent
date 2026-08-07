@@ -227,6 +227,60 @@ describe("parent wake mid-batch starvation characterization", () => {
     }
   })
 
+  test("#given an admitted wake consumed by the live turn #when the re-admission interval elapses #then the wake is dropped, not re-admitted", async () => {
+    // given
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    let consumed = false
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "busy" } },
+      messagesProvider: () =>
+        consumed
+          ? [
+              ...BLOCKED_MESSAGES,
+              {
+                info: { role: "assistant", finish: "tool-calls", time: { created: 230_000 } },
+                parts: [
+                  { type: "text", text: "retrieving background results" },
+                  { type: "tool", state: { status: "running" } },
+                ],
+              },
+            ]
+          : BLOCKED_MESSAGES,
+    })
+    notifier.queuePendingParentWake("parent-1", PROGRESS_WAKE, { agent: "sisyphus" }, false)
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+    const wake = notifier.getPendingParentWakes().get("parent-1")
+    if (!wake) throw new Error("expected pending wake")
+    wake.queuedAt = 40_000
+
+    try {
+      // when: the merged wake is admitted as noReply while history is unsafe
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.noReplyAdmittedAt).toBeDefined()
+
+      // when: the live turn consumes the deposit and the re-admission interval elapses
+      consumed = true
+      releaseParentWakeHold("parent-1")
+      notifier.clearPendingParentWakeTimer("parent-1")
+      now = 700_000
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: dropAdmittedWakeConsumedByParent runs before any re-admission
+      // consideration — the wake is dropped, never re-admitted or re-dispatched
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+    }
+  })
+
   test("#given a mid-batch noReply wake with no final wake ever arriving #when the parent stays busy indefinitely #then the wake is delivered within a bounded deadline", async () => {
     // given
     const originalDateNow = Date.now
