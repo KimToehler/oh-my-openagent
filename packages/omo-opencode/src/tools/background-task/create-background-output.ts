@@ -7,6 +7,7 @@ import type { BackgroundOutputClient, BackgroundOutputManager } from "./clients"
 import { BACKGROUND_OUTPUT_DESCRIPTION } from "./constants"
 import { delay } from "./delay"
 import { formatFullSession } from "./full-session-format"
+import { findSessionIdInParentTranscript } from "./parent-transcript-pairing"
 import { formatTaskResult } from "./task-result-format"
 import { formatTaskStatus } from "./task-status-format"
 
@@ -78,6 +79,71 @@ async function getTaskWithMissingRetry(
   return retriedTask
 }
 
+// `taskHistory` is NOT a valid fallback source here. It is per-process
+// in-memory state (`TaskHistory`, `task-history.ts`), so it is empty in exactly
+// the runtime that fails this lookup. The miss is a process/realm split, not a
+// retention race — see `.omo/plans/bg-wake-and-crossprocess-lookup.md`.
+// Instead, scan the calling session's transcript (server/DB-backed, therefore
+// process-independent) for the `bg_... → ses_...` pairing that the launch
+// output and the completion notification both record.
+async function recoverFromParentTranscript(
+  client: BackgroundOutputClient,
+  ctx: ToolContextWithMetadata,
+  args: BackgroundOutputArgs,
+): Promise<string | undefined> {
+  if (!isBackgroundTaskId(args.task_id) || !ctx.sessionID) {
+    return undefined
+  }
+
+  const recoveredSessionId = await findSessionIdInParentTranscript(client, ctx.sessionID, args.task_id)
+  if (!recoveredSessionId) {
+    return undefined
+  }
+
+  log("[background_output] recovered child session id from the parent transcript", {
+    taskId: args.task_id,
+    sessionId: recoveredSessionId,
+    parentSessionId: ctx.sessionID,
+  })
+
+  const recoveredTask: BackgroundTask = {
+    id: args.task_id,
+    sessionId: recoveredSessionId,
+    parentSessionId: ctx.sessionID,
+    parentMessageId: ctx.messageID ?? "",
+    description: `Recovered from the parent transcript (task owned by another runtime)`,
+    prompt: "",
+    agent: "unknown",
+    status: "completed",
+  }
+
+  await publishToolMetadata(ctx, {
+    title: formatResolvedTitle(recoveredTask),
+    metadata: {
+      backgroundTaskId: recoveredTask.id,
+      agent: recoveredTask.agent,
+      description: recoveredTask.description,
+      sessionId: recoveredSessionId,
+      taskId: recoveredSessionId,
+    },
+  })
+
+  const output = await formatFullSession(recoveredTask, client, {
+    includeThinking: args.include_thinking ?? false,
+    messageLimit: args.message_limit,
+    sinceMessageId: args.since_message_id,
+    includeToolResults: args.include_tool_results ?? false,
+    thinkingMaxChars: args.thinking_max_chars,
+    fromEnd: args.from_end ?? true,
+  })
+
+  recordBackgroundOutputConsumption(ctx.sessionID, ctx.messageID, recoveredSessionId)
+
+  return `> **Note:** This background task is owned by a different runtime than the one serving this tool call, so its in-memory record is unreachable here. The result below was recovered from the child session transcript (\`${recoveredSessionId}\`).
+
+${output}`
+}
+
 function formatTaskNotFoundMessage(taskId: string): string {
   if (!isSessionId(taskId)) {
     return `Task not found: ${taskId}`
@@ -117,6 +183,10 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
         const ctx = toolContext as ToolContextWithMetadata
         const task = await getTaskWithMissingRetry(manager, args.task_id)
         if (!task) {
+          const recovered = await recoverFromParentTranscript(client, ctx, args)
+          if (recovered !== undefined) {
+            return recovered
+          }
           return formatTaskNotFoundMessage(args.task_id)
         }
 

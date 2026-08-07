@@ -132,6 +132,119 @@ describe("createBackgroundOutput cross-instance lookup", () => {
     })
   })
 
+  describe("#given a bg id unknown to this runtime", () => {
+    describe("#when the parent transcript records that id paired with a child session id", () => {
+      test("#then background_output returns the child session transcript instead of a bare not-found", async () => {
+        const manager = createManager()
+        clearBackgroundTaskRegistryForTesting()
+
+        const client: BackgroundOutputClient = {
+          session: {
+            messages: async ({ path }) => {
+              if (path.id === "test-session") {
+                return {
+                  data: [
+                    {
+                      id: "m-parent",
+                      info: { role: "assistant", time: "2026-08-07T00:00:10.000Z" },
+                      parts: [
+                        {
+                          type: "text",
+                          text: [
+                            "Background task launched.",
+                            "",
+                            "Background Task ID: bg_foreign_realm",
+                            "",
+                            "<task_metadata>",
+                            "session_id: ses_recovered",
+                            "background_task_id: bg_foreign_realm",
+                            "</task_metadata>",
+                          ].join("\n"),
+                        },
+                      ],
+                    },
+                  ],
+                }
+              }
+              if (path.id === "ses_recovered") {
+                return {
+                  data: [
+                    {
+                      id: "m-child",
+                      info: { role: "assistant", time: "2026-08-07T00:01:00.000Z" },
+                      parts: [{ type: "text", text: "recovered child result" }],
+                    },
+                  ],
+                }
+              }
+              return { data: [] }
+            },
+          },
+        }
+
+        const outputTool = createBackgroundOutput(manager, client)
+        const output = await outputTool.execute({ task_id: "bg_foreign_realm" }, mockContext)
+
+        expect(output).not.toContain("Task not found")
+        expect(output).toContain("recovered child result")
+        expect(output).toContain("ses_recovered")
+      })
+    })
+
+    describe("#when a completion notification line pairs the id with a session id", () => {
+      test("#then background_output recovers the session for that specific task line", async () => {
+        const manager = createManager()
+        clearBackgroundTaskRegistryForTesting()
+
+        const client: BackgroundOutputClient = {
+          session: {
+            messages: async ({ path }) => {
+              if (path.id === "test-session") {
+                return {
+                  data: [
+                    {
+                      id: "m-parent",
+                      info: { role: "assistant", time: "2026-08-07T00:00:10.000Z" },
+                      parts: [
+                        {
+                          type: "text",
+                          text: [
+                            "**Completed:**",
+                            "- `bg_other_task`: other task | session: `ses_other`",
+                            "- `bg_second_task`: second task | session: `ses_second`",
+                          ].join("\n"),
+                        },
+                      ],
+                    },
+                  ],
+                }
+              }
+              if (path.id === "ses_second") {
+                return {
+                  data: [
+                    {
+                      id: "m-child",
+                      info: { role: "assistant", time: "2026-08-07T00:01:00.000Z" },
+                      parts: [{ type: "text", text: "second task transcript" }],
+                    },
+                  ],
+                }
+              }
+              return { data: [] }
+            },
+          },
+        }
+
+        const outputTool = createBackgroundOutput(manager, client)
+        const output = await outputTool.execute({ task_id: "bg_second_task" }, mockContext)
+
+        expect(output).not.toContain("Task not found")
+        expect(output).toContain("second task transcript")
+        expect(output).toContain("ses_second")
+      })
+    })
+  })
+
   describe("#given the global background task registry is empty (simulating a foreign realm)", () => {
     describe("#when background_output looks up a bg id", () => {
       test("#then it returns the not-found message", async () => {
