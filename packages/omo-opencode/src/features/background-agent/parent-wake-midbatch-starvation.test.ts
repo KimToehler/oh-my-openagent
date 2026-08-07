@@ -1,0 +1,280 @@
+import { afterEach, describe, expect, test } from "bun:test"
+import { createOpencodeClient } from "@opencode-ai/sdk"
+import { ParentWakeNotifier } from "./parent-wake-notifier"
+import {
+  releaseAllPromptAsyncReservationsForTesting,
+  releasePromptAsyncReservation,
+} from "../../hooks/shared/prompt-async-gate"
+
+type PromptAsyncCall = {
+  path: { id: string }
+  body: {
+    noReply?: boolean
+    parts?: unknown[]
+  }
+  query?: {
+    directory: string
+  }
+}
+
+type SessionMessageStub = {
+  info?: {
+    role?: string
+    finish?: string
+    time?: { created?: number; completed?: number }
+  }
+  parts?: Array<{ type?: string; text?: string; synthetic?: boolean; state?: { status?: string } }>
+}
+
+const PROGRESS_WAKE = [
+  "<system-reminder>",
+  "[BACKGROUND TASK RESULT READY]",
+  "**ID:** `task-a`",
+  "**Description:** task A",
+  "**Duration:** 10s",
+  "",
+  "**1 task still in progress.** You WILL be notified when ALL complete.",
+  "Do NOT poll - continue productive work.",
+  "",
+  'Use `background_output(task_id="task-a")` to retrieve this result when ready.',
+  "</system-reminder>",
+].join("\n")
+
+const FINAL_WAKE = [
+  "<system-reminder>",
+  "[BACKGROUND TASK COMPLETED]",
+  "[ALL BACKGROUND TASKS COMPLETE]",
+  "",
+  "**Completed:**",
+  "- `task-a`: task A",
+  "",
+  'Use `background_output(task_id="<id>")` to retrieve each result.',
+  "</system-reminder>",
+].join("\n")
+
+const BLOCKED_MESSAGES: SessionMessageStub[] = [
+  {
+    info: { role: "user", time: { created: 80_000 } },
+    parts: [{ type: "text", text: "start work" }],
+  },
+  {
+    info: { role: "assistant", finish: "tool-calls", time: { created: 99_500 } },
+    parts: [{ type: "tool", state: { status: "running" } }],
+  },
+]
+
+const SAFE_MESSAGES: SessionMessageStub[] = [
+  {
+    info: { role: "user", time: { created: 80_000 } },
+    parts: [{ type: "text", text: "start work" }],
+  },
+  {
+    info: { role: "assistant", finish: "stop", time: { created: 90_000 } },
+    parts: [{ type: "text", text: "delegated to background" }],
+  },
+]
+
+function createNotifier(args: {
+  sessionStatuses: Record<string, { type: string }>
+  messagesProvider: () => SessionMessageStub[]
+  parentActivityWindowMs?: number
+}): {
+  notifier: ParentWakeNotifier
+  promptAsyncCalls: PromptAsyncCall[]
+} {
+  const promptAsyncCalls: PromptAsyncCall[] = []
+  const client = createOpencodeClient({ baseUrl: "http://127.0.0.1:1" })
+  Object.assign(client.session, {
+    messages: async () => ({ data: args.messagesProvider() }),
+    status: async () => ({ data: args.sessionStatuses }),
+    promptAsync: async (call: PromptAsyncCall) => {
+      promptAsyncCalls.push(call)
+      return { data: {} }
+    },
+    abort: async () => ({ data: {} }),
+  })
+
+  const notifier = new ParentWakeNotifier(
+    {
+      client,
+      directory: "/tmp/test-omo",
+      enqueueNotificationForParent: async (_sessionID, operation) => {
+        await operation()
+      },
+    },
+    {
+      pendingRetryMs: 1_000,
+      acceptedMessageSkewMs: 5_000,
+      toolCallDeferMaxMs: 5_000,
+      failureRequeueWindowMs: 5_000,
+      userMessageInProgressWindowMs: 2_000,
+      parentSessionActivityInProgressWindowMs: args.parentActivityWindowMs,
+    },
+  )
+
+  return { notifier, promptAsyncCalls }
+}
+
+function releaseParentWakeHold(sessionID: string): void {
+  releasePromptAsyncReservation(sessionID, "test:simulate-expired-parent-wake-hold", {
+    reservedBy: "background-agent-parent-wake",
+  })
+}
+
+afterEach(() => {
+  releaseAllPromptAsyncReservationsForTesting()
+})
+
+describe("parent wake mid-batch starvation characterization", () => {
+  test("#given a mid-batch noReply wake ages past the ceiling while the parent stays busy with safe history #when the final allComplete wake merges into it #then a single reply is dispatched carrying the final text", async () => {
+    // given
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "busy" } },
+      messagesProvider: () => SAFE_MESSAGES,
+    })
+    notifier.queuePendingParentWake("parent-1", PROGRESS_WAKE, { agent: "sisyphus" }, false)
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-1")
+      now = 160_000
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+      now = 220_000
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(0)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(false)
+
+      // when
+      notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).not.toBe(true)
+      const dispatchedText = JSON.stringify(promptAsyncCalls[0]?.body.parts)
+      expect(dispatchedText).toContain("[ALL BACKGROUND TASKS COMPLETE]")
+      expect(dispatchedText).not.toContain("still in progress")
+      expect(notifier.getPendingParentWakes().has("parent-1")).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+    }
+  })
+
+  test("#given a mid-batch noReply wake admitted while history was unsafe #when the final wake merges and the parent remains persistently unsafe #then the wake is delivered within a bounded deadline", async () => {
+    // given
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "busy" } },
+      messagesProvider: () => BLOCKED_MESSAGES,
+    })
+    notifier.queuePendingParentWake("parent-1", PROGRESS_WAKE, { agent: "sisyphus" }, false)
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(0)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(false)
+
+      // when
+      now = 160_000
+      notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+      notifier.clearPendingParentWakeTimer("parent-1")
+      now = 220_000
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.noReplyAdmittedAt).toBeDefined()
+      const callCountAfterAdmission = promptAsyncCalls.length
+
+      // when
+      releaseParentWakeHold("parent-1")
+      notifier.clearPendingParentWakeTimer("parent-1")
+      now = 400_000
+      await notifier.flushPendingParentWake("parent-1")
+      releaseParentWakeHold("parent-1")
+      notifier.clearPendingParentWakeTimer("parent-1")
+      now = 700_000
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      // The wake must still be pending with shouldReply true: this proves any
+      // failure below is an unbounded defer, NOT a dropped wake, a merge bug,
+      // or a dedupe suppression.
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+      // Intended post-fix behavior: a bounded deadline forces at least one
+      // further delivery (re-admission or reply) after the first unsafe
+      // admission. Pre-fix, deferReplyWakeWhileUnsafe reschedules forever.
+      expect(promptAsyncCalls.length).toBeGreaterThan(callCountAfterAdmission)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+    }
+  })
+
+  test("#given a mid-batch noReply wake with no final wake ever arriving #when the parent stays busy indefinitely #then the wake is delivered within a bounded deadline", async () => {
+    // given
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "busy" } },
+      messagesProvider: () => SAFE_MESSAGES,
+    })
+    notifier.queuePendingParentWake("parent-1", PROGRESS_WAKE, { agent: "sisyphus" }, false)
+
+    try {
+      // when
+      now = 130_000
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      // Asserted well before any plausible delivery ceiling: the wake exists at
+      // the notifier layer (the manager queues one per completed sibling), so a
+      // starvation below lives in wake delivery, not in wake creation.
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(false)
+      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+
+      // when
+      now = 220_000
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+      now = 400_000
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+      now = 700_000
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      // The wake must still be pending: this proves any failure below is an
+      // unbounded defer at the delivery layer, not a dropped or missing wake.
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(false)
+      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+      // Intended post-fix behavior: the deposit reaches the parent within a
+      // bounded deadline even when no final wake ever arrives. Pre-fix, a
+      // shouldReply:false wake on a busy parent is deferred forever before any
+      // admission — not even a noReply deposit is made.
+      expect(promptAsyncCalls.length).toBeGreaterThan(0)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+    }
+  })
+})
