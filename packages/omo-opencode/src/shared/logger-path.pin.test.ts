@@ -33,7 +33,7 @@ describe("#given the OpenCode logger shim defaults", () => {
     expect(actualPath).toBe(expectedPath)
   })
 
-  test("#when an entry with data is flushed #then the line keeps the historical timestamp message json format", () => {
+  test("#when an entry with data is flushed #then the line keeps the timestamp-first format with the runtime id after it", () => {
     // given
     const logFilePath = path.join(tempDir, "pinned.log")
     _setLoggerForTesting({ filePath: logFilePath, maxSizeBytes: 1024 * 1024, maxBackups: 2 })
@@ -44,6 +44,6 @@ describe("#given the OpenCode logger shim defaults", () => {
 
     // then
     const contents = fs.readFileSync(logFilePath, "utf8")
-    expect(contents).toMatch(/^\[\d{4}-\d{2}-\d{2}T.*Z\] LOGGER-OK \{"qa":true\}\n$/)
+    expect(contents).toMatch(/^\[\d{4}-\d{2}-\d{2}T.*Z\] \[rt:[^\]]+\] LOGGER-OK \{"qa":true\}\n$/)
   })
 })

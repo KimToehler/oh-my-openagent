@@ -1,6 +1,20 @@
+import { randomUUID } from "crypto"
 import * as fs from "fs"
 import * as os from "os"
 import * as path from "path"
+
+// Identifies the runtime (process + module realm) that emitted a line, so one
+// shared log file can be read across the several runtimes that write it. The pid
+// alone is not enough: a worker thread shares the pid but gets its own
+// `globalThis`, and `globalThis` is where the background-task registry lives, so
+// two realms with one pid must still be told apart. The random suffix does that.
+//
+// Format constraint — the value must contain NO ISO-date-shaped substring, and
+// the timestamp must stay first in the line. Log consumers (the opencode-qa
+// probe scripts) pull the timestamp out with a bare `grep -o` date pattern and
+// match everything else by substring, so a date-shaped runtime id would shadow
+// the real timestamp.
+export const RUNTIME_ID = `${process.pid}:${randomUUID().slice(0, 4)}`
 
 export const DEFAULT_MAX_LOG_FILE_SIZE_BYTES = 50 * 1024 * 1024
 export const DEFAULT_MAX_LOG_FILE_BACKUPS = 2
@@ -94,7 +108,7 @@ export function createLogger(options: LoggerOptions): BoundLogger {
   function log(message: string, data?: unknown): void {
     try {
       const timestamp = new Date().toISOString()
-      const logEntry = `[${timestamp}] ${message} ${data ? JSON.stringify(data) : ""}\n`
+      const logEntry = `[${timestamp}] [rt:${RUNTIME_ID}] ${message} ${data ? JSON.stringify(data) : ""}\n`
       buffer.push(logEntry)
       if (buffer.length >= bufferSizeLimit) {
         flush()

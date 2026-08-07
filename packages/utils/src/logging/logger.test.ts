@@ -20,13 +20,15 @@ describe("#given a bound utils logger", () => {
     fs.rmSync(tempDir, { recursive: true, force: true })
   })
 
-  test("#when flushed with product data #then it writes the historical timestamp message json line", () => {
+  test("#when flushed with product data #then it writes the timestamp runtime-id message json line", () => {
     const logger = createLogger({ logFileName: "unused.log", resolveLogFilePath: () => logFilePath })
 
     logger.log("LOGGER-OK", { qa: true })
     logger._flushForTesting()
 
-    expect(fs.readFileSync(logFilePath, "utf8")).toMatch(/^\[\d{4}-\d{2}-\d{2}T.*Z\] LOGGER-OK \{"qa":true\}\n$/)
+    expect(fs.readFileSync(logFilePath, "utf8")).toMatch(
+      /^\[\d{4}-\d{2}-\d{2}T.*Z\] \[rt:[^\]]+\] LOGGER-OK \{"qa":true\}\n$/,
+    )
   })
 
   test("#when cyclic data cannot be serialized #then logging swallows the failure and writes no partial line", () => {
