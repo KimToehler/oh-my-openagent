@@ -112,9 +112,12 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
 }
 
 function markRetainedNoReplyAdmission(input: ParentWakePromptDispatchInput, dispatchStartedAt: number): void {
-  if (input.retainPendingWake !== true || input.forceNoReply !== true || !input.latestWake.shouldReply) {
+  if (input.retainPendingWake !== true || input.forceNoReply !== true) {
     return
   }
+  // Also marked for retained shouldReply:false deposits: the admission marker
+  // both restarts the bounded re-admission ceiling and lets
+  // dropAdmittedWakeConsumedByParent drop a deposit the live turn consumed.
   input.latestWake.noReplyAdmittedAt = dispatchStartedAt
   input.scheduleFlush()
 }

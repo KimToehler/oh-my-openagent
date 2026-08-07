@@ -16,6 +16,15 @@ type ParentWakeFlushRunnerDeps = {
 }
 
 const PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS = 60_000
+// Second, longer ceiling for wakes parked behind a continuously-unsafe or
+// continuously-active parent. When it elapses the wake is re-admitted as a
+// noReply deposit — NEVER escalated to a forced reply, because forcing a reply
+// into a live turn is exactly the #4120 Electron sidecar crash the noReply
+// mechanism exists to avoid. Must stay well above
+// PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS so the reply path always gets its
+// chance first (parent-wake-active-defer-ceiling.test.ts pins that a 2-minute
+// old admission is not yet re-admitted).
+const PENDING_PARENT_WAKE_MAX_RETAINED_ADMIT_DEFER_MS = 300_000
 
 export class ParentWakeFlushRunner {
   constructor(private readonly deps: ParentWakeFlushRunnerDeps) {}
@@ -50,6 +59,26 @@ export class ParentWakeFlushRunner {
     const emptyAssistantTurnRetry = latestWake.allowEmptyAssistantTurnRetry === true
     const forceDispatchAfterActiveDefer = sessionActive && this.shouldForceDispatchAfterActiveDefer(latestWake)
     if (sessionActive && !forceDispatchAfterActiveDefer) {
+      // A wake with no reply ceiling (shouldReply false, or an already-admitted
+      // retained wake) would otherwise defer here forever while the parent stays
+      // busy — the parent would never even receive a deposit. After the bounded
+      // interval, deposit it as noReply (never a forced reply, see #4120) and
+      // retain it so a later final notification still merges into the original
+      // queuedAt. dropAdmittedWakeConsumedByParent above already dropped any
+      // deposit the live turn consumed.
+      if (this.shouldAdmitRetainedWakeAfterCeiling(latestWake)) {
+        await this.sendParentWakePrompt(sessionID, latestWake, {
+          emptyAssistantTurnRetry: false,
+          toolWaitDecision: { defer: false, skipPromptGateToolStateCheck: true },
+          forceNoReply: true,
+          retainPendingWake: true,
+        })
+        log("[background-agent] Recorded admit-only parent wake after active-defer deposit ceiling:", {
+          sessionID,
+        })
+        this.schedulePendingParentWakeFlush(sessionID)
+        return
+      }
       this.schedulePendingParentWakeFlush(sessionID)
       log("[background-agent] Deferred parent wake because parent session is active:", {
         sessionID,
@@ -174,6 +203,19 @@ export class ParentWakeFlushRunner {
       return true
     }
     if (latestWake.shouldReply && latestWake.noReplyAdmittedAt !== undefined) {
+      // A persistently-unsafe parent would defer the retained wake forever:
+      // after the first admission the notification set no longer changes, so
+      // nothing ever clears noReplyAdmittedAt. Once the bounded interval
+      // elapses, fall through so the caller re-admits the wake as a fresh
+      // noReply deposit (marker refreshed by the dispatch path). This is still
+      // an admission, never a consumption (#4874/#5086), and never a forced
+      // reply (#4120) — the reply itself still waits for independently safe
+      // history. dropAdmittedWakeConsumedByParent has already dropped any
+      // deposit the live turn consumed.
+      if (Date.now() - latestWake.noReplyAdmittedAt >= PENDING_PARENT_WAKE_MAX_RETAINED_ADMIT_DEFER_MS) {
+        log("[background-agent] Re-admitting retained parent wake after retained-admit ceiling:", { sessionID })
+        return false
+      }
       this.schedulePendingParentWakeFlush(sessionID)
       log("[background-agent] Deferred retained reply-required parent wake until parent session is safe:", { sessionID })
       return true
@@ -255,6 +297,18 @@ export class ParentWakeFlushRunner {
 
   private shouldForceDispatchAfterActiveDefer(wake: PendingParentWake): boolean {
     return wake.shouldReply && this.getQueuedAgeMs(wake) >= PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS
+  }
+
+  // Bounded deposit ceiling for wakes the active-session defer would otherwise
+  // starve forever: shouldReply:false wakes never qualify for the force-dispatch
+  // ceiling, and an admitted retained wake restarts its clock from the last
+  // admission. Only ever produces another noReply admission — never a reply.
+  private shouldAdmitRetainedWakeAfterCeiling(wake: PendingParentWake): boolean {
+    const referenceAt = wake.noReplyAdmittedAt ?? wake.queuedAt
+    if (referenceAt === undefined) {
+      return false
+    }
+    return Date.now() - referenceAt >= PENDING_PARENT_WAKE_MAX_RETAINED_ADMIT_DEFER_MS
   }
 
   private getQueuedAgeMs(wake: PendingParentWake): number {
