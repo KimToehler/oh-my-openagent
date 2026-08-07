@@ -281,6 +281,58 @@ describe("parent wake mid-batch starvation characterization", () => {
     }
   })
 
+  test("#given an admit-only deposit fired for a noReply wake #when a reply-required wake merges and the live turn consumes the deposit #then the reply-required wake is still dispatched as a reply", async () => {
+    // given
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    let consumed = false
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "busy" } },
+      messagesProvider: () =>
+        consumed
+          ? [
+              ...SAFE_MESSAGES,
+              {
+                info: { role: "assistant", finish: "stop", time: { created: 470_000 } },
+                parts: [{ type: "text", text: "kept working through the deposit" }],
+              },
+            ]
+          : SAFE_MESSAGES,
+    })
+    notifier.queuePendingParentWake("parent-1", PROGRESS_WAKE, { agent: "sisyphus" }, false)
+
+    try {
+      // when: the admit-only deposit ceiling elapses for the noReply wake
+      now = 460_000
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+
+      // when: a reply-required wake with the same notification merges in, the
+      // live turn consumes the deposit, and the parent history becomes safe
+      notifier.queuePendingParentWake("parent-1", PROGRESS_WAKE, { agent: "sisyphus" }, true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+      consumed = true
+      releaseParentWakeHold("parent-1")
+      notifier.clearPendingParentWakeTimer("parent-1")
+      now = 530_000
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: the reply-required wake is dispatched as a reply, never dropped
+      // on an admission timestamp earned by the admit-only deposit
+      expect(promptAsyncCalls).toHaveLength(2)
+      expect(promptAsyncCalls[1]?.body.noReply).not.toBe(true)
+      expect(JSON.stringify(promptAsyncCalls[1]?.body.parts)).toContain("[BACKGROUND TASK RESULT READY]")
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+    }
+  })
+
   test("#given a mid-batch noReply wake with no final wake ever arriving #when the parent stays busy indefinitely #then the wake is delivered within a bounded deadline", async () => {
     // given
     const originalDateNow = Date.now
