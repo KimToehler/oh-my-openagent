@@ -5,6 +5,10 @@ import {
   withInternalNoReplyMarker,
 } from "../../shared"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
+import {
+  DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS,
+  DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS,
+} from "../../shared/prompt-async-gate/timing"
 import type { InternalPromptDispatchResult, PromptDispatchClient } from "../../shared/prompt-async-gate/types"
 import { getErrorText } from "./error-classifier"
 import {
@@ -23,9 +27,21 @@ import type { ToolWaitDeferralDecision } from "./parent-wake-session-history"
 // budget covers post-dispatch window recovery, this one covers pre-dispatch
 // gate discards.
 export const MAX_COALESCE_REQUEUE_ATTEMPTS = 3
-// Mirrors the reserved-branch backoff below: retrying faster than the gate's
-// post-dispatch hold would spin against the same recent-dispatch record.
-const COALESCE_REQUEUE_FLUSH_DELAY_MS = 2_000
+// The gate's semantic dedupe hold is never refreshed on a coalesce, so the
+// requeue budget only works if it can outlast that hold: otherwise every
+// retry lands inside the hold, the cap exhausts, and the wake is recorded as
+// dispatched without ever reaching the client. Derive the per-attempt delay
+// from the hold so the invariant
+//   MAX_COALESCE_REQUEUE_ATTEMPTS * COALESCE_REQUEUE_FLUSH_DELAY_MS
+//     >= DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS
+// survives any future edit to timing.ts instead of holding by coincidence.
+// The post-dispatch hold is folded in as slack so the budget clears the
+// semantic hold even if the first coalesce is observed at the instant the
+// record is written and flush timers fire early.
+export const COALESCE_REQUEUE_FLUSH_DELAY_MS = Math.ceil(
+  (DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS + DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS) /
+    MAX_COALESCE_REQUEUE_ATTEMPTS,
+)
 
 // The gate discarded this prompt as a duplicate of one already delivered.
 // An "in-flight" coalesce is NOT discarded: an identical prompt is still on

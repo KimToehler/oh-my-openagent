@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../hooks/shared/prompt-async-gate"
+import { DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS } from "../../shared/prompt-async-gate/timing"
 import type { PendingParentWake } from "./parent-wake-dedupe"
 import {
+  COALESCE_REQUEUE_FLUSH_DELAY_MS,
   isDiscardedCoalesceDispatchResult,
   MAX_COALESCE_REQUEUE_ATTEMPTS,
   sendParentWakePrompt,
@@ -114,7 +116,7 @@ describe("sendParentWakePrompt coalesce requeue", () => {
       expect(fixture.promptAsyncCalls).toHaveLength(1)
       expect(fixture.trackedWakes).toHaveLength(1)
       expect(fixture.requeuedWakes).toHaveLength(1)
-      expect(fixture.flushDelays).toEqual([2_000])
+      expect(fixture.flushDelays).toEqual([COALESCE_REQUEUE_FLUSH_DELAY_MS])
       // then: no retained-admission markers were written for the discarded wake.
       expect(fixture.latestWake.noReplyAdmittedAt).toBeUndefined()
       expect(fixture.latestWake.lastAdmitOnlyDepositAt).toBeUndefined()
@@ -171,9 +173,50 @@ describe("sendParentWakePrompt coalesce requeue", () => {
       expect(MAX_COALESCE_REQUEUE_ATTEMPTS).toBe(3)
       expect(fixture.requeuedWakes).toHaveLength(3)
       expect(fixture.latestWake.coalesceRequeueCount).toBe(3)
-      expect(fixture.flushDelays).toEqual([2_000, 2_000, 2_000])
+      expect(fixture.flushDelays).toEqual([
+        COALESCE_REQUEUE_FLUSH_DELAY_MS,
+        COALESCE_REQUEUE_FLUSH_DELAY_MS,
+        COALESCE_REQUEUE_FLUSH_DELAY_MS,
+      ])
       expect(fixture.trackedWakes).toHaveLength(2)
       expect(fixture.promptAsyncCalls).toHaveLength(1)
+    } finally {
+      fixture.restoreClock()
+    }
+  })
+
+  test("#given the requeue budget and the semantic dedupe hold #when comparing them #then the budget always outlasts the hold", () => {
+    // given / when / then: the invariant itself, not the resulting numbers. If
+    // a future edit to timing.ts or to either constant shrinks the budget back
+    // under the hold, every requeue coalesces, the cap exhausts inside the
+    // hold, and the wake is silently recorded as dispatched without ever
+    // reaching the client. This assertion makes that edit fail loudly.
+    expect(MAX_COALESCE_REQUEUE_ATTEMPTS * COALESCE_REQUEUE_FLUSH_DELAY_MS).toBeGreaterThanOrEqual(
+      DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS,
+    )
+  })
+
+  test("#given a wake that keeps coalescing #when retries fire on the real flush schedule #then the semantic hold expires before the budget and the wake dispatches for real", async () => {
+    // given: a first dispatch lands and records a recent semantic dispatch.
+    const sessionID = "parent-coalesce-requeue-survival"
+    const fixture = createDispatchFixture(sessionID)
+    try {
+      await fixture.send()
+      expect(fixture.promptAsyncCalls).toHaveLength(1)
+
+      // when: each retry waits the actual scheduled flush delay before firing,
+      // exactly as production timers would.
+      for (let attempt = 0; attempt < MAX_COALESCE_REQUEUE_ATTEMPTS; attempt++) {
+        fixture.advanceClock(COALESCE_REQUEUE_FLUSH_DELAY_MS)
+        await fixture.send()
+      }
+
+      // then: the semantic hold expired inside the budget, so a later retry
+      // reached the client for real instead of exhausting the cap and being
+      // silently recorded as dispatched.
+      expect(fixture.promptAsyncCalls).toHaveLength(2)
+      expect(fixture.trackedWakes).toHaveLength(2)
+      expect(fixture.latestWake.coalesceRequeueCount).toBeLessThan(MAX_COALESCE_REQUEUE_ATTEMPTS)
     } finally {
       fixture.restoreClock()
     }
