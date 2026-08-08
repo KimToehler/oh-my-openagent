@@ -63,6 +63,7 @@ export class ParentWakePendingQueue {
         delete pendingWake.noReplyAdmittedAt
         delete pendingWake.lastAdmitOnlyDepositAt
         delete pendingWake.noAssistantOutputRetryCount
+        delete pendingWake.coalesceRequeueCount
       }
       return
     }
@@ -98,6 +99,13 @@ export class ParentWakePendingQueue {
       )
       if (noAssistantOutputRetryCount > 0) {
         pendingWake.noAssistantOutputRetryCount = noAssistantOutputRetryCount
+      }
+      const coalesceRequeueCount = Math.max(
+        pendingWake.coalesceRequeueCount ?? 0,
+        latestWake.coalesceRequeueCount ?? 0,
+      )
+      if (coalesceRequeueCount > 0) {
+        pendingWake.coalesceRequeueCount = coalesceRequeueCount
       }
       return
     }

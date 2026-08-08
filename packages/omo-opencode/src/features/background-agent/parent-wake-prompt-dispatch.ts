@@ -5,7 +5,7 @@ import {
   withInternalNoReplyMarker,
 } from "../../shared"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
-import type { PromptDispatchClient } from "../../shared/prompt-async-gate/types"
+import type { InternalPromptDispatchResult, PromptDispatchClient } from "../../shared/prompt-async-gate/types"
 import { getErrorText } from "./error-classifier"
 import {
   createEmptyAssistantTurnRetryDedupeKey,
@@ -13,6 +13,26 @@ import {
 } from "./parent-wake-history-state"
 import { cloneParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"
 import type { ToolWaitDeferralDecision } from "./parent-wake-session-history"
+
+// Explicit termination bound for coalesce-originated requeues. An
+// "already-delivered" coalesce means the gate DISCARDED this wake, so
+// recording it as dispatched would lose it; requeue instead, but only this
+// many times per wake so the loop terminates by invariant, not by the
+// semantic-dedupe hold happening to expire. Deliberately distinct from
+// MAX_NO_ASSISTANT_OUTPUT_RETRIES (parent-wake-window-recovery.ts): that
+// budget covers post-dispatch window recovery, this one covers pre-dispatch
+// gate discards.
+export const MAX_COALESCE_REQUEUE_ATTEMPTS = 3
+// Mirrors the reserved-branch backoff below: retrying faster than the gate's
+// post-dispatch hold would spin against the same recent-dispatch record.
+const COALESCE_REQUEUE_FLUSH_DELAY_MS = 2_000
+
+// The gate discarded this prompt as a duplicate of one already delivered.
+// An "in-flight" coalesce is NOT discarded: an identical prompt is still on
+// its way, so treating it as dispatched is correct.
+export function isDiscardedCoalesceDispatchResult(result: InternalPromptDispatchResult): boolean {
+  return result.status === "queued" && result.coalesceKind === "already-delivered"
+}
 
 type ParentWakePromptDispatchInput = {
   readonly client: PromptDispatchClient
@@ -95,6 +115,23 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       })
       return
     }
+    if (isDiscardedCoalesceDispatchResult(promptResult) && !isAdmitOnlyDispatch(input)) {
+      const coalesceRequeueCount = input.latestWake.coalesceRequeueCount ?? 0
+      if (coalesceRequeueCount < MAX_COALESCE_REQUEUE_ATTEMPTS) {
+        input.latestWake.coalesceRequeueCount = coalesceRequeueCount + 1
+        input.requeueWake(input.latestWake)
+        input.scheduleFlush(COALESCE_REQUEUE_FLUSH_DELAY_MS)
+        log("[background-agent] Requeued parent wake discarded as an already-delivered coalesce:", {
+          sessionID: input.sessionID,
+          coalesceRequeueCount: coalesceRequeueCount + 1,
+        })
+        return
+      }
+      log("[background-agent] Coalesce requeue budget exhausted; recording parent wake as dispatched:", {
+        sessionID: input.sessionID,
+        coalesceRequeueCount,
+      })
+    }
     if (!isInternalPromptDispatchAccepted(promptResult)) {
       input.requeueWake(input.latestWake)
       input.scheduleFlush()
@@ -114,6 +151,13 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
     input.scheduleFlush()
     log("[background-agent] Failed to send deferred parent wake:", { sessionID: input.sessionID, error: errorText })
   }
+}
+
+// The admit-only path deposits a retained noReply admission and MUST NOT
+// requeue on a coalesce: requeuing would re-deposit identical noReply text and
+// skip the markRetainedNoReplyAdmission write that #4874/#5086 depend on.
+function isAdmitOnlyDispatch(input: ParentWakePromptDispatchInput): boolean {
+  return input.forceNoReply === true && input.retainPendingWake === true
 }
 
 function markRetainedNoReplyAdmission(input: ParentWakePromptDispatchInput, dispatchStartedAt: number): void {
