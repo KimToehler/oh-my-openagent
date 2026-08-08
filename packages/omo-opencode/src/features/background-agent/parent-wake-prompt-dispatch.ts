@@ -159,6 +159,7 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
     }
     log("[background-agent] Sent deferred parent wake:", { sessionID: input.sessionID })
     delete input.latestWake.allowEmptyAssistantTurnRetry
+    delete input.latestWake.coalesceRequeueCount
     markRetainedNoReplyAdmission(input, dispatchStartedAt)
     input.trackDispatchedWake(createTrackedDispatchedWake(input.latestWake, input.forceNoReply), dispatchStartedAt)
   } catch (error) {

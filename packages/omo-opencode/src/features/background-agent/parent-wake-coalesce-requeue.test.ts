@@ -167,12 +167,12 @@ describe("sendParentWakePrompt coalesce requeue", () => {
         await fixture.send()
       }
 
-      // then: exactly MAX_COALESCE_REQUEUE_ATTEMPTS requeues happened, the
-      // counter stopped at the cap, and the attempt beyond the cap was recorded
-      // as dispatched so the loop terminates.
+      // then: exactly MAX_COALESCE_REQUEUE_ATTEMPTS requeues happened, and the
+      // attempt beyond the cap was recorded as dispatched so the loop terminates
+      // and closes that coalesce episode.
       expect(MAX_COALESCE_REQUEUE_ATTEMPTS).toBe(3)
       expect(fixture.requeuedWakes).toHaveLength(3)
-      expect(fixture.latestWake.coalesceRequeueCount).toBe(3)
+      expect(fixture.latestWake.coalesceRequeueCount).toBeUndefined()
       expect(fixture.flushDelays).toEqual([
         COALESCE_REQUEUE_FLUSH_DELAY_MS,
         COALESCE_REQUEUE_FLUSH_DELAY_MS,
@@ -216,7 +216,32 @@ describe("sendParentWakePrompt coalesce requeue", () => {
       // silently recorded as dispatched.
       expect(fixture.promptAsyncCalls).toHaveLength(2)
       expect(fixture.trackedWakes).toHaveLength(2)
-      expect(fixture.latestWake.coalesceRequeueCount).toBeLessThan(MAX_COALESCE_REQUEUE_ATTEMPTS)
+      expect(fixture.requeuedWakes).toHaveLength(2)
+      expect(fixture.latestWake.coalesceRequeueCount).toBeUndefined()
+    } finally {
+      fixture.restoreClock()
+    }
+  })
+
+  test("#given a wake that coalesced once and then dispatched successfully #when a new same-notification episode starts #then the full coalesce requeue budget is restored", async () => {
+    // given: one discarded coalesce consumes one attempt from the current episode.
+    const sessionID = "parent-coalesce-requeue-new-episode"
+    const fixture = createDispatchFixture(sessionID)
+    try {
+      await fixture.send()
+      fixture.advanceClock(PAST_RESERVATION_HOLD_MS)
+      await fixture.send()
+      expect(fixture.latestWake.coalesceRequeueCount).toBe(1)
+
+      // when: semantic dedupe expires and the same wake reaches the client in a
+      // successful dispatch, ending the current coalesce episode.
+      fixture.advanceClock(DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS)
+      await fixture.send()
+
+      // then: a later no-output retry with unchanged notifications starts with
+      // the full budget instead of inheriting the prior episode's count.
+      expect(fixture.promptAsyncCalls).toHaveLength(2)
+      expect(fixture.latestWake.coalesceRequeueCount).toBeUndefined()
     } finally {
       fixture.restoreClock()
     }

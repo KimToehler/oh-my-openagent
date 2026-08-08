@@ -601,10 +601,11 @@ describe("parent wake mid-batch starvation characterization", () => {
       notifier.clearPendingParentWakeTimer("parent-1")
       await notifier.flushPendingParentWake("parent-1")
 
-      // then: the budget still reads exactly the one genuine no-output retry
+      // then: successful acceptance closes the coalesce episode while the
+      // genuine no-output retry budget remains untouched.
       expect(promptAsyncCalls).toHaveLength(1)
       const trackedWake = notifier.getDispatchedParentWakes().get("parent-1")
-      expect(trackedWake?.coalesceRequeueCount).toBe(MAX_COALESCE_REQUEUE_ATTEMPTS)
+      expect(trackedWake?.coalesceRequeueCount).toBeUndefined()
       expect(trackedWake?.noAssistantOutputRetryCount).toBe(1)
     } finally {
       Date.now = originalDateNow
