@@ -52,6 +52,17 @@ const FINAL_WAKE = [
   "</system-reminder>",
 ].join("\n")
 
+const FINISHED_WITH_FAILURES_WAKE = [
+  "<system-reminder>",
+  "[ALL BACKGROUND TASKS FINISHED (1 FAILED)]",
+  "",
+  "**Failed:**",
+  "- `task-a`: task A",
+  "",
+  'Use `background_output(task_id="<id>")` to retrieve each result.',
+  "</system-reminder>",
+].join("\n")
+
 const BLOCKED_MESSAGES: SessionMessageStub[] = [
   {
     info: { role: "user", time: { created: 80_000 } },
@@ -327,6 +338,104 @@ describe("parent wake mid-batch starvation characterization", () => {
       expect(promptAsyncCalls).toHaveLength(2)
       expect(promptAsyncCalls[1]?.body.noReply).not.toBe(true)
       expect(JSON.stringify(promptAsyncCalls[1]?.body.parts)).toContain("[BACKGROUND TASK RESULT READY]")
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+    }
+  })
+
+  test("#given a failure-classified final wake parked in the tool-wait deferral while the parent stays unsafe #when the retained-admit ceiling elapses #then a bounded noReply deposit is delivered", async () => {
+    // given
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () => BLOCKED_MESSAGES,
+    })
+    notifier.queuePendingParentWake("parent-1", FINISHED_WITH_FAILURES_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when: flush while the latest assistant turn blocks internal prompts
+      await notifier.flushPendingParentWake("parent-1")
+      now = 200_000
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: within the ceiling the failure wake stays parked without admission
+      expect(promptAsyncCalls).toHaveLength(0)
+      // The wake must still be pending with shouldReply true: this proves any
+      // failure below is an unbounded defer, NOT a dropped wake.
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+      expect(notifier.getPendingParentWakeTimers().has("parent-1")).toBe(true)
+
+      // when: the retained-admit ceiling elapses while the parent stays unsafe
+      now = 500_000
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: a bounded noReply deposit is delivered, the reply stays owed
+      expect(promptAsyncCalls.length).toBeGreaterThan(0)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+    }
+  })
+
+  test("#given a ceiling deposit refreshes the parent activity window #when subsequent flushes run #then no tight re-deposit loop forms and the next deposit waits a full ceiling", async () => {
+    // given
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () => BLOCKED_MESSAGES,
+      parentActivityWindowMs: 5_500,
+    })
+    notifier.queuePendingParentWake("parent-1", FINISHED_WITH_FAILURES_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when: the ceiling elapses and the first deposit fires
+      now = 500_000
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).toBe(true)
+
+      // when: the deposit's own prompt refreshes the parent activity window
+      notifier.recordParentSessionActivity("parent-1")
+      releaseParentWakeHold("parent-1")
+      notifier.clearPendingParentWakeTimer("parent-1")
+      now = 503_000
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: the fresh-activity defer does not immediately re-deposit
+      expect(promptAsyncCalls).toHaveLength(1)
+
+      // when: the activity window lapses but the ceiling has not elapsed again
+      now = 560_000
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+      now = 680_000
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: no deposit at +60s or +180s after the first
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
+
+      // when: a full ceiling elapses since the first deposit
+      now = 805_000
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: exactly one further bounded deposit
+      expect(promptAsyncCalls).toHaveLength(2)
+      expect(promptAsyncCalls[1]?.body.noReply).toBe(true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.shouldReply).toBe(true)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()
