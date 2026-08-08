@@ -7,7 +7,10 @@ import {
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
 import type { PromptDispatchClient } from "../../shared/prompt-async-gate/types"
 import { getErrorText } from "./error-classifier"
-import { createEmptyAssistantTurnRetryDedupeKey } from "./parent-wake-history-state"
+import {
+  createEmptyAssistantTurnRetryDedupeKey,
+  createNoAssistantOutputRetryDedupeKey,
+} from "./parent-wake-history-state"
 import { cloneParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"
 import type { ToolWaitDeferralDecision } from "./parent-wake-session-history"
 
@@ -40,7 +43,9 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
       source: "background-agent-parent-wake",
       ...(input.emptyAssistantTurnRetry
         ? { dedupeKey: createEmptyAssistantTurnRetryDedupeKey(input.latestWake) }
-        : {}),
+        : (input.latestWake.noAssistantOutputRetryCount ?? 0) > 0
+          ? { dedupeKey: createNoAssistantOutputRetryDedupeKey(input.latestWake) }
+          : {}),
       settleMs: 0,
       queueBehavior: "defer",
       checkStatus: input.forceNoReply !== true && input.skipPromptGateStatusCheck !== true,

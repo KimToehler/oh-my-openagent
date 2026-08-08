@@ -99,6 +99,16 @@ export function createEmptyAssistantTurnRetryDedupeKey(wake: PendingParentWake):
   ].join("\u0000")
 }
 
+export function createNoAssistantOutputRetryDedupeKey(wake: PendingParentWake): string {
+  return [
+    "background-agent-parent-wake-noout-retry",
+    String(wake.noAssistantOutputRetryCount ?? 0),
+    ...wake.notifications,
+    JSON.stringify(wake.promptContext),
+    wake.shouldReply ? "reply" : "silent",
+  ].join("\u0000")
+}
+
 function partHasFreshToolActivity(part: unknown, now: number, maxAgeMs: number): boolean {
   if (!isRecord(part)) {
     return false
