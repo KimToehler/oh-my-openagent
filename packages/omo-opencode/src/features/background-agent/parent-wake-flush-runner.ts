@@ -21,14 +21,10 @@ type ParentWakeFlushRunnerDeps = {
 }
 
 const PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS = 60_000
-// Second, longer ceiling for wakes parked behind a continuously-unsafe or
-// continuously-active parent. When it elapses the wake is re-admitted as a
-// noReply deposit — NEVER escalated to a forced reply, because forcing a reply
-// into a live turn is exactly the #4120 Electron sidecar crash the noReply
-// mechanism exists to avoid. Must stay well above
-// PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS so the reply path always gets its
-// chance first (parent-wake-active-defer-ceiling.test.ts pins that a 2-minute
-// old admission is not yet re-admitted).
+// Longer ceiling for wakes parked behind a continuously-unsafe or -active
+// parent: re-admit as a noReply deposit, NEVER a forced reply (#4120/#6546).
+// Must stay well above PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS so the reply
+// path gets its chance first (pinned by parent-wake-active-defer-ceiling.test.ts).
 const PENDING_PARENT_WAKE_MAX_RETAINED_ADMIT_DEFER_MS = 300_000
 
 export class ParentWakeFlushRunner {
@@ -198,26 +194,22 @@ export class ParentWakeFlushRunner {
   }
 
   // Reply-required wakes must never be consumed by an admit-only noReply
-  // dispatch (issues #4874/#5086): failure wakes stay queued until the parent
-  // is safe, and an already-admitted final wake is not re-admitted while the
-  // parent remains unsafe.
+  // dispatch (#4874/#5086): failure and already-admitted wakes stay parked while
+  // the parent is unsafe, but only until the retained-admit ceiling elapses,
+  // then the caller deposits a fresh noReply admission (never a forced reply,
+  // #4120/#6546). The reply itself still waits for independently safe history.
   private deferReplyWakeWhileUnsafe(sessionID: string, latestWake: PendingParentWake): boolean {
     if (isFailureParentWake(latestWake)) {
+      if (this.shouldAdmitRetainedWakeAfterCeiling(latestWake)) {
+        log("[background-agent] Admitting failure parent wake after retained-admit ceiling:", { sessionID })
+        return false
+      }
       this.schedulePendingParentWakeFlush(sessionID)
       log("[background-agent] Deferred failure parent wake until parent session is safe:", { sessionID })
       return true
     }
     if (latestWake.shouldReply && latestWake.noReplyAdmittedAt !== undefined) {
-      // A persistently-unsafe parent would defer the retained wake forever:
-      // after the first admission the notification set no longer changes, so
-      // nothing ever clears noReplyAdmittedAt. Once the bounded interval
-      // elapses, fall through so the caller re-admits the wake as a fresh
-      // noReply deposit (marker refreshed by the dispatch path). This is still
-      // an admission, never a consumption (#4874/#5086), and never a forced
-      // reply (#4120) — the reply itself still waits for independently safe
-      // history. dropAdmittedWakeConsumedByParent has already dropped any
-      // deposit the live turn consumed.
-      if (Date.now() - latestWake.noReplyAdmittedAt >= PENDING_PARENT_WAKE_MAX_RETAINED_ADMIT_DEFER_MS) {
+      if (this.shouldAdmitRetainedWakeAfterCeiling(latestWake)) {
         log("[background-agent] Re-admitting retained parent wake after retained-admit ceiling:", { sessionID })
         return false
       }
