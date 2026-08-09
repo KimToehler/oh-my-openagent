@@ -3,6 +3,7 @@
 import { describe, expect, test } from "bun:test"
 import type { BackgroundOutputClient } from "../../tools/background-task/clients"
 import { findSessionIdInParentTranscript } from "../../tools/background-task/parent-transcript-pairing"
+import { buildBlockedAnswerInstruction } from "./blocked-answer-instruction"
 import { buildBackgroundTaskNotificationText } from "./background-task-notification-template"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
@@ -82,6 +83,7 @@ Use \`background_output(task_id="task-1")\` to retrieve this result when ready.
   describe("#given a blocked cancelled task", () => {
     test("#when building the partial notification #then it renders an actionable blocked wake", () => {
       // given
+      const sessionId = "ses_blocked_child_123"
       const notification = buildBackgroundTaskNotificationText({
         task: {
           id: "bg_blocked_1",
@@ -90,7 +92,7 @@ Use \`background_output(task_id="task-1")\` to retrieve this result when ready.
           error: "Reason: repeated gateway timeout\nNeeds: refreshed API credentials",
           blockedAt: new Date("2026-08-09T10:00:00.000Z"),
           blockedReason: "Reason: repeated gateway timeout\nNeeds: refreshed API credentials",
-          sessionId: "ses_blocked_child_123",
+          sessionId,
         },
         duration: "2m 5s",
         statusText: "BLOCKED",
@@ -98,11 +100,13 @@ Use \`background_output(task_id="task-1")\` to retrieve this result when ready.
         remainingCount: 1,
         completedTasks: [],
       })
+      const sharedInstruction = buildBlockedAnswerInstruction(sessionId)
 
       // then
       expect(notification).toContain("[BACKGROUND TASK BLOCKED]")
       expect(notification).toContain("repeated gateway timeout")
       expect(notification).toContain("refreshed API credentials")
+      expect(notification).toContain(sharedInstruction)
       expect(notification).toContain('task(task_id="ses_blocked_child_123", prompt="<your answer>")')
     })
   })

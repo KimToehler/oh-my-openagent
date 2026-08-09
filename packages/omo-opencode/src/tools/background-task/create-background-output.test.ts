@@ -71,7 +71,8 @@ describe("createBackgroundOutput blocked task rendering", () => {
     // then
     expect(output).toContain("BLOCKED")
     expect(output).toContain("Need deployment target")
-    expect(output).toContain('task(task_id="ses_child", prompt="...")')
+    expect(output).toContain("**Child needs your answer:**")
+    expect(output).toContain('task(task_id="ses_child", prompt="<your answer>")')
   })
 
   test("#given a plain cancelled task #when output is requested #then legacy output stays unchanged", async () => {

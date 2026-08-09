@@ -1,3 +1,4 @@
+import { buildBlockedAnswerInstruction } from "./blocked-answer-instruction"
 import type { BackgroundTaskAttempt, BackgroundTaskStatus } from "./types"
 
 export type BackgroundTaskNotificationStatus = "COMPLETED" | "BLOCKED" | "CANCELLED" | "INTERRUPTED" | "ERROR"
@@ -124,7 +125,7 @@ ${resultCollectionInstruction}${hasFailures ? `\n\n**ACTION REQUIRED:** ${failed
       ? `[BACKGROUND TASK ${statusText}]`
       : "[BACKGROUND TASK RESULT READY]"
   const blockedInstruction = isBlocked
-    ? `\n\n**Blocked:** ${task.blockedReason ?? task.error ?? "No reason provided"}\n**Child needs your answer:** Reply with the requested information using this exact invocation:\n\`task(task_id="${task.sessionId ?? "unknown-session"}", prompt="<your answer>")\``
+    ? `\n\n**Blocked:** ${task.blockedReason ?? task.error ?? "No reason provided"}\n${buildBlockedAnswerInstruction(task.sessionId ?? "unknown-session")}`
     : ""
 
   // The `| session: \`ses_...\`` suffix is the machine-parsable handle the
