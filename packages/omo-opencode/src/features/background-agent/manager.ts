@@ -1378,10 +1378,13 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     const resumeSnapshot = this.captureResumeTaskSnapshot(existingTask)
-    const completionTimer = this.completionTimers.get(existingTask.id)
-    if (completionTimer) {
-      clearTimeout(completionTimer)
-      this.completionTimers.delete(existingTask.id)
+    const wasBlocked = existingTask.blockedAt !== undefined
+    if (!wasBlocked) {
+      const completionTimer = this.completionTimers.get(existingTask.id)
+      if (completionTimer) {
+        clearTimeout(completionTimer)
+        this.completionTimers.delete(existingTask.id)
+      }
     }
 
     // Re-acquire concurrency using the persisted concurrency group
@@ -1514,6 +1517,16 @@ The fallback retry session is now created and can be inspected directly.
           status: promptResult.status,
         })
         this.restoreTaskAfterSkippedResume(existingTask, resumeSnapshot, promptResult.status)
+        return
+      }
+      if (wasBlocked) {
+        existingTask.blockedAt = undefined
+        existingTask.blockedReason = undefined
+        const blockedTimer = this.completionTimers.get(existingTask.id)
+        if (blockedTimer) {
+          clearTimeout(blockedTimer)
+          this.completionTimers.delete(existingTask.id)
+        }
       }
     }).catch(async (error) => {
       log("[background-agent] resume prompt error:", error)
