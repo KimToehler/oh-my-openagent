@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { createOpencodeClient } from "@opencode-ai/sdk"
 import { ParentWakeNotifier } from "./parent-wake-notifier"
+import { MAX_COALESCE_REQUEUE_ATTEMPTS } from "./parent-wake-prompt-dispatch"
 import {
   releaseAllPromptAsyncReservationsForTesting,
   releasePromptAsyncReservation,
@@ -487,6 +488,125 @@ describe("parent wake mid-batch starvation characterization", () => {
       // shouldReply:false wake on a busy parent is deferred forever before any
       // admission — not even a noReply deposit is made.
       expect(promptAsyncCalls.length).toBeGreaterThan(0)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+    }
+  })
+
+  test("#given a reply wake retry the gate discards as an already-delivered coalesce #when the discarded dispatch returns #then neither admission marker is written, while a genuine retained admission still writes both", async () => {
+    // given: an idle parent with safe history, so the first flush takes the
+    // plain reply path and records a semantic dedupe entry for that prompt.
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    let historyBlocked = false
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () => (historyBlocked ? BLOCKED_MESSAGES : SAFE_MESSAGES),
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(promptAsyncCalls[0]?.body.noReply).not.toBe(true)
+
+      // when: the same wake is requeued and retried past the gate's 2s
+      // post-dispatch hold but inside its 15s semantic dedupe hold, so the gate
+      // discards the retry as already-delivered.
+      expect(await notifier.requeueDispatchedParentWake("parent-1", "test:simulate-late-prompt-failure")).toBe(true)
+      now = 103_000
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: the retry never reached the client, so it is a phantom delivery
+      // and must leave no delivery footprint. Neither marker guarding issues
+      // #4874/#5086 may be written, and the wake must not be recorded as sent.
+      expect(promptAsyncCalls).toHaveLength(1)
+      const coalescedWake = notifier.getPendingParentWakes().get("parent-1")
+      expect(coalescedWake?.noReplyAdmittedAt).toBeUndefined()
+      expect(coalescedWake?.lastAdmitOnlyDepositAt).toBeUndefined()
+      expect(coalescedWake?.coalesceRequeueCount).toBe(1)
+      expect(notifier.getDispatchedParentWakes().has("parent-1")).toBe(false)
+
+      // when: the semantic hold lapses and the parent history turns unsafe, so
+      // the next flush is a GENUINE retained admit-only dispatch.
+      historyBlocked = true
+      now = 120_000
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: control for the assertions above. The marker-writing code is live
+      // and reachable, so "unset after a coalesce" is a real observation rather
+      // than a vacuously passing assertion.
+      expect(promptAsyncCalls).toHaveLength(2)
+      expect(promptAsyncCalls[1]?.body.noReply).toBe(true)
+      const admittedWake = notifier.getPendingParentWakes().get("parent-1")
+      expect(admittedWake?.noReplyAdmittedAt).toBe(120_000)
+      expect(admittedWake?.lastAdmitOnlyDepositAt).toBe(120_000)
+    } finally {
+      Date.now = originalDateNow
+      notifier.shutdown()
+    }
+  })
+
+  test("#given a wake carrying one genuine no-output retry #when coalesce requeue cycles run to the cap #then the no-output retry budget is untouched and only the coalesce counter moves", async () => {
+    // given: a wake seeded with the single retry that parent-wake-window-recovery
+    // records after a real no-output dispatch. That path is the ONLY legitimate
+    // increment of noAssistantOutputRetryCount.
+    const originalDateNow = Date.now
+    let now = 100_000
+    Date.now = () => now
+    const { notifier, promptAsyncCalls } = createNotifier({
+      sessionStatuses: { "parent-1": { type: "idle" } },
+      messagesProvider: () => SAFE_MESSAGES,
+    })
+    notifier.queuePendingParentWake("parent-1", FINAL_WAKE, { agent: "sisyphus" }, true)
+    const seededWake = notifier.getPendingParentWakes().get("parent-1")
+    if (!seededWake) throw new Error("expected pending wake")
+    seededWake.noAssistantOutputRetryCount = 1
+
+    try {
+      // when: the seeded wake dispatches once and is requeued for retry
+      await notifier.flushPendingParentWake("parent-1")
+      expect(promptAsyncCalls).toHaveLength(1)
+      expect(await notifier.requeueDispatchedParentWake("parent-1", "test:simulate-late-prompt-failure")).toBe(true)
+      expect(notifier.getPendingParentWakes().get("parent-1")?.noAssistantOutputRetryCount).toBe(1)
+
+      // when: every retry inside the semantic hold coalesces as already-delivered
+      const observedRetryBudgets: (number | undefined)[] = []
+      const observedCoalesceCounts: (number | undefined)[] = []
+      for (let cycle = 1; cycle <= MAX_COALESCE_REQUEUE_ATTEMPTS; cycle++) {
+        now = 100_000 + cycle * 3_000
+        notifier.clearPendingParentWakeTimer("parent-1")
+        await notifier.flushPendingParentWake("parent-1")
+        const cycleWake = notifier.getPendingParentWakes().get("parent-1")
+        observedRetryBudgets.push(cycleWake?.noAssistantOutputRetryCount)
+        observedCoalesceCounts.push(cycleWake?.coalesceRequeueCount)
+      }
+
+      // then: the two counters have separate lifecycles. Coalesce requeues move
+      // coalesceRequeueCount only; the no-output retry budget is neither
+      // incremented nor decremented, and no cycle reached the client.
+      expect(observedCoalesceCounts).toEqual([1, 2, 3])
+      expect(observedRetryBudgets).toEqual([1, 1, 1])
+      expect(promptAsyncCalls).toHaveLength(1)
+
+      // when: one more retry runs past the cap, so the wake is recorded as sent
+      now = 100_000 + (MAX_COALESCE_REQUEUE_ATTEMPTS + 1) * 3_000
+      notifier.clearPendingParentWakeTimer("parent-1")
+      await notifier.flushPendingParentWake("parent-1")
+
+      // then: successful acceptance closes the coalesce episode while the
+      // genuine no-output retry budget remains untouched.
+      expect(promptAsyncCalls).toHaveLength(1)
+      const trackedWake = notifier.getDispatchedParentWakes().get("parent-1")
+      expect(trackedWake?.coalesceRequeueCount).toBeUndefined()
+      expect(trackedWake?.noAssistantOutputRetryCount).toBe(1)
     } finally {
       Date.now = originalDateNow
       notifier.shutdown()

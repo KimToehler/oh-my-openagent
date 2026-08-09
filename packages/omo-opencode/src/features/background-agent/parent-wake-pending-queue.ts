@@ -19,6 +19,8 @@ type ParentWakePendingQueueOptions = {
 export class ParentWakePendingQueue {
   private pendingParentWakes: Map<string, PendingParentWake> = new Map()
   private pendingParentWakeTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
+  private pendingParentWakeTimerDeadlines: Map<string, number> = new Map()
+  private pendingParentWakeTimersExtended: Set<string> = new Set()
 
   constructor(private readonly options: ParentWakePendingQueueOptions) {}
 
@@ -63,6 +65,7 @@ export class ParentWakePendingQueue {
         delete pendingWake.noReplyAdmittedAt
         delete pendingWake.lastAdmitOnlyDepositAt
         delete pendingWake.noAssistantOutputRetryCount
+        delete pendingWake.coalesceRequeueCount
       }
       return
     }
@@ -99,6 +102,13 @@ export class ParentWakePendingQueue {
       if (noAssistantOutputRetryCount > 0) {
         pendingWake.noAssistantOutputRetryCount = noAssistantOutputRetryCount
       }
+      const coalesceRequeueCount = Math.max(
+        pendingWake.coalesceRequeueCount ?? 0,
+        latestWake.coalesceRequeueCount ?? 0,
+      )
+      if (coalesceRequeueCount > 0) {
+        pendingWake.coalesceRequeueCount = coalesceRequeueCount
+      }
       return
     }
     const clonedWake = cloneParentWake(latestWake)
@@ -107,19 +117,33 @@ export class ParentWakePendingQueue {
   }
 
   scheduleFlush(sessionID: string, operation: () => Promise<void>, delayMs?: number): void {
-    if (this.pendingParentWakeTimers.has(sessionID)) {
-      return
+    const existingTimer = this.pendingParentWakeTimers.get(sessionID)
+    if (existingTimer) {
+      if (delayMs === undefined || this.pendingParentWakeTimersExtended.has(sessionID)) {
+        return
+      }
+      const requestedDeadline = Date.now() + delayMs
+      const existingDeadline = this.pendingParentWakeTimerDeadlines.get(sessionID)
+      if (existingDeadline === undefined || requestedDeadline <= existingDeadline) {
+        return
+      }
+      clearTimeout(existingTimer)
+      this.pendingParentWakeTimersExtended.add(sessionID)
     }
 
+    const resolvedDelayMs = delayMs ?? this.options.pendingRetryMs
     const timer = setTimeout(() => {
       this.pendingParentWakeTimers.delete(sessionID)
+      this.pendingParentWakeTimerDeadlines.delete(sessionID)
+      this.pendingParentWakeTimersExtended.delete(sessionID)
       void this.options.enqueueNotificationForParent(sessionID, operation).catch((error) => {
         log("[background-agent] Failed to retry pending parent wake:", { sessionID, error })
       })
-    }, delayMs ?? this.options.pendingRetryMs)
+    }, resolvedDelayMs)
     unrefTimerHandle(timer)
 
     this.pendingParentWakeTimers.set(sessionID, timer)
+    this.pendingParentWakeTimerDeadlines.set(sessionID, Date.now() + resolvedDelayMs)
   }
 
   clearTimer(sessionID: string): void {
@@ -130,6 +154,8 @@ export class ParentWakePendingQueue {
 
     clearTimeout(timer)
     this.pendingParentWakeTimers.delete(sessionID)
+    this.pendingParentWakeTimerDeadlines.delete(sessionID)
+    this.pendingParentWakeTimersExtended.delete(sessionID)
   }
 
   shutdown(): void {
@@ -137,6 +163,8 @@ export class ParentWakePendingQueue {
       clearTimeout(timer)
     }
     this.pendingParentWakeTimers.clear()
+    this.pendingParentWakeTimerDeadlines.clear()
+    this.pendingParentWakeTimersExtended.clear()
     this.pendingParentWakes.clear()
   }
 }

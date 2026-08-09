@@ -62,9 +62,20 @@ export type PromptAsyncReservation = {
   readonly expiresAt?: number
 }
 
+// Distinguishes the two "queued" coalesce shapes: "already-delivered" means an
+// identical prompt already dispatched within the semantic dedupe hold and this
+// one was discarded; "in-flight" means an identical prompt is reserved or
+// pending right now and will still be delivered.
+export type InternalPromptCoalesceKind = "already-delivered" | "in-flight"
+
 export type InternalPromptDispatchResult =
   | { readonly status: "dispatched"; readonly response: unknown }
-  | { readonly status: "queued"; readonly queuedBy: string; readonly position: number }
+  | {
+    readonly status: "queued"
+    readonly queuedBy: string
+    readonly position: number
+    readonly coalesceKind?: InternalPromptCoalesceKind
+  }
   | { readonly status: "active" }
   | { readonly status: "reserved"; readonly reservedBy: string }
   | { readonly status: "unavailable" }

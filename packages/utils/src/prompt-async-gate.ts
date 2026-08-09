@@ -59,6 +59,7 @@ export {
 } from "./prompt-async-gate/timing"
 
 export type {
+  InternalPromptCoalesceKind,
   InternalPromptDispatchArgs,
   InternalPromptDispatchMode,
   InternalPromptDispatchResult,

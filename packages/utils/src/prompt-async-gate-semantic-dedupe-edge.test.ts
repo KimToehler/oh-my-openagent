@@ -91,7 +91,7 @@ describe("dispatchInternalPrompt semantic dedupe edge cases", () => {
         throw new Error("expected first dispatch to fail after attempt")
       }
       expect(first.dispatchAttempted).toBe(true)
-      expect(second).toEqual({ status: "queued", queuedBy: "test:reject-semantic:first", position: 0 })
+      expect(second).toEqual({ status: "queued", queuedBy: "test:reject-semantic:first", position: 0, coalesceKind: "already-delivered" })
       expect(promptCalls).toEqual(["prompt"])
     } finally {
       Date.now = originalDateNow

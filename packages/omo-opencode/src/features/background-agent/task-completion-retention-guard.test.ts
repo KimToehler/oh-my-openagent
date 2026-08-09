@@ -3,6 +3,8 @@ import { afterEach, describe, expect, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { TASK_CLEANUP_DELAY_MS } from "./constants"
 import { BackgroundManager } from "./manager"
+import type { PendingParentWake } from "./parent-wake-dedupe"
+import { MAX_COALESCE_REQUEUE_ATTEMPTS } from "./parent-wake-prompt-dispatch"
 import type { BackgroundTask } from "./types"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../hooks/shared/prompt-async-gate"
 
@@ -199,6 +201,74 @@ function getDispatchedParentWakes(manager: BackgroundManager): Map<string, Pendi
   return parentWakeNotifier.getDispatchedParentWakes()
 }
 
+function getParentWakePendingQueue(manager: BackgroundManager): {
+  getWake: (sessionID: string) => PendingParentWake | undefined
+  deleteWake: (sessionID: string) => void
+  requeueWake: (sessionID: string, wake: PendingParentWake) => void
+} {
+  const parentWakeNotifier = Reflect.get(manager, "parentWakeNotifier") as {
+    pendingQueue: {
+      getWake: (sessionID: string) => PendingParentWake | undefined
+      deleteWake: (sessionID: string) => void
+      requeueWake: (sessionID: string, wake: PendingParentWake) => void
+    }
+  }
+  return parentWakeNotifier.pendingQueue
+}
+
+function getParentWakeDispatchedTracker(manager: BackgroundManager): {
+  trackWake: (sessionID: string, wake: PendingParentWake, dispatchedAt: number) => void
+} {
+  const parentWakeNotifier = Reflect.get(manager, "parentWakeNotifier") as {
+    dispatchedTracker: {
+      trackWake: (sessionID: string, wake: PendingParentWake, dispatchedAt: number) => void
+    }
+  }
+  return parentWakeNotifier.dispatchedTracker
+}
+
+function takeOwedParentWake(manager: BackgroundManager, sessionID: string): PendingParentWake {
+  const pendingQueue = getParentWakePendingQueue(manager)
+  const wake = pendingQueue.getWake(sessionID)
+  if (wake === undefined) {
+    throw new Error(`Missing pending parent wake for ${sessionID}`)
+  }
+  // The flush runner deletes the pending entry BEFORE dispatching
+  // (parent-wake-flush-runner.ts:260-263), so every dispatch outcome below
+  // starts from an empty pending slot.
+  pendingQueue.deleteWake(sessionID)
+  return wake
+}
+
+// Mirrors the already-delivered coalesce branch of parent-wake-prompt-dispatch:
+// the gate DISCARDED the prompt, so the wake is requeued with an incremented
+// coalesce counter instead of being recorded as dispatched. A wake is still
+// owed for the whole of that retry window.
+function requeueParentWakeAfterDiscardedCoalesce(
+  manager: BackgroundManager,
+  sessionID: string,
+): PendingParentWake {
+  const wake = takeOwedParentWake(manager, sessionID)
+  wake.coalesceRequeueCount = (wake.coalesceRequeueCount ?? 0) + 1
+  const pendingQueue = getParentWakePendingQueue(manager)
+  pendingQueue.requeueWake(sessionID, wake)
+  const requeuedWake = pendingQueue.getWake(sessionID)
+  if (requeuedWake === undefined) {
+    throw new Error(`Requeue dropped the parent wake for ${sessionID}`)
+  }
+
+  return requeuedWake
+}
+
+// Mirrors the tail of the same branch: once the dedicated
+// MAX_COALESCE_REQUEUE_ATTEMPTS budget is spent the wake is recorded as
+// dispatched instead of requeued again, so the retry window closes while the
+// reply is still owed.
+function recordParentWakeDispatchedAfterCoalesceCap(manager: BackgroundManager, sessionID: string): void {
+  const wake = takeOwedParentWake(manager, sessionID)
+  getParentWakeDispatchedTracker(manager).trackWake(sessionID, wake, Date.now())
+}
+
 function markParentWakeInFlight(manager: BackgroundManager, sessionID: string): void {
   const parentWakeNotifier = Reflect.get(manager, "parentWakeNotifier") as {
     dispatchedTracker: { markInFlight: (sessionID: string) => void }
@@ -348,6 +418,110 @@ describe("BackgroundManager completion cleanup retention guard", () => {
     // unobservable through the two wake maps
     expect(getTasks(manager).has(task.id)).toBe(true)
     expect(manager.getTask(task.id)?.id).toBe(task.id)
+  })
+
+  test("#given a wake requeued by an already-delivered coalesce #when the cleanup timer fires #then the task stays retrievable across the retry window", async () => {
+    // given: the dispatch was DISCARDED by the prompt gate as an
+    // already-delivered coalesce, so parent-wake-prompt-dispatch requeues the
+    // wake instead of recording it as dispatched. The reply is still owed for
+    // the whole of that retry window, and the retry backoff (2000ms) plus the
+    // gate's 15s semantic hold can outlast a cleanup pass.
+    const { manager } = createManager()
+    managerUnderTest = manager
+    const task = createTask({
+      id: "bg_retention_coalesce_retry",
+      parentSessionId: "parent-coalesce-retry",
+      description: "coalesce-retry retention task",
+      status: "completed",
+      completedAt: new Date(),
+      sessionId: "ses_retention_coalesce_retry",
+    })
+    getTasks(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+
+    await notifyParentSessionForTest(manager, task)
+    expect(getPendingParentWakes(manager).get(task.parentSessionId)?.shouldReply).toBe(true)
+
+    // when: the first dispatch attempt coalesces and the wake is requeued
+    const requeuedWake = requeueParentWakeAfterDiscardedCoalesce(manager, task.parentSessionId)
+    expect(requeuedWake.coalesceRequeueCount).toBe(1)
+
+    // then: the requeued wake is owed again through the pending queue
+    expect(getPendingParentWakes(manager).get(task.parentSessionId)?.shouldReply).toBe(true)
+    expect(getDispatchedParentWakes(manager).has(task.parentSessionId)).toBe(false)
+
+    // when: the cleanup timer fires inside that retry window
+    await fakeTimers?.run(getRequiredTimer(manager, task.id))
+
+    // then: the task survives, because a shouldReply wake is still queued
+    expect(getPendingParentWakes(manager).get(task.parentSessionId)?.shouldReply).toBe(true)
+    expect(getTasks(manager).has(task.id)).toBe(true)
+    expect(manager.getTask(task.id)?.id).toBe(task.id)
+
+    // when: a second attempt coalesces too, still inside the dedicated cap
+    const secondRequeuedWake = requeueParentWakeAfterDiscardedCoalesce(manager, task.parentSessionId)
+    expect(secondRequeuedWake.coalesceRequeueCount).toBe(2)
+    expect(secondRequeuedWake.coalesceRequeueCount).toBeLessThan(MAX_COALESCE_REQUEUE_ATTEMPTS)
+    await fakeTimers?.run(getRequiredTimer(manager, task.id))
+
+    // then: retention holds for the whole retry window, not just one pass
+    expect(getPendingParentWakes(manager).get(task.parentSessionId)?.shouldReply).toBe(true)
+    expect(getTasks(manager).has(task.id)).toBe(true)
+  })
+
+  test("#given the coalesce requeue cap is exhausted while the wake is still owed #when cleanup keeps firing #then the task is removed instead of pinned forever", async () => {
+    // given: every coalesce retry was spent, so the dispatch path stops
+    // requeueing and records the wake as dispatched. shouldReply stays true, so
+    // the retention guard keeps seeing an owed wake with nothing left to
+    // deliver it. Retention must still terminate: the guard's TASK_TTL_MS /
+    // reschedule bound is what stops the new retry window from pinning a
+    // completed task forever.
+    const { manager } = createManager()
+    managerUnderTest = manager
+    const task = createTask({
+      id: "bg_retention_coalesce_exhausted",
+      parentSessionId: "parent-coalesce-exhausted",
+      description: "coalesce-exhausted retention task",
+      status: "completed",
+      completedAt: new Date(),
+      sessionId: "ses_retention_coalesce_exhausted",
+    })
+    getTasks(manager).set(task.id, task)
+    getPendingByParent(manager).set(task.parentSessionId, new Set([task.id]))
+
+    await notifyParentSessionForTest(manager, task)
+
+    // when: the wake burns every requeue the dedicated cap allows
+    for (let attempt = 1; attempt <= MAX_COALESCE_REQUEUE_ATTEMPTS; attempt++) {
+      const requeuedWake = requeueParentWakeAfterDiscardedCoalesce(manager, task.parentSessionId)
+      expect(requeuedWake.coalesceRequeueCount).toBe(attempt)
+      expect(getPendingParentWakes(manager).get(task.parentSessionId)?.shouldReply).toBe(true)
+    }
+
+    // when: the attempt beyond the cap is recorded as dispatched rather than requeued
+    recordParentWakeDispatchedAfterCoalesceCap(manager, task.parentSessionId)
+    expect(getPendingParentWakes(manager).get(task.parentSessionId)?.shouldReply).toBeUndefined()
+    expect(getDispatchedParentWakes(manager).get(task.parentSessionId)?.shouldReply).toBe(true)
+
+    // when: the first cleanup pass fires while that wake is still owed
+    await fakeTimers?.run(getRequiredTimer(manager, task.id))
+
+    // then: the guard defers, exactly as it does for any owed reply wake
+    expect(getTasks(manager).has(task.id)).toBe(true)
+
+    // when: cleanup keeps firing and nothing ever consumes the wake
+    let cleanupPasses = 1
+    while (getCompletionTimers(manager).has(task.id) && cleanupPasses < 12) {
+      await fakeTimers?.run(getRequiredTimer(manager, task.id))
+      cleanupPasses += 1
+    }
+
+    // then: the removal ACTUALLY happens - the guard released the task on its
+    // own bound while the wake was still reported as owed, so the coalesce
+    // retry window cannot pin a completed task indefinitely.
+    expect(getDispatchedParentWakes(manager).get(task.parentSessionId)?.shouldReply).toBe(true)
+    expect(getCompletionTimers(manager).has(task.id)).toBe(false)
+    expect(getTasks(manager).has(task.id)).toBe(false)
   })
 
   test("#given the owed wake is consumed #when the cleanup timer fires again #then the task is removed", async () => {

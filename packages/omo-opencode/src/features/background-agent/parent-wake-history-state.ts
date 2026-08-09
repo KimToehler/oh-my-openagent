@@ -91,12 +91,22 @@ export function latestAssistantTurnHasStaleUnknownSubstantiveOutput(
 }
 
 export function createEmptyAssistantTurnRetryDedupeKey(wake: PendingParentWake): string {
-  return [
-    "background-agent-parent-wake-empty-retry",
-    ...wake.notifications,
-    JSON.stringify(wake.promptContext),
-    wake.shouldReply ? "reply" : "silent",
-  ].join("\u0000")
+  return JSON.stringify({
+    kind: "background-agent-parent-wake-empty-retry",
+    notifications: wake.notifications,
+    promptContext: wake.promptContext,
+    replyMode: wake.shouldReply ? "reply" : "silent",
+  })
+}
+
+export function createNoAssistantOutputRetryDedupeKey(wake: PendingParentWake): string {
+  return JSON.stringify({
+    kind: "background-agent-parent-wake-noout-retry",
+    retryCount: wake.noAssistantOutputRetryCount ?? 0,
+    notifications: wake.notifications,
+    promptContext: wake.promptContext,
+    replyMode: wake.shouldReply ? "reply" : "silent",
+  })
 }
 
 function partHasFreshToolActivity(part: unknown, now: number, maxAgeMs: number): boolean {
