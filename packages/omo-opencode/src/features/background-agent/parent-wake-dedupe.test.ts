@@ -56,7 +56,7 @@ describe("blocked parent wake classification", () => {
     expect(failure).toBe(true)
   })
 
-  test("#given a blocked progress wake behind a final wake #when merging the final wake #then blocked progress is removed", () => {
+  test("#given a blocked wake whose body mentions remaining work #when merging a final wake #then blocked action survives", () => {
     // given
     const blockedNotification = "<system-reminder>\n[BACKGROUND TASK BLOCKED]\n**1 task still in progress.** You WILL be notified when ALL complete.\n</system-reminder>"
     const finalNotification = "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]\n</system-reminder>"
@@ -65,6 +65,6 @@ describe("blocked parent wake classification", () => {
     const notifications = mergeParentWakeNotifications([blockedNotification], finalNotification)
 
     // then
-    expect(notifications).toEqual([finalNotification])
+    expect(notifications).toEqual([finalNotification, blockedNotification])
   })
 })

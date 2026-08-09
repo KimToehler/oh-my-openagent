@@ -57,7 +57,7 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
 }
 
 // The admission timestamp a consumed-deposit drop may key on. A reply-required
-// wake is only droppable on an admission it earned itself (noReplyAdmittedAt) —
+// wake is only droppable on an admission it earned itself (noReplyAdmittedAt) -
 // never on an admit-only deposit made before a reply-required wake merged in
 // (issues #4874/#5086). A shouldReply:false wake is droppable on its
 // admit-only deposit: once the live turn consumed it, nothing is owed.
@@ -134,7 +134,8 @@ function isFinalBackgroundTaskNotification(notification: string): boolean {
 }
 
 function isBackgroundTaskProgressNotification(notification: string): boolean {
-  if (!getSystemReminderHeaderLines(notification).some(isBackgroundTaskProgressHeader)) {
+  const headerLines = getSystemReminderHeaderLines(notification)
+  if (headerLines.includes("[BACKGROUND TASK BLOCKED]") || !headerLines.some(isBackgroundTaskProgressHeader)) {
     return false
   }
 
@@ -145,7 +146,6 @@ function isBackgroundTaskProgressNotification(notification: string): boolean {
 
 function isBackgroundTaskProgressHeader(line: string): boolean {
   return line === "[BACKGROUND TASK RESULT READY]"
-    || line === "[BACKGROUND TASK BLOCKED]"
     || line === "[BACKGROUND TASK CANCELLED]"
     || line === "[BACKGROUND TASK INTERRUPTED]"
     || line === "[BACKGROUND TASK ERROR]"
