@@ -35,7 +35,24 @@ type RouteRegistration = {
 const registrations = new Map<unknown, RouteRegistration>()
 let lastRegistration: RouteRegistration | undefined
 
-let liveParentWakeRoutingDisabled = false
+// Live parent-wake routing is OPT-IN because it breaks live rendering.
+//
+// The live route builds a second SDK client from `serverUrl` alone, so a prompt
+// dispatched through it is published in a different instance context. Since
+// opencode 1.18.x the instance `/event` stream filters on event location
+// metadata (directory + workspace), and the attached TUI subscribes to exactly
+// that filtered stream. The injected turn therefore persists to the database
+// but never reaches the TUI, which keeps showing nothing until opencode is
+// restarted. `promptAsync` returns 204 immediately after forking the work, so
+// the dispatch still reports success and the wake bookkeeping then observes
+// "no assistant output", retries, and finally drops the retained wake.
+//
+// Passing the `GET /session/{id}` affinity probe only proves the listener owns
+// the SESSION, never that it owns the TUI's event stream, so the route cannot
+// be made render-safe without an upstream render-affinity handshake. Keep it
+// disabled unless an operator explicitly opts in for serve-topology
+// runner-split protection (#5569 / #6022).
+let liveParentWakeRoutingDisabled = true
 
 type FetchImpl = typeof fetch
 let fetchImplementationForTesting: FetchImpl | undefined

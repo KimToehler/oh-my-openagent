@@ -232,7 +232,14 @@ export function createPluginModule(overrides: Partial<PluginModuleDeps> = {}): P
       }
     }
     deps.initLiveServerRoute({ serverUrl: input.serverUrl, directory: input.directory, inProcessClient: input.client })
-    deps.setLiveParentWakeRoutingDisabled(pluginConfig.experimental?.disable_live_parent_wake_routing === true)
+    // Live routing is opt-in: it persists wakes without rendering them (see
+    // live-server-route.ts). `enable_live_parent_wake_routing: true` turns it
+    // back on; the legacy `disable_live_parent_wake_routing` flag still wins
+    // when set so existing configs keep working.
+    deps.setLiveParentWakeRoutingDisabled(
+      pluginConfig.experimental?.disable_live_parent_wake_routing === true ||
+        pluginConfig.experimental?.enable_live_parent_wake_routing !== true,
+    )
     deps.warmLiveServerProbe()
     const runtimeSecuritySkills = selectRuntimeSecuritySkills(pluginConfig)
     let runtimeSkillSource: Awaited<ReturnType<PluginModuleDeps["createRuntimeSkillSourceServer"]>> | undefined
