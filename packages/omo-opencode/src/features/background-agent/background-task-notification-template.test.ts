@@ -3,6 +3,7 @@
 import { describe, expect, test } from "bun:test"
 import type { BackgroundOutputClient } from "../../tools/background-task/clients"
 import { findSessionIdInParentTranscript } from "../../tools/background-task/parent-transcript-pairing"
+import { buildBlockedAnswerInstruction } from "./blocked-answer-instruction"
 import { buildBackgroundTaskNotificationText } from "./background-task-notification-template"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
@@ -78,6 +79,163 @@ Use \`background_output(task_id="task-1")\` to retrieve this result when ready.
     })
   })
 
+
+  describe("#given a blocked cancelled task", () => {
+    test("#when building the partial notification #then it renders an actionable blocked wake", () => {
+      // given
+      const sessionId = "ses_blocked_child_123"
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "bg_blocked_1",
+          description: "Inspect remote logs",
+          status: "cancelled",
+          error: "Reason: repeated gateway timeout\nNeeds: refreshed API credentials",
+          blockedAt: new Date("2026-08-09T10:00:00.000Z"),
+          blockedReason: "Reason: repeated gateway timeout\nNeeds: refreshed API credentials",
+          sessionId,
+        },
+        duration: "2m 5s",
+        statusText: "BLOCKED",
+        allComplete: false,
+        remainingCount: 1,
+        completedTasks: [],
+      })
+      const sharedInstruction = buildBlockedAnswerInstruction(sessionId)
+
+      // then
+      expect(notification).toContain("[BACKGROUND TASK BLOCKED]")
+      expect(notification).toContain("repeated gateway timeout")
+      expect(notification).toContain("refreshed API credentials")
+      expect(notification).toContain(sharedInstruction)
+      expect(notification).toContain('task(task_id="ses_blocked_child_123", prompt="<your answer>")')
+    })
+
+    test("#when building the partial notification #then it uses answer-oriented call-to-action not failure call-to-action", () => {
+      // given
+      const sessionId = "ses_blocked_child_456"
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "bg_blocked_2",
+          description: "Fetch credentials",
+          status: "cancelled",
+          blockedReason: "Needs: AWS access key refresh",
+          sessionId,
+        },
+        duration: "1m 30s",
+        statusText: "BLOCKED",
+        allComplete: false,
+        remainingCount: 2,
+        completedTasks: [],
+      })
+
+      // then
+      expect(notification).toContain("**CHILD AWAITING RESPONSE:** Answer the child to unblock it.")
+      expect(notification).not.toContain("**ACTION REQUIRED:** This task failed.")
+      expect(notification).not.toContain("retry, cancel remaining tasks")
+    })
+  })
+
+  describe("#given blocked tasks that make the batch otherwise complete", () => {
+    const blockedTask = {
+      id: "bg_blocked_last",
+      description: "Audit payments",
+      status: "cancelled" as const,
+      error: "Reason: payment scope unclear\nNeeds from parent: choose audit boundary",
+      blockedAt: new Date("2026-08-09T10:00:00.000Z"),
+      blockedReason: "Reason: payment scope unclear\nNeeds from parent: choose audit boundary",
+      sessionId: "ses_child_real",
+    }
+
+    test("#when the only child blocks with allComplete true #then blocked rendering wins", () => {
+      // when
+      const notification = buildBackgroundTaskNotificationText({
+        task: blockedTask,
+        duration: "1m",
+        statusText: "BLOCKED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [blockedTask],
+      })
+
+      // then
+      expect(notification).toContain("[BACKGROUND TASK BLOCKED]")
+      expect(notification).toContain("payment scope unclear")
+      expect(notification).toContain('task(task_id="ses_child_real", prompt="<your answer>")')
+      expect(notification).not.toContain("[ALL BACKGROUND TASKS FINISHED - 1 FAILED]")
+    })
+
+    test("#when the last child blocks after a sibling completed #then blocked action and completed sibling summary coexist", () => {
+      // when
+      const notification = buildBackgroundTaskNotificationText({
+        task: blockedTask,
+        duration: "1m",
+        statusText: "BLOCKED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [
+          { id: "bg_done", description: "Index payments", status: "completed", sessionId: "ses_done" },
+          blockedTask,
+        ],
+      })
+
+      // then
+      expect(notification).toContain("[BACKGROUND TASK BLOCKED]")
+      expect(notification).toContain("**Completed siblings:**")
+      expect(notification).toContain("`bg_done`: Index payments")
+      expect(notification).toContain('task(task_id="ses_child_real", prompt="<your answer>")')
+    })
+
+    test("#when two children block in sequence #then each wake retains its own answer instruction", () => {
+      // given
+      const secondTask = { ...blockedTask, id: "bg_blocked_second", sessionId: "ses_child_second" }
+
+      // when
+      const firstNotification = buildBackgroundTaskNotificationText({
+        task: blockedTask,
+        duration: "1m",
+        statusText: "BLOCKED",
+        allComplete: false,
+        remainingCount: 1,
+        completedTasks: [],
+      })
+      const secondNotification = buildBackgroundTaskNotificationText({
+        task: secondTask,
+        duration: "2m",
+        statusText: "BLOCKED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [blockedTask, secondTask],
+      })
+
+      // then
+      expect(firstNotification).toContain('task(task_id="ses_child_real", prompt="<your answer>")')
+      expect(secondNotification).toContain('task(task_id="ses_child_second", prompt="<your answer>")')
+    })
+  })
+
+  describe("#given a cancelled task without blocked metadata", () => {
+    test("#when building the partial notification #then it keeps the cancelled header", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "bg_cancelled_1",
+          description: "Cancelled task",
+          status: "cancelled",
+          error: "User cancelled",
+          sessionId: "ses_cancelled_child_123",
+        },
+        duration: "10s",
+        statusText: "CANCELLED",
+        allComplete: false,
+        remainingCount: 1,
+        completedTasks: [],
+      })
+
+      // then
+      expect(notification).toContain("[BACKGROUND TASK CANCELLED]")
+      expect(notification).not.toContain("[BACKGROUND TASK BLOCKED]")
+    })
+  })
   describe("#given one task still running after a failed task notification", () => {
     test("#when building the partial notification #then it preserves the existing failure format", () => {
       // given
@@ -111,6 +269,27 @@ Use \`background_output(task_id="task-2")\` to retrieve this result when ready.
 
       // then
       expect(notification).toBe(expectedNotification)
+    })
+
+    test("#when building the partial notification #then ERROR still has the failure call-to-action not answer-oriented text", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "task-error-999",
+          description: "Critical check",
+          status: "error",
+          error: "Connection refused",
+        },
+        duration: "5s",
+        statusText: "ERROR",
+        allComplete: false,
+        remainingCount: 1,
+        completedTasks: [],
+      })
+
+      // then
+      expect(notification).toContain("**ACTION REQUIRED:** This task failed. Check the error and decide whether to retry, cancel remaining tasks, or continue.")
+      expect(notification).not.toContain("**CHILD AWAITING RESPONSE:**")
     })
   })
 
@@ -313,9 +492,9 @@ All sibling background tasks are complete. Your next action should be to call \`
       expect(notification).toContain("[ALL BACKGROUND TASKS COMPLETE]")
       expect(notification).toContain("- `task-3`: Fallback task")
       expect(notification).toContain("Background task attempts:")
-      expect(notification).toContain("  - Attempt 1 — ERROR — genai-proxy-openai/gpt-5.6-luna-fast — ses-primary")
+      expect(notification).toContain("  - Attempt 1 - ERROR - genai-proxy-openai/gpt-5.6-luna-fast - ses-primary")
       expect(notification).toContain("    Error: Forbidden: Selected provider is forbidden")
-      expect(notification).toContain("  - Attempt 2 — COMPLETED — anthropic/claude-haiku-4.5 — ses-fallback")
+      expect(notification).toContain("  - Attempt 2 - COMPLETED - anthropic/claude-haiku-4.5 - ses-fallback")
     })
   })
 

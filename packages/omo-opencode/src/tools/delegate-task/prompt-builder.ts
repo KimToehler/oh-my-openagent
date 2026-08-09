@@ -13,6 +13,9 @@ Additional requirements for this planning request:
 - Include a clear atomic commit strategy.`
 
 const TDD_LINE = "- Use TDD-oriented planning."
+const BACKGROUND_BLOCKED_REPORTING = `<background-subagent-tools>
+If blocked and parent input is required, call report_blocked with both reason and needs. This alerts parent and parks this background task until parent resumes it.
+</background-subagent-tools>`
 
 function buildPlanAgentPromptAppend(tddEnabled: boolean): string {
   if (tddEnabled) {
@@ -99,4 +102,8 @@ export function buildTaskPrompt(prompt: string, agentName: string | undefined, t
 
   const effectiveTdd = tddEnabled ?? true
   return `${prompt}${buildPlanAgentPromptAppend(effectiveTdd)}`
+}
+
+export function buildBackgroundTaskPrompt(prompt: string, agentName: string | undefined, tddEnabled?: boolean): string {
+  return `${BACKGROUND_BLOCKED_REPORTING}\n\n${buildTaskPrompt(prompt, agentName, tddEnabled)}`
 }

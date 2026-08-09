@@ -7907,11 +7907,13 @@
         },
         "staleTimeoutMs": {
           "type": "number",
-          "minimum": 60000
+          "minimum": 60000,
+          "description": "Stale timeout in milliseconds - interrupt tasks with no activity for this duration (default: 2700000 = 45 minutes, minimum: 60000 = 1 minute)"
         },
         "messageStalenessTimeoutMs": {
           "type": "number",
-          "minimum": 60000
+          "minimum": 60000,
+          "description": "Timeout for tasks that never received any progress update, falling back to startedAt (default: 3600000 = 60 minutes, minimum: 60000 = 1 minute)"
         },
         "taskTtlMs": {
           "type": "number",
@@ -7925,6 +7927,16 @@
           "type": "number",
           "minimum": 60000
         },
+        "blockedRewakeMs": {
+          "type": "number",
+          "minimum": 60000,
+          "description": "Delay before sending one reminder for an unanswered blocked task in milliseconds (default: 600000 = 10 minutes, minimum: 60000 = 1 minute)."
+        },
+        "blockedExpiryMs": {
+          "type": "number",
+          "minimum": 60000,
+          "description": "Time before an unanswered blocked task expires in milliseconds (default: 1200000 = 20 minutes, minimum: 60000 = 1 minute). Must remain below the terminal task TTL."
+        },
         "syncPollTimeoutMs": {
           "type": "number",
           "minimum": 60000
@@ -7937,7 +7949,8 @@
         "maxToolCalls": {
           "type": "integer",
           "minimum": 10,
-          "maximum": 9007199254740991
+          "maximum": 9007199254740991,
+          "description": "Maximum tool calls per subagent task before circuit breaker triggers (default: 4000, minimum: 10). Prevents runaway loops from burning unlimited tokens."
         },
         "circuitBreaker": {
           "type": "object",

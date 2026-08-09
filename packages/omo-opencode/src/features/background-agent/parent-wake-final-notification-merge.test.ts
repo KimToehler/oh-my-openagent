@@ -9,6 +9,7 @@ type PromptAsyncCall = Parameters<ParentWakeNotifierClientForTest["session"]["pr
 
 const FINAL_WAKE = "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]\n**Completed:**\n- `task-a`: task A\n- `task-b`: task B\n</system-reminder>"
 const PROGRESS_WAKE = "<system-reminder>\n[BACKGROUND TASK RESULT READY]\n**ID:** `task-a`\n**1 task still in progress.** You WILL be notified when ALL complete.\n</system-reminder>"
+const BLOCKED_WAKE = "<system-reminder>\n[BACKGROUND TASK BLOCKED]\n**ID:** `task-b`\n**Blocked:** Need parent input\n**2 tasks still in progress.** You WILL be notified when ALL complete.\n</system-reminder>"
 
 function createNotifier(): {
   readonly notifier: ParentWakeNotifier
@@ -84,6 +85,48 @@ describe("ParentWakeNotifier final notification merge", () => {
       expect(notificationText).not.toContain("[BACKGROUND TASK RESULT READY]")
       expect(notificationText).not.toContain("still in progress")
       expect(promptAsyncCalls[0]?.body.noReply).toBe(false)
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given a blocked wake is pending before a final wake #when flushed #then both actionable notifications survive", async () => {
+    // given
+    const { notifier, promptAsyncCalls } = createNotifier()
+    const sessionID = "parent-blocked-before-final"
+    notifier.queuePendingParentWake(sessionID, BLOCKED_WAKE, { agent: "sisyphus" }, true)
+    notifier.queuePendingParentWake(sessionID, FINAL_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when
+      await notifier.flushPendingParentWake(sessionID)
+
+      // then
+      const notificationText = getPromptText(promptAsyncCalls[0])
+      expect(notificationText).toContain("[BACKGROUND TASK BLOCKED]")
+      expect(notificationText).toContain("[ALL BACKGROUND TASKS COMPLETE]")
+    } finally {
+      notifier.shutdown()
+      releaseAllPromptAsyncReservationsForTesting()
+    }
+  })
+
+  test("#given a final wake is pending before a blocked wake #when flushed #then both actionable notifications survive", async () => {
+    // given
+    const { notifier, promptAsyncCalls } = createNotifier()
+    const sessionID = "parent-final-before-blocked"
+    notifier.queuePendingParentWake(sessionID, FINAL_WAKE, { agent: "sisyphus" }, true)
+    notifier.queuePendingParentWake(sessionID, BLOCKED_WAKE, { agent: "sisyphus" }, true)
+
+    try {
+      // when
+      await notifier.flushPendingParentWake(sessionID)
+
+      // then
+      const notificationText = getPromptText(promptAsyncCalls[0])
+      expect(notificationText).toContain("[BACKGROUND TASK BLOCKED]")
+      expect(notificationText).toContain("[ALL BACKGROUND TASKS COMPLETE]")
     } finally {
       notifier.shutdown()
       releaseAllPromptAsyncReservationsForTesting()

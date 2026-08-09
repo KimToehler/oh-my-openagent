@@ -48,6 +48,7 @@ import {
   type BackgroundTaskNotificationTask,
   buildBackgroundTaskNotificationText,
 } from "./background-task-notification-template"
+import { isTaskBlocked } from "./blocked-state"
 import { writeBackgroundTaskMarker } from "./background-task-marker"
 import {
   findNearestMessageExcludingCompaction,
@@ -55,6 +56,7 @@ import {
 } from "./compaction-aware-message-resolver"
 import { ConcurrencyManager } from "./concurrency"
 import {
+  DEFAULT_BLOCKED_EXPIRY_MS,
   POLLING_INTERVAL_MS,
   type QueueItem,
   TASK_CLEANUP_DELAY_MS,
@@ -131,6 +133,8 @@ type ResumeTaskSnapshot = {
   error?: string
   startedAt?: Date
   progress?: BackgroundTask["progress"]
+  blockedAt?: Date
+  blockedReason?: string
   parentSessionId: string
   parentMessageId: string
   parentModel?: BackgroundTask["parentModel"]
@@ -285,6 +289,7 @@ export class BackgroundManager {
   private readonly scheduledFlushSettledCounts = new Map<string, number>()
   private readonly scheduledFlushSettledWaiters = new Map<string, Array<() => void>>()
   private readonly completingTaskIds = new Set<string>()
+  private readonly blockedNotificationTaskIds = new Set<string>()
 
   constructor(config: BackgroundManagerConfig) {
     const { pluginContext, ...options } = config
@@ -436,6 +441,7 @@ export class BackgroundManager {
   private removeTask(task: BackgroundTask): void {
     this.archiveCompletedTask(task)
     archiveBackgroundTask(task)
+    this.blockedNotificationTaskIds.delete(task.id)
     this.tasks.delete(task.id)
     this.removeTaskFromParentIndex(task.id, task.parentSessionId)
   }
@@ -495,6 +501,8 @@ export class BackgroundManager {
       error: task.error,
       startedAt: task.startedAt,
       progress: task.progress,
+      blockedAt: task.blockedAt,
+      blockedReason: task.blockedReason,
       parentSessionId: task.parentSessionId,
       parentMessageId: task.parentMessageId,
       parentModel: task.parentModel,
@@ -527,6 +535,8 @@ export class BackgroundManager {
     task.error = snapshot.error
     task.startedAt = snapshot.startedAt
     task.progress = snapshot.progress
+    task.blockedAt = snapshot.blockedAt
+    task.blockedReason = snapshot.blockedReason
     task.parentMessageId = snapshot.parentMessageId
     task.parentModel = snapshot.parentModel
     task.parentAgent = snapshot.parentAgent
@@ -1375,10 +1385,13 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     const resumeSnapshot = this.captureResumeTaskSnapshot(existingTask)
-    const completionTimer = this.completionTimers.get(existingTask.id)
-    if (completionTimer) {
-      clearTimeout(completionTimer)
-      this.completionTimers.delete(existingTask.id)
+    const wasBlocked = existingTask.blockedAt !== undefined
+    if (!wasBlocked) {
+      const completionTimer = this.completionTimers.get(existingTask.id)
+      if (completionTimer) {
+        clearTimeout(completionTimer)
+        this.completionTimers.delete(existingTask.id)
+      }
     }
 
     // Re-acquire concurrency using the persisted concurrency group
@@ -1511,6 +1524,17 @@ The fallback retry session is now created and can be inspected directly.
           status: promptResult.status,
         })
         this.restoreTaskAfterSkippedResume(existingTask, resumeSnapshot, promptResult.status)
+        return
+      }
+      if (wasBlocked) {
+        existingTask.blockedAt = undefined
+        existingTask.blockedReason = undefined
+        this.blockedNotificationTaskIds.delete(existingTask.id)
+        const blockedTimer = this.completionTimers.get(existingTask.id)
+        if (blockedTimer) {
+          clearTimeout(blockedTimer)
+          this.completionTimers.delete(existingTask.id)
+        }
       }
     }).catch(async (error) => {
       log("[background-agent] resume prompt error:", error)
@@ -2405,6 +2429,20 @@ The task was re-queued on a fallback model after a retryable failure.
       const task = this.tasks.get(taskId)
       if (!task) return
 
+      const blockedAtTimestamp = task.blockedAt?.getTime()
+      const blockedExpiryMs = this.config?.blockedExpiryMs ?? DEFAULT_BLOCKED_EXPIRY_MS
+      if (isTaskBlocked(task) && blockedAtTimestamp !== undefined) {
+        const remainingBlockedLifetime = blockedExpiryMs - (Date.now() - blockedAtTimestamp)
+        if (remainingBlockedLifetime > 0) {
+          const blockedRetentionTimer = setTimeout(
+            () => this.scheduleTaskRemoval(taskId, rescheduleCount),
+            remainingBlockedLifetime,
+          )
+          this.completionTimers.set(taskId, blockedRetentionTimer)
+          return
+        }
+      }
+
       if (task.parentSessionId) {
         const siblings = this.getTasksByParentSession(task.parentSessionId)
         const runningOrPendingSiblings = siblings.filter(
@@ -2453,15 +2491,31 @@ The task was re-queued on a fallback model after a retryable failure.
     this.completionTimers.set(taskId, timer)
   }
 
+  async notifyBlockedTask(taskId: string): Promise<void> {
+    const task = this.tasks.get(taskId)
+    if (!task || this.blockedNotificationTaskIds.has(taskId)) {
+      return
+    }
+
+    this.blockedNotificationTaskIds.add(taskId)
+    this.markForNotification(task)
+    await this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task))
+  }
+
   async cancelTask(
     taskId: string,
     options?: { source?: string; reason?: string; abortSession?: boolean; skipNotification?: boolean }
   ): Promise<boolean> {
     const task = this.tasks.get(taskId)
     if (!task || (task.status !== "running" && task.status !== "pending") || this.completingTaskIds.has(task.id)) {
+      this.blockedNotificationTaskIds.delete(taskId)
       return false
     }
     this.completingTaskIds.add(task.id)
+    const notificationParentSessionID = options?.skipNotification ? undefined : task.parentSessionId
+    if (notificationParentSessionID) {
+      this.parentWakeNotifier.reserveNotificationPreparation(notificationParentSessionID)
+    }
 
      try {
        const source = options?.source ?? "cancel"
@@ -2550,6 +2604,10 @@ The task was re-queued on a fallback model after a retryable failure.
 
       return true
     } finally {
+      if (notificationParentSessionID) {
+        this.parentWakeNotifier.releaseNotificationPreparation(notificationParentSessionID)
+        this.updateBackgroundTaskMarker(notificationParentSessionID)
+      }
       this.completingTaskIds.delete(task.id)
     }
   }
@@ -2753,13 +2811,15 @@ The task was re-queued on a fallback model after a retryable failure.
       this.completedTaskSummaries.delete(task.parentSessionId)
     }
 
-    const statusText = task.status === "completed"
-      ? "COMPLETED"
-      : task.status === "interrupt"
-        ? "INTERRUPTED"
-        : task.status === "error"
-          ? "ERROR"
-          : "CANCELLED"
+    const statusText = isTaskBlocked(task)
+      ? "BLOCKED"
+      : task.status === "completed"
+        ? "COMPLETED"
+        : task.status === "interrupt"
+          ? "INTERRUPTED"
+          : task.status === "error"
+            ? "ERROR"
+            : "CANCELLED"
     const notification = buildBackgroundTaskNotificationText({
       task,
       duration,
@@ -2779,7 +2839,8 @@ The task was re-queued on a fallback model after a retryable failure.
         })
 
         const isTaskFailure = task.status === "error" || task.status === "cancelled" || task.status === "interrupt"
-        const shouldReply = allComplete || isTaskFailure
+        const isBlocked = isTaskBlocked(task)
+        const shouldReply = allComplete || isTaskFailure || isBlocked
 
         const shouldDeferNotification = await this.isSessionActive(task.parentSessionId)
 
@@ -2916,7 +2977,7 @@ The task was re-queued on a fallback model after a retryable failure.
 
   /**
    * Test-only: resolves once the settled-flush count for this session exceeds
-   * `sinceCount` (captured before the flush was triggered). Deterministic — no
+   * `sinceCount` (captured before the flush was triggered). Deterministic: no
    * blind sleep past the debounce, and no registration-after-settle race.
    */
   awaitScheduledFlush(sessionID: string, sinceCount: number): Promise<void> {
@@ -2965,6 +3026,7 @@ The task was re-queued on a fallback model after a retryable failure.
       tasks: this.tasks,
       notifications: this.notifications,
       taskTtlMs: this.config?.taskTtlMs,
+      blockedExpiryMs: this.config?.blockedExpiryMs,
       sessionStatuses: allStatuses,
       onTaskPruned: (taskId, task, errorMessage) => {
         const wasPending = task.status === "pending"

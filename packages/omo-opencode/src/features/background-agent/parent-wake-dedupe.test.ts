@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { mergeParentWakeNotifications } from "./parent-wake-dedupe"
+import { isFailureParentWake, mergeParentWakeNotifications } from "./parent-wake-dedupe"
 
 describe("mergeParentWakeNotifications", () => {
   test("#given distinct final background wake notifications #when the newer final is merged #then both final summaries are preserved", () => {
@@ -36,5 +36,35 @@ describe("mergeParentWakeNotifications", () => {
 
     // then
     expect(notifications).toEqual([finalNotification, bodyMentionsProgress])
+  })
+})
+
+
+describe("blocked parent wake classification", () => {
+  test("#given a reply-required blocked wake #when checking failure classification #then it is a failure wake", () => {
+    // given
+    const wake = {
+      promptContext: {},
+      notifications: ["<system-reminder>\n[BACKGROUND TASK BLOCKED]\nBlocked details\n</system-reminder>"],
+      shouldReply: true,
+    }
+
+    // when
+    const failure = isFailureParentWake(wake)
+
+    // then
+    expect(failure).toBe(true)
+  })
+
+  test("#given a blocked wake whose body mentions remaining work #when merging a final wake #then blocked action survives", () => {
+    // given
+    const blockedNotification = "<system-reminder>\n[BACKGROUND TASK BLOCKED]\n**1 task still in progress.** You WILL be notified when ALL complete.\n</system-reminder>"
+    const finalNotification = "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]\n</system-reminder>"
+
+    // when
+    const notifications = mergeParentWakeNotifications([blockedNotification], finalNotification)
+
+    // then
+    expect(notifications).toEqual([finalNotification, blockedNotification])
   })
 })

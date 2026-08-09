@@ -23,8 +23,9 @@ export function createCoreTools(args: {
   readonly skillContext: SkillContext
   readonly availableCategories: AvailableCategory[]
   readonly factories: ToolRegistryFactories
+  readonly reportBlockedTool: ToolDefinition
 }): Record<string, ToolDefinition> {
-  const { ctx, pluginConfig, managers, skillContext, availableCategories, factories } = args
+  const { ctx, pluginConfig, managers, skillContext, availableCategories, factories, reportBlockedTool } = args
   const backgroundTools = factories.createBackgroundTools(managers.backgroundManager, ctx.client)
   const callOmoAgent = factories.createCallOmoAgent(
     ctx,
@@ -129,6 +130,7 @@ export function createCoreTools(args: {
     ...factories.createGlobTools(ctx),
     ...factories.createSessionManagerTools(ctx),
     ...backgroundTools,
+    report_blocked: reportBlockedTool,
     call_omo_agent: callOmoAgent,
   }
   if (isMultimodalLookerEnabled) {

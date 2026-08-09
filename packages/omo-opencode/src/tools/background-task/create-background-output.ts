@@ -1,6 +1,7 @@
 import { RUNTIME_ID } from "@oh-my-opencode/utils"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { BackgroundTask } from "../../features/background-agent"
+import { isTaskBlocked } from "../../features/background-agent/blocked-state"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { log } from "../../shared/logger"
 import type { BackgroundOutputArgs } from "./types"
@@ -83,7 +84,7 @@ async function getTaskWithMissingRetry(
 // `taskHistory` is NOT a valid fallback source here. It is per-process
 // in-memory state (`TaskHistory`, `task-history.ts`), so it is empty in exactly
 // the runtime that fails this lookup. The miss is a process/realm split, not a
-// retention race — see `.omo/plans/bg-wake-and-crossprocess-lookup.md`.
+// retention race; see `.omo/plans/bg-wake-and-crossprocess-lookup.md`.
 // Instead, scan the calling session's transcript (server/DB-backed, therefore
 // process-independent) for the `bg_... → ses_...` pairing that the launch
 // output and the completion notification both record.
@@ -168,8 +169,8 @@ To inspect this session directly, use \`session_read(session_id="${taskId}")\`, 
     return `Task not found in this runtime: ${taskId}
 
 Two possibilities:
-1. The task id never existed — check the launch output for the exact \`bg_...\` id.
-2. The task is owned by a different runtime (process/realm) than the one serving this tool call${resolveRuntimeIdLabel()}. Background task state is per-runtime memory; when terminal opencode, \`opencode serve\`, and IDE-embedded opencode run side by side, a task launched in one is invisible to the others. This is NOT a retention/cleanup race — the owning runtime may still hold the task.
+1. The task id never existed - check the launch output for the exact \`bg_...\` id.
+2. The task is owned by a different runtime (process/realm) than the one serving this tool call${resolveRuntimeIdLabel()}. Background task state is per-runtime memory; when terminal opencode, \`opencode serve\`, and IDE-embedded opencode run side by side, a task launched in one is invisible to the others. This is NOT a retention/cleanup race; the owning runtime may still hold the task.
 
 Recovery: use \`session_read(session_id="ses_...")\` with the session id from the task's launch output or completion notification (the \`| session: \`ses_...\`\` suffix). Session transcripts are server-backed and readable from every runtime.`
   }
@@ -278,6 +279,10 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
           })
 
           return didTimeoutWhileActive ? appendTimeoutNote(output, timeoutMs) : output
+        }
+
+        if (isTaskBlocked(resolvedTask)) {
+          return formatTaskStatus(resolvedTask)
         }
 
         if (resolvedTask.status === "completed") {

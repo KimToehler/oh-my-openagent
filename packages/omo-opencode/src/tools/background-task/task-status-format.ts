@@ -1,4 +1,6 @@
 import type { BackgroundTask } from "../../features/background-agent"
+import { buildBlockedAnswerInstruction } from "../../features/background-agent/blocked-answer-instruction"
+import { isTaskBlocked } from "../../features/background-agent/blocked-state"
 import { formatDuration } from "./time-format"
 import { truncateText } from "./truncate-text"
 
@@ -32,8 +34,15 @@ ${truncated}
 \`\`\``
   }
 
-   let statusNote = ""
-   if (task.status === "pending") {
+  const blocked = isTaskBlocked(task)
+  let statusNote = ""
+  if (blocked) {
+    statusNote = `
+
+> **BLOCKED**: ${task.blockedReason ?? "Reason not provided."}
+>
+> ${buildBlockedAnswerInstruction(task.sessionId ?? task.id)}`
+  } else if (task.status === "pending") {
      statusNote = `
 
 > **Queued**: Task is waiting for a concurrency slot to become available.`
@@ -60,7 +69,7 @@ ${truncated}
 | Task ID | \`${task.id}\` |
 | Description | ${task.description} |
 | Agent | ${task.agent} |
-| Status | **${task.status}** |
+| Status | **${blocked ? "BLOCKED" : task.status}** |
 | ${durationLabel} | ${duration} |
 | Session ID | \`${task.sessionId}\` |${progressSection}
 ${statusNote}
