@@ -120,6 +120,7 @@ export function isFailureParentWake(wake: PendingParentWake): boolean {
 
 function isBackgroundTaskFailureHeader(line: string): boolean {
   return line === "[BACKGROUND TASK ERROR]"
+    || line === "[BACKGROUND TASK BLOCKED]"
     || line === "[BACKGROUND TASK CANCELLED]"
     || line === "[BACKGROUND TASK INTERRUPTED]"
     || (line.startsWith("[ALL BACKGROUND TASKS FINISHED") && line.endsWith("]"))
@@ -144,6 +145,7 @@ function isBackgroundTaskProgressNotification(notification: string): boolean {
 
 function isBackgroundTaskProgressHeader(line: string): boolean {
   return line === "[BACKGROUND TASK RESULT READY]"
+    || line === "[BACKGROUND TASK BLOCKED]"
     || line === "[BACKGROUND TASK CANCELLED]"
     || line === "[BACKGROUND TASK INTERRUPTED]"
     || line === "[BACKGROUND TASK ERROR]"

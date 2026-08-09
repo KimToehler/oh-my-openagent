@@ -48,6 +48,7 @@ import {
   type BackgroundTaskNotificationTask,
   buildBackgroundTaskNotificationText,
 } from "./background-task-notification-template"
+import { isTaskBlocked } from "./blocked-state"
 import { writeBackgroundTaskMarker } from "./background-task-marker"
 import {
   findNearestMessageExcludingCompaction,
@@ -2773,13 +2774,15 @@ The task was re-queued on a fallback model after a retryable failure.
       this.completedTaskSummaries.delete(task.parentSessionId)
     }
 
-    const statusText = task.status === "completed"
-      ? "COMPLETED"
-      : task.status === "interrupt"
-        ? "INTERRUPTED"
-        : task.status === "error"
-          ? "ERROR"
-          : "CANCELLED"
+    const statusText = isTaskBlocked(task)
+      ? "BLOCKED"
+      : task.status === "completed"
+        ? "COMPLETED"
+        : task.status === "interrupt"
+          ? "INTERRUPTED"
+          : task.status === "error"
+            ? "ERROR"
+            : "CANCELLED"
     const notification = buildBackgroundTaskNotificationText({
       task,
       duration,

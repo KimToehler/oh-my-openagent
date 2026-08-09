@@ -1,6 +1,6 @@
 import type { BackgroundTaskAttempt, BackgroundTaskStatus } from "./types"
 
-export type BackgroundTaskNotificationStatus = "COMPLETED" | "CANCELLED" | "INTERRUPTED" | "ERROR"
+export type BackgroundTaskNotificationStatus = "COMPLETED" | "BLOCKED" | "CANCELLED" | "INTERRUPTED" | "ERROR"
 
 export interface BackgroundTaskNotificationTask {
   id: string
@@ -9,6 +9,8 @@ export interface BackgroundTaskNotificationTask {
   error?: string
   attempts?: BackgroundTaskAttempt[]
   sessionId?: string
+  blockedAt?: Date
+  blockedReason?: string
 }
 
 function formatAttemptModel(attempt: BackgroundTaskAttempt): string {
@@ -114,8 +116,16 @@ ${resultCollectionInstruction}${hasFailures ? `\n\n**ACTION REQUIRED:** ${failed
 </system-reminder>`
   }
 
+  const isBlocked = statusText === "BLOCKED"
   const isFailure = statusText !== "COMPLETED"
-  const header = isFailure ? `[BACKGROUND TASK ${statusText}]` : "[BACKGROUND TASK RESULT READY]"
+  const header = isBlocked
+    ? "[BACKGROUND TASK BLOCKED]"
+    : isFailure
+      ? `[BACKGROUND TASK ${statusText}]`
+      : "[BACKGROUND TASK RESULT READY]"
+  const blockedInstruction = isBlocked
+    ? `\n\n**Blocked:** ${task.blockedReason ?? task.error ?? "No reason provided"}\n**Child needs your answer:** Reply with the requested information using this exact invocation:\n\`task(task_id="${task.sessionId ?? "unknown-session"}", prompt="<your answer>")\``
+    : ""
 
   // The `| session: \`ses_...\`` suffix is the machine-parsable handle the
   // cross-runtime transcript scanner recognizes (parent-transcript-pairing.ts
@@ -127,7 +137,7 @@ ${resultCollectionInstruction}${hasFailures ? `\n\n**ACTION REQUIRED:** ${failed
 ${header}
 **ID:** \`${task.id}\`${sessionHandle}
 **Description:** ${safeDescription(task)}
-**Duration:** ${duration}${errorInfo}
+**Duration:** ${duration}${errorInfo}${blockedInstruction}
 
 **${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.** You WILL be notified when ALL complete.
 ${isFailure ? "**ACTION REQUIRED:** This task failed. Check the error and decide whether to retry, cancel remaining tasks, or continue." : "Do NOT poll - continue productive work."}

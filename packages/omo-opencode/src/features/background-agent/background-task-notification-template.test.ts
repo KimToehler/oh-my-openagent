@@ -78,6 +78,58 @@ Use \`background_output(task_id="task-1")\` to retrieve this result when ready.
     })
   })
 
+
+  describe("#given a blocked cancelled task", () => {
+    test("#when building the partial notification #then it renders an actionable blocked wake", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "bg_blocked_1",
+          description: "Inspect remote logs",
+          status: "cancelled",
+          error: "Reason: repeated gateway timeout\nNeeds: refreshed API credentials",
+          blockedAt: new Date("2026-08-09T10:00:00.000Z"),
+          blockedReason: "Reason: repeated gateway timeout\nNeeds: refreshed API credentials",
+          sessionId: "ses_blocked_child_123",
+        },
+        duration: "2m 5s",
+        statusText: "BLOCKED",
+        allComplete: false,
+        remainingCount: 1,
+        completedTasks: [],
+      })
+
+      // then
+      expect(notification).toContain("[BACKGROUND TASK BLOCKED]")
+      expect(notification).toContain("repeated gateway timeout")
+      expect(notification).toContain("refreshed API credentials")
+      expect(notification).toContain('task(task_id="ses_blocked_child_123", prompt="<your answer>")')
+    })
+  })
+
+  describe("#given a cancelled task without blocked metadata", () => {
+    test("#when building the partial notification #then it keeps the cancelled header", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "bg_cancelled_1",
+          description: "Cancelled task",
+          status: "cancelled",
+          error: "User cancelled",
+          sessionId: "ses_cancelled_child_123",
+        },
+        duration: "10s",
+        statusText: "CANCELLED",
+        allComplete: false,
+        remainingCount: 1,
+        completedTasks: [],
+      })
+
+      // then
+      expect(notification).toContain("[BACKGROUND TASK CANCELLED]")
+      expect(notification).not.toContain("[BACKGROUND TASK BLOCKED]")
+    })
+  })
   describe("#given one task still running after a failed task notification", () => {
     test("#when building the partial notification #then it preserves the existing failure format", () => {
       // given
