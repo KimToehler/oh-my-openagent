@@ -122,7 +122,8 @@ describe("dependency security", () => {
     expect(opencodePluginDependencies).toMatchObject({
       dependencies: expect.objectContaining({ effect: expect.any(String) }),
     })
-    expect(bunLock.packages?.effect?.[0]).toBe("effect@4.0.0-beta.66")
+    // Tracks whatever `@opencode-ai/plugin` pulls in; bump alongside the SDK pin.
+    expect(bunLock.packages?.effect?.[0]).toBe("effect@4.0.0-beta.83")
   })
 
   it("#given first-party TypeScript sources #when dependency imports are scanned #then no source imports effect directly", async () => {
