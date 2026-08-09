@@ -285,6 +285,7 @@ export class BackgroundManager {
   private readonly scheduledFlushSettledCounts = new Map<string, number>()
   private readonly scheduledFlushSettledWaiters = new Map<string, Array<() => void>>()
   private readonly completingTaskIds = new Set<string>()
+  private readonly blockedNotificationTaskIds = new Set<string>()
 
   constructor(config: BackgroundManagerConfig) {
     const { pluginContext, ...options } = config
@@ -2453,6 +2454,17 @@ The task was re-queued on a fallback model after a retryable failure.
     this.completionTimers.set(taskId, timer)
   }
 
+  async notifyBlockedTask(taskId: string): Promise<void> {
+    const task = this.tasks.get(taskId)
+    if (!task || this.blockedNotificationTaskIds.has(taskId)) {
+      return
+    }
+
+    this.blockedNotificationTaskIds.add(taskId)
+    this.markForNotification(task)
+    await this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task))
+  }
+
   async cancelTask(
     taskId: string,
     options?: { source?: string; reason?: string; abortSession?: boolean; skipNotification?: boolean }
@@ -2462,6 +2474,10 @@ The task was re-queued on a fallback model after a retryable failure.
       return false
     }
     this.completingTaskIds.add(task.id)
+    const notificationParentSessionID = options?.skipNotification ? undefined : task.parentSessionId
+    if (notificationParentSessionID) {
+      this.parentWakeNotifier.reserveNotificationPreparation(notificationParentSessionID)
+    }
 
      try {
        const source = options?.source ?? "cancel"
@@ -2550,6 +2566,10 @@ The task was re-queued on a fallback model after a retryable failure.
 
       return true
     } finally {
+      if (notificationParentSessionID) {
+        this.parentWakeNotifier.releaseNotificationPreparation(notificationParentSessionID)
+        this.updateBackgroundTaskMarker(notificationParentSessionID)
+      }
       this.completingTaskIds.delete(task.id)
     }
   }
