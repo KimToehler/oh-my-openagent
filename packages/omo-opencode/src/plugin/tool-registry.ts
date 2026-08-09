@@ -8,6 +8,7 @@ import type { ToolRegistryFactories } from "./tool-registry-factories"
 import { isInteractiveBashEnabled } from "../interactive-bash-availability"
 import { filterDisabledTools } from "../shared/disabled-tools"
 import { log } from "../shared"
+import { createReportBlockedTool } from "../tools/report-blocked"
 import { normalizeToolArgSchemas } from "./normalize-tool-arg-schemas"
 import { createCoreTools } from "./tool-registry-core-tools"
 import { defaultToolRegistryFactories } from "./tool-registry-factories"
@@ -49,6 +50,7 @@ export function createToolRegistry(args: {
     ...toolFactories,
   }
   const taskSystemEnabled = getTaskSystemEnabled(pluginConfig)
+  const reportBlockedTool = createReportBlockedTool(managers.backgroundManager)
   const allTools = {
     ...createCoreTools({
       ctx,
@@ -57,6 +59,7 @@ export function createToolRegistry(args: {
       skillContext,
       availableCategories,
       factories,
+      reportBlockedTool,
     }),
     ...(interactiveBashEnabled ? { interactive_bash: factories.interactive_bash } : {}),
     ...createTeamModeToolsRecord({ pluginConfig, ctx, managers, factories }),

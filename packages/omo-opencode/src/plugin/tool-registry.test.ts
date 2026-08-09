@@ -115,6 +115,35 @@ describe("#given tool trimming prioritization", () => {
   })
 })
 
+describe("#given the core tool registry", () => {
+  test("#when the registry is built #then report_blocked is registered", () => {
+    // given
+    const pluginConfig = createPluginConfig()
+
+    // when
+    const result = createToolRegistry({
+      ctx: { directory: "/tmp" } as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig,
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      toolFactories,
+    })
+
+    // then
+    expect(result.filteredTools).toHaveProperty("report_blocked")
+  })
+})
+
 describe("#given task_system configuration", () => {
   test("#when task_system is omitted #then task tools are not registered by default", () => {
     syncSessionCreatedCallbacks.length = 0
