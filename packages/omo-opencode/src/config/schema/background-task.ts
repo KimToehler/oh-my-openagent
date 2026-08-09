@@ -1,4 +1,5 @@
 import { z } from "zod"
+import { TERMINAL_TASK_TTL_MS } from "../../features/background-agent/constants"
 
 const CircuitBreakerConfigSchema = z.object({
   enabled: z.boolean().optional(),
@@ -23,6 +24,10 @@ export const BackgroundTaskConfigSchema = z.object({
   sessionGoneTimeoutMs: z.number().min(10000).optional(),
   /** Delay before removing completed/cancelled/errored tasks from memory in milliseconds (default: 600000 = 10 minutes, minimum: 60000 = 1 minute). */
   taskCleanupDelayMs: z.number().min(60000).optional(),
+  /** Delay before sending one reminder for an unanswered blocked task in milliseconds (default: 600000 = 10 minutes, minimum: 60000 = 1 minute). */
+  blockedRewakeMs: z.number().describe("Delay before sending one reminder for an unanswered blocked task in milliseconds (default: 600000 = 10 minutes, minimum: 60000 = 1 minute).").min(60000).optional(),
+  /** Time before an unanswered blocked task expires in milliseconds (default: 1200000 = 20 minutes, minimum: 60000 = 1 minute). Must remain below the terminal task TTL. */
+  blockedExpiryMs: z.number().describe("Time before an unanswered blocked task expires in milliseconds (default: 1200000 = 20 minutes, minimum: 60000 = 1 minute). Must remain below the terminal task TTL.").min(60000).optional(),
   syncPollTimeoutMs: z.number().min(60000).optional(),
   syncWallClockTimeoutMs: z
     .number()
@@ -34,6 +39,22 @@ export const BackgroundTaskConfigSchema = z.object({
   /** Maximum tool calls per subagent task before circuit breaker triggers (default: 4000, minimum: 10). Prevents runaway loops from burning unlimited tokens. */
   maxToolCalls: z.number().int().describe("Maximum tool calls per subagent task before circuit breaker triggers (default: 4000, minimum: 10). Prevents runaway loops from burning unlimited tokens.").min(10).optional(),
   circuitBreaker: CircuitBreakerConfigSchema.optional(),
+}).superRefine((config, context) => {
+  if (config.blockedRewakeMs !== undefined && config.blockedExpiryMs !== undefined && config.blockedRewakeMs >= config.blockedExpiryMs) {
+    context.addIssue({
+      code: "custom",
+      path: ["blockedRewakeMs"],
+      message: "blockedRewakeMs must be less than blockedExpiryMs",
+    })
+  }
+
+  if (config.blockedExpiryMs !== undefined && config.blockedExpiryMs >= TERMINAL_TASK_TTL_MS) {
+    context.addIssue({
+      code: "custom",
+      path: ["blockedExpiryMs"],
+      message: "blockedExpiryMs must be less than the terminal task TTL",
+    })
+  }
 })
 
 export type BackgroundTaskConfig = z.infer<typeof BackgroundTaskConfigSchema>

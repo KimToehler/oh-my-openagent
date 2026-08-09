@@ -3,6 +3,9 @@ import {
   DEFAULT_STALE_TIMEOUT_MS,
   DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS,
   DEFAULT_MAX_TOOL_CALLS,
+  DEFAULT_BLOCKED_REWAKE_MS,
+  DEFAULT_BLOCKED_EXPIRY_MS,
+  TERMINAL_TASK_TTL_MS,
 } from "../../features/background-agent/constants"
 import { BackgroundTaskConfigSchema } from "./background-task"
 
@@ -58,6 +61,66 @@ describe("background-task schema defaults", () => {
         
         expect(documentedDefault).toBe(DEFAULT_MAX_TOOL_CALLS)
         expect(DEFAULT_MAX_TOOL_CALLS).toBe(4000)
+      })
+
+      it("#then documented default for blockedRewakeMs matches runtime constant", () => {
+        // given
+        const innerSchema = BackgroundTaskConfigSchema.shape.blockedRewakeMs._def.innerType
+
+        // when
+        const defaultMatch = (innerSchema.description || "").match(/default:\s*(\d+)/)
+        const documentedDefault = defaultMatch ? parseInt(defaultMatch[1], 10) : null
+
+        // then
+        expect(documentedDefault).toBe(DEFAULT_BLOCKED_REWAKE_MS)
+      })
+
+      it("#then documented default for blockedExpiryMs matches runtime constant", () => {
+        // given
+        const innerSchema = BackgroundTaskConfigSchema.shape.blockedExpiryMs._def.innerType
+
+        // when
+        const defaultMatch = (innerSchema.description || "").match(/default:\s*(\d+)/)
+        const documentedDefault = defaultMatch ? parseInt(defaultMatch[1], 10) : null
+
+        // then
+        expect(documentedDefault).toBe(DEFAULT_BLOCKED_EXPIRY_MS)
+      })
+
+      it("#then blocked expiry remains strictly below terminal task TTL", () => {
+        // given
+        const terminalTaskTtlMs = TERMINAL_TASK_TTL_MS
+
+        // when
+        const blockedExpiryMs = DEFAULT_BLOCKED_EXPIRY_MS
+
+        // then
+        expect(blockedExpiryMs).toBeLessThan(
+          terminalTaskTtlMs,
+          "blocked expiry must stay below terminal task TTL so expiry wins before the 30-minute purge",
+        )
+      })
+
+      it("#then schema rejects blocked rewake at or after expiry", () => {
+        // given
+        const input = { blockedRewakeMs: DEFAULT_BLOCKED_EXPIRY_MS, blockedExpiryMs: DEFAULT_BLOCKED_EXPIRY_MS }
+
+        // when
+        const result = BackgroundTaskConfigSchema.safeParse(input)
+
+        // then
+        expect(result.success).toBe(false)
+      })
+
+      it("#then schema rejects blocked expiry at or after terminal task TTL", () => {
+        // given
+        const input = { blockedRewakeMs: DEFAULT_BLOCKED_REWAKE_MS, blockedExpiryMs: TERMINAL_TASK_TTL_MS }
+
+        // when
+        const result = BackgroundTaskConfigSchema.safeParse(input)
+
+        // then
+        expect(result.success).toBe(false)
       })
 
       it("#then BackgroundTaskStatus has no new 'blocked' member", () => {

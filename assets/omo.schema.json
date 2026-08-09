@@ -9126,6 +9126,16 @@
               "type": "number",
               "minimum": 60000
             },
+            "blockedRewakeMs": {
+              "type": "number",
+              "minimum": 60000,
+              "description": "Delay before sending one reminder for an unanswered blocked task in milliseconds (default: 600000 = 10 minutes, minimum: 60000 = 1 minute)."
+            },
+            "blockedExpiryMs": {
+              "type": "number",
+              "minimum": 60000,
+              "description": "Time before an unanswered blocked task expires in milliseconds (default: 1200000 = 20 minutes, minimum: 60000 = 1 minute). Must remain below the terminal task TTL."
+            },
             "syncPollTimeoutMs": {
               "type": "number",
               "minimum": 60000
@@ -21140,6 +21150,16 @@
                   "taskCleanupDelayMs": {
                     "type": "number",
                     "minimum": 60000
+                  },
+                  "blockedRewakeMs": {
+                    "type": "number",
+                    "minimum": 60000,
+                    "description": "Delay before sending one reminder for an unanswered blocked task in milliseconds (default: 600000 = 10 minutes, minimum: 60000 = 1 minute)."
+                  },
+                  "blockedExpiryMs": {
+                    "type": "number",
+                    "minimum": 60000,
+                    "description": "Time before an unanswered blocked task expires in milliseconds (default: 1200000 = 20 minutes, minimum: 60000 = 1 minute). Must remain below the terminal task TTL."
                   },
                   "syncPollTimeoutMs": {
                     "type": "number",
