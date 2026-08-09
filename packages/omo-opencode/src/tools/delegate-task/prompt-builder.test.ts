@@ -14,7 +14,7 @@ const { describe, test, expect } = require("bun:test") as {
   }
 }
 
-import { buildSystemContent } from "./prompt-builder"
+import { buildBackgroundTaskPrompt, buildSystemContent } from "./prompt-builder"
 import type { AvailableSkill, AvailableCategory } from "../../agents/dynamic-agent-prompt-builder"
 
 describe("prompt-builder", () => {
@@ -116,6 +116,19 @@ describe("prompt-builder", () => {
         expect(result).toBeDefined()
         expect(result).toContain("Custom agent context here")
         expect(result).not.toContain("deploy-skill")
+      })
+    })
+
+    describe("#given a background subagent prompt", () => {
+      test("#when system content is built #then report_blocked is advertised", () => {
+        // given
+        const skillContent = "Background worker instructions"
+
+        // when
+        const result = buildBackgroundTaskPrompt(skillContent, "explore")
+
+        // then
+        expect(result).toContain("report_blocked")
       })
     })
   })

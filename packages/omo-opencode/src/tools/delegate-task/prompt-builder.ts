@@ -78,10 +78,7 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
     ? buildPlanAgentSystemPrepend(availableCategories, effectiveAvailableSkills)
     : ""
 
-  const baseAgentsContext = agentsContext ?? planAgentPrepend
-  const effectiveAgentsContext = baseAgentsContext
-    ? `${baseAgentsContext}\n\n${BACKGROUND_BLOCKED_REPORTING}`
-    : BACKGROUND_BLOCKED_REPORTING
+  const effectiveAgentsContext = agentsContext ?? planAgentPrepend
 
   const effectiveMaxPromptTokens = maxPromptTokens
     ?? (usesFreeOrLocalModel(model) ? FREE_OR_LOCAL_PROMPT_TOKEN_LIMIT : undefined)
@@ -105,4 +102,8 @@ export function buildTaskPrompt(prompt: string, agentName: string | undefined, t
 
   const effectiveTdd = tddEnabled ?? true
   return `${prompt}${buildPlanAgentPromptAppend(effectiveTdd)}`
+}
+
+export function buildBackgroundTaskPrompt(prompt: string, agentName: string | undefined, tddEnabled?: boolean): string {
+  return `${BACKGROUND_BLOCKED_REPORTING}\n\n${buildTaskPrompt(prompt, agentName, tddEnabled)}`
 }
