@@ -13,8 +13,8 @@ export function createReportBlockedTool(manager: ReportBlockedManager): ToolDefi
 
 This notifies the parent, then parks the current background task until the parent resumes it. Only background subagents can use this tool.`,
     args: {
-      reason: tool.schema.string().describe("What is preventing progress"),
-      needs: tool.schema.string().describe("What input or action is needed from the parent"),
+      reason: tool.schema.string().min(1).describe("What is preventing progress"),
+      needs: tool.schema.string().min(1).describe("What input or action is needed from the parent"),
     },
     async execute(args, context) {
       const task = manager.findBySession(context.sessionID)
@@ -35,7 +35,7 @@ This notifies the parent, then parks the current background task until the paren
       })
 
       if (!parked) {
-        return `[ERROR] The parent was notified, but report_blocked failed to park this child. This background subagent is still running and must not wait silently.`
+        return `[ERROR] The parent was notified, but report_blocked failed to park this child. Current task status: ${task.status}. This background subagent must not wait silently.`
       }
 
       return "Blocked state reported to parent and background subagent parked."

@@ -59,7 +59,7 @@ describe("#given a background subagent task", () => {
     expect(result).toContain("parked")
   })
 
-  test("#when parking fails #then the parent is still notified and the child is told it remains running", async () => {
+  test("#when parking fails twice #then each attempt re-notifies and reports the current status", async () => {
     // given
     const task = createTask()
     const notifyBlockedTask = mock(async () => {})
@@ -71,16 +71,41 @@ describe("#given a background subagent task", () => {
     })
 
     // when
-    const result = await reportBlocked.execute(
+    const firstResult = await reportBlocked.execute(
+      { reason: "Missing credentials", needs: "Provide sandbox credentials" },
+      toolContext,
+    )
+    task.status = "cancelled"
+    const secondResult = await reportBlocked.execute(
       { reason: "Missing credentials", needs: "Provide sandbox credentials" },
       toolContext,
     )
 
     // then
-    expect(notifyBlockedTask).toHaveBeenCalledWith("task_child")
-    expect(result).toContain("parent was notified")
-    expect(result).toContain("failed to park")
-    expect(result).toContain("still running")
+    expect(notifyBlockedTask).toHaveBeenCalledTimes(2)
+    expect(firstResult).toContain("parent was notified")
+    expect(firstResult).toContain("failed to park")
+    expect(firstResult).toContain("Current task status: running")
+    expect(secondResult).toContain("Current task status: cancelled")
+  })
+})
+
+describe("#given an empty blocked report", () => {
+  test("#when parsing tool arguments #then empty reason and needs are rejected", () => {
+    // given
+    const reportBlocked = createReportBlockedTool({
+      findBySession: mock(() => createTask()),
+      notifyBlockedTask: mock(async () => {}),
+      cancelTask: mock(async () => true),
+    })
+
+    // when
+    const reason = reportBlocked.args.reason.safeParse("")
+    const needs = reportBlocked.args.needs.safeParse("")
+
+    // then
+    expect(reason.success).toBe(false)
+    expect(needs.success).toBe(false)
   })
 })
 
