@@ -109,6 +109,30 @@ Use \`background_output(task_id="task-1")\` to retrieve this result when ready.
       expect(notification).toContain(sharedInstruction)
       expect(notification).toContain('task(task_id="ses_blocked_child_123", prompt="<your answer>")')
     })
+
+    test("#when building the partial notification #then it uses answer-oriented call-to-action not failure call-to-action", () => {
+      // given
+      const sessionId = "ses_blocked_child_456"
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "bg_blocked_2",
+          description: "Fetch credentials",
+          status: "cancelled",
+          blockedReason: "Needs: AWS access key refresh",
+          sessionId,
+        },
+        duration: "1m 30s",
+        statusText: "BLOCKED",
+        allComplete: false,
+        remainingCount: 2,
+        completedTasks: [],
+      })
+
+      // then
+      expect(notification).toContain("**CHILD AWAITING RESPONSE:** Answer the child to unblock it.")
+      expect(notification).not.toContain("**ACTION REQUIRED:** This task failed.")
+      expect(notification).not.toContain("retry, cancel remaining tasks")
+    })
   })
 
   describe("#given a cancelled task without blocked metadata", () => {
@@ -167,6 +191,27 @@ Use \`background_output(task_id="task-2")\` to retrieve this result when ready.
 
       // then
       expect(notification).toBe(expectedNotification)
+    })
+
+    test("#when building the partial notification #then ERROR still has the failure call-to-action not answer-oriented text", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: {
+          id: "task-error-999",
+          description: "Critical check",
+          status: "error",
+          error: "Connection refused",
+        },
+        duration: "5s",
+        statusText: "ERROR",
+        allComplete: false,
+        remainingCount: 1,
+        completedTasks: [],
+      })
+
+      // then
+      expect(notification).toContain("**ACTION REQUIRED:** This task failed. Check the error and decide whether to retry, cancel remaining tasks, or continue.")
+      expect(notification).not.toContain("**CHILD AWAITING RESPONSE:**")
     })
   })
 

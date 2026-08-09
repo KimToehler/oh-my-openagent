@@ -118,10 +118,10 @@ ${resultCollectionInstruction}${hasFailures ? `\n\n**ACTION REQUIRED:** ${failed
   }
 
   const isBlocked = statusText === "BLOCKED"
-  const isFailure = statusText !== "COMPLETED"
+  const isGenuineFailure = statusText !== "COMPLETED" && statusText !== "BLOCKED"
   const header = isBlocked
     ? "[BACKGROUND TASK BLOCKED]"
-    : isFailure
+    : isGenuineFailure
       ? `[BACKGROUND TASK ${statusText}]`
       : "[BACKGROUND TASK RESULT READY]"
   const blockedInstruction = isBlocked
@@ -141,7 +141,7 @@ ${header}
 **Duration:** ${duration}${errorInfo}${blockedInstruction}
 
 **${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.** You WILL be notified when ALL complete.
-${isFailure ? "**ACTION REQUIRED:** This task failed. Check the error and decide whether to retry, cancel remaining tasks, or continue." : "Do NOT poll - continue productive work."}
+${isBlocked ? "**CHILD AWAITING RESPONSE:** Answer the child to unblock it." : isGenuineFailure ? "**ACTION REQUIRED:** This task failed. Check the error and decide whether to retry, cancel remaining tasks, or continue." : "Do NOT poll - continue productive work."}
 
 Use \`background_output(task_id="${task.id}")\` to retrieve this result when ready.${task.sessionId ? ` If that returns not-found, fall back to \`session_read(session_id="${task.sessionId}")\`.` : ""}
 </system-reminder>`
