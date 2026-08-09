@@ -135,6 +135,84 @@ Use \`background_output(task_id="task-1")\` to retrieve this result when ready.
     })
   })
 
+  describe("#given blocked tasks that make the batch otherwise complete", () => {
+    const blockedTask = {
+      id: "bg_blocked_last",
+      description: "Audit payments",
+      status: "cancelled" as const,
+      error: "Reason: payment scope unclear\nNeeds from parent: choose audit boundary",
+      blockedAt: new Date("2026-08-09T10:00:00.000Z"),
+      blockedReason: "Reason: payment scope unclear\nNeeds from parent: choose audit boundary",
+      sessionId: "ses_child_real",
+    }
+
+    test("#when the only child blocks with allComplete true #then blocked rendering wins", () => {
+      // when
+      const notification = buildBackgroundTaskNotificationText({
+        task: blockedTask,
+        duration: "1m",
+        statusText: "BLOCKED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [blockedTask],
+      })
+
+      // then
+      expect(notification).toContain("[BACKGROUND TASK BLOCKED]")
+      expect(notification).toContain("payment scope unclear")
+      expect(notification).toContain('task(task_id="ses_child_real", prompt="<your answer>")')
+      expect(notification).not.toContain("[ALL BACKGROUND TASKS FINISHED - 1 FAILED]")
+    })
+
+    test("#when the last child blocks after a sibling completed #then blocked action and completed sibling summary coexist", () => {
+      // when
+      const notification = buildBackgroundTaskNotificationText({
+        task: blockedTask,
+        duration: "1m",
+        statusText: "BLOCKED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [
+          { id: "bg_done", description: "Index payments", status: "completed", sessionId: "ses_done" },
+          blockedTask,
+        ],
+      })
+
+      // then
+      expect(notification).toContain("[BACKGROUND TASK BLOCKED]")
+      expect(notification).toContain("**Completed siblings:**")
+      expect(notification).toContain("`bg_done`: Index payments")
+      expect(notification).toContain('task(task_id="ses_child_real", prompt="<your answer>")')
+    })
+
+    test("#when two children block in sequence #then each wake retains its own answer instruction", () => {
+      // given
+      const secondTask = { ...blockedTask, id: "bg_blocked_second", sessionId: "ses_child_second" }
+
+      // when
+      const firstNotification = buildBackgroundTaskNotificationText({
+        task: blockedTask,
+        duration: "1m",
+        statusText: "BLOCKED",
+        allComplete: false,
+        remainingCount: 1,
+        completedTasks: [],
+      })
+      const secondNotification = buildBackgroundTaskNotificationText({
+        task: secondTask,
+        duration: "2m",
+        statusText: "BLOCKED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [blockedTask, secondTask],
+      })
+
+      // then
+      expect(firstNotification).toContain('task(task_id="ses_child_real", prompt="<your answer>")')
+      expect(secondNotification).toContain('task(task_id="ses_child_second", prompt="<your answer>")')
+    })
+  })
+
   describe("#given a cancelled task without blocked metadata", () => {
     test("#when building the partial notification #then it keeps the cancelled header", () => {
       // given
@@ -414,9 +492,9 @@ All sibling background tasks are complete. Your next action should be to call \`
       expect(notification).toContain("[ALL BACKGROUND TASKS COMPLETE]")
       expect(notification).toContain("- `task-3`: Fallback task")
       expect(notification).toContain("Background task attempts:")
-      expect(notification).toContain("  - Attempt 1 — ERROR — genai-proxy-openai/gpt-5.6-luna-fast — ses-primary")
+      expect(notification).toContain("  - Attempt 1 - ERROR - genai-proxy-openai/gpt-5.6-luna-fast - ses-primary")
       expect(notification).toContain("    Error: Forbidden: Selected provider is forbidden")
-      expect(notification).toContain("  - Attempt 2 — COMPLETED — anthropic/claude-haiku-4.5 — ses-fallback")
+      expect(notification).toContain("  - Attempt 2 - COMPLETED - anthropic/claude-haiku-4.5 - ses-fallback")
     })
   })
 

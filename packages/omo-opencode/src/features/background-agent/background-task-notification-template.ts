@@ -38,7 +38,7 @@ function formatAttemptTimeline(task: BackgroundTaskNotificationTask): string {
   const lines = task.attempts
     .map((attempt) => {
       const attemptLines = [
-        `  - Attempt ${attempt.attemptNumber} — ${attempt.status.toUpperCase()} — ${formatAttemptModel(attempt)} — ${attempt.sessionId ?? "unknown"}`,
+        `  - Attempt ${attempt.attemptNumber} - ${attempt.status.toUpperCase()} - ${formatAttemptModel(attempt)} - ${attempt.sessionId ?? "unknown"}`,
       ]
 
       if (attempt.status !== "completed" && attempt.error) {
@@ -75,8 +75,9 @@ export function buildBackgroundTaskNotificationText(input: {
 
   const safeDescription = (t: BackgroundTaskNotificationTask): string => t.description || t.id
   const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
+  const isBlocked = statusText === "BLOCKED"
 
-  if (allComplete) {
+  if (allComplete && !isBlocked) {
     const succeededTasks = completedTasks.filter((t) => t.status === "completed")
     const failedTasks = completedTasks.filter((t) => t.status !== "completed")
 
@@ -117,15 +118,20 @@ ${resultCollectionInstruction}${hasFailures ? `\n\n**ACTION REQUIRED:** ${failed
 </system-reminder>`
   }
 
-  const isBlocked = statusText === "BLOCKED"
   const isGenuineFailure = statusText !== "COMPLETED" && statusText !== "BLOCKED"
   const header = isBlocked
     ? "[BACKGROUND TASK BLOCKED]"
     : isGenuineFailure
       ? `[BACKGROUND TASK ${statusText}]`
       : "[BACKGROUND TASK RESULT READY]"
+  const completedSiblingText = isBlocked && allComplete
+    ? completedTasks
+      .filter((completedTask) => completedTask.id !== task.id && completedTask.status === "completed")
+      .map(formatTaskSummaryLine)
+      .join("\n")
+    : ""
   const blockedInstruction = isBlocked
-    ? `\n\n**Blocked:** ${task.blockedReason ?? task.error ?? "No reason provided"}\n${buildBlockedAnswerInstruction(task.sessionId ?? "unknown-session")}`
+    ? `\n\n**Blocked:** ${task.blockedReason ?? task.error ?? "No reason provided"}\n${buildBlockedAnswerInstruction(task.sessionId ?? "unknown-session")}${completedSiblingText ? `\n\n**Completed siblings:**\n${completedSiblingText}` : ""}`
     : ""
 
   // The `| session: \`ses_...\`` suffix is the machine-parsable handle the
@@ -140,7 +146,7 @@ ${header}
 **Description:** ${safeDescription(task)}
 **Duration:** ${duration}${errorInfo}${blockedInstruction}
 
-**${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.** You WILL be notified when ALL complete.
+${allComplete && isBlocked ? "**All other background tasks are complete.**" : `**${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.** You WILL be notified when ALL complete.`}
 ${isBlocked ? "**CHILD AWAITING RESPONSE:** Answer the child to unblock it." : isGenuineFailure ? "**ACTION REQUIRED:** This task failed. Check the error and decide whether to retry, cancel remaining tasks, or continue." : "Do NOT poll - continue productive work."}
 
 Use \`background_output(task_id="${task.id}")\` to retrieve this result when ready.${task.sessionId ? ` If that returns not-found, fall back to \`session_read(session_id="${task.sessionId}")\`.` : ""}
