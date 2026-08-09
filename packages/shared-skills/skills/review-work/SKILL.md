@@ -84,7 +84,7 @@ Before launching agents, collect these inputs. Extract from conversation history
 - **BACKGROUND**: Why this work was needed. Business context, user stories, related systems, prior decisions that informed the approach.
 - **CHANGED_FILES**: Auto-collect via `git diff --name-only HEAD~1` or against the appropriate base (branch point, specific commit).
 - **DIFF**: Auto-collect via `git diff HEAD~1` or against the appropriate base.
-- **FILE_CONTENTS**: Read the full content of each changed file (not just the diff). Oracle agents cannot read files - they need full context in the prompt.
+- **FILE_CONTENTS**: Read the full content of each changed file (not just the diff). Inline it in the Oracle prompts. Oracle has `read`/`grep`/`glob`, so it CAN open files itself, but every lookup is a round-trip the orchestrator already paid for - front-load the content and let Oracle spend its budget on reasoning.
 - **RUN_COMMAND**: How to start/run the application. Check `package.json` scripts, `Makefile`, `docker-compose.yml`, or ask the user.
 
 </required_inputs>
@@ -115,9 +115,15 @@ For GOAL, CONSTRAINTS, BACKGROUND - review the full conversation history. The us
 
 Launch ALL 5 in a single turn. Every agent uses `run_in_background=true`. No sequential launches. No waiting between them.
 
-**Oracle agents receive everything in the prompt** (they cannot read files or run commands). Include DIFF + FILE_CONTENTS + all context directly in the prompt text.
+**Oracle agents are read-only, not blind.** Oracle is denied `write`, `edit`, `apply_patch`, and `task`, and is explicitly granted `read`, `grep`, and `glob`. It can open any file in the repo and verify a claim against the tree.
+
+Front-load DIFF + FILE_CONTENTS + all context into the prompt anyway - that is what makes the review fast - but NEVER tell Oracle it cannot read files. That instruction is false, and it makes Oracle guess from memory instead of checking. A reviewer that reasons about timing constants or line numbers from a paraphrase will produce confident, wrong findings. Tell it the context is provided for speed and that it should verify anything load-bearing against the actual files.
 
 **unspecified-high agents are autonomous** - they can read files, run commands, and use tools. Give them goals and pointers, not raw content dumps.
+
+**Verify every blocker before you act on it.** Reviewer verdicts are input, not instruction. Before fixing a reported blocker, reproduce it yourself: run the failing command, execute the arithmetic, read the cited line. Reviewers do return confidently-wrong findings, and shipping a "fix" for a defect that does not exist is its own regression. A finding you disproved gets recorded as rejected with the evidence, not silently dropped.
+
+**Scope your verification runs to the whole repo, not just the changed directories.** A scoped `test <dir>` run can be green while CI fails: duplicated or re-exporting test files outside your diff still exercise the code you changed. Run whatever CI runs before you call a review passed.
 
 ---
 
