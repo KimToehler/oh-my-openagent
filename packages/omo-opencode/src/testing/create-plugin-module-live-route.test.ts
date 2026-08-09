@@ -231,8 +231,10 @@ describe("createPluginModule() — live-server-route wiring", () => {
   })
 
   describe("#given config without experimental block", () => {
-    it("#when server(input) completes #then setLiveParentWakeRoutingDisabled(false) is called", async () => {
+    it("#when server(input) completes #then setLiveParentWakeRoutingDisabled(true) is called", async () => {
       //#given
+      // Live routing is opt-in: without it an injected parent wake persists but
+      // never renders in the attached TUI until opencode restarts.
       const calls: boolean[] = []
       const mockSetDisabled = mock((v: boolean) => {
         calls.push(v)
@@ -253,7 +255,68 @@ describe("createPluginModule() — live-server-route wiring", () => {
 
       //#then
       expect(calls).toHaveLength(1)
+      expect(calls[0]).toBe(true)
+    })
+  })
+
+  describe("#given config with experimental.enable_live_parent_wake_routing: true", () => {
+    it("#when server(input) completes #then setLiveParentWakeRoutingDisabled(false) is called", async () => {
+      //#given
+      const calls: boolean[] = []
+      const mockSetDisabled = mock((v: boolean) => {
+        calls.push(v)
+      })
+      const mockLoadPluginConfig = mock(() => ({
+        experimental: { enable_live_parent_wake_routing: true },
+      }))
+
+      const pluginModule = createTestPluginModule({
+        loadPluginConfig: mockLoadPluginConfig,
+        setLiveParentWakeRoutingDisabled: mockSetDisabled,
+      })
+
+      //#when
+      await pluginModule.server({
+        directory: "/tmp/live-flag-optin-test",
+        client: {},
+        serverUrl: new URL("http://127.0.0.1:4000"),
+      } as Parameters<typeof pluginModule.server>[0])
+
+      //#then
+      expect(calls).toHaveLength(1)
       expect(calls[0]).toBe(false)
+    })
+  })
+
+  describe("#given both the legacy disable flag and the opt-in flag are true", () => {
+    it("#when server(input) completes #then the legacy disable flag wins", async () => {
+      //#given
+      const calls: boolean[] = []
+      const mockSetDisabled = mock((v: boolean) => {
+        calls.push(v)
+      })
+      const mockLoadPluginConfig = mock(() => ({
+        experimental: {
+          disable_live_parent_wake_routing: true,
+          enable_live_parent_wake_routing: true,
+        },
+      }))
+
+      const pluginModule = createTestPluginModule({
+        loadPluginConfig: mockLoadPluginConfig,
+        setLiveParentWakeRoutingDisabled: mockSetDisabled,
+      })
+
+      //#when
+      await pluginModule.server({
+        directory: "/tmp/live-flag-conflict-test",
+        client: {},
+        serverUrl: new URL("http://127.0.0.1:4000"),
+      } as Parameters<typeof pluginModule.server>[0])
+
+      //#then
+      expect(calls).toHaveLength(1)
+      expect(calls[0]).toBe(true)
     })
   })
 

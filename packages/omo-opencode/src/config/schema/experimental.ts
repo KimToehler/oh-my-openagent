@@ -21,8 +21,10 @@ export const ExperimentalConfigSchema = z.object({
   model_fallback_title: z.boolean().optional(),
   /** Maximum number of tools to register. When set, lower-priority tools are excluded to stay within provider limits (e.g., OpenAI's 128-tool cap). Accounts for ~20 OpenCode built-in tools. */
   max_tools: z.number().int().min(1).optional(),
-  /** Disable routing parent-targeted internal prompts through the live opencode listener (rollback to pre-migration in-process dispatch) */
+  /** Legacy kill switch for live parent-wake routing. Live routing is opt-in since the render-stall fix, so this flag is only needed to keep older configs explicit. */
   disable_live_parent_wake_routing: z.boolean().optional(),
+  /** Opt back into routing parent-targeted internal prompts through the live opencode listener. Off by default: the live route persists wakes without rendering them in an attached TUI until opencode restarts. Enable only for serve-topology runner-split protection. */
+  enable_live_parent_wake_routing: z.boolean().optional(),
 })
 
 export type ExperimentalConfig = z.infer<typeof ExperimentalConfigSchema>

@@ -7675,6 +7675,9 @@
         },
         "disable_live_parent_wake_routing": {
           "type": "boolean"
+        },
+        "enable_live_parent_wake_routing": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false
