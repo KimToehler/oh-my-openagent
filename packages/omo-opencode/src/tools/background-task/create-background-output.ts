@@ -1,6 +1,7 @@
 import { RUNTIME_ID } from "@oh-my-opencode/utils"
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { BackgroundTask } from "../../features/background-agent"
+import { isTaskBlocked } from "../../features/background-agent/blocked-state"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { log } from "../../shared/logger"
 import type { BackgroundOutputArgs } from "./types"
@@ -278,6 +279,10 @@ export function createBackgroundOutput(manager: BackgroundOutputManager, client:
           })
 
           return didTimeoutWhileActive ? appendTimeoutNote(output, timeoutMs) : output
+        }
+
+        if (isTaskBlocked(resolvedTask)) {
+          return formatTaskStatus(resolvedTask)
         }
 
         if (resolvedTask.status === "completed") {
