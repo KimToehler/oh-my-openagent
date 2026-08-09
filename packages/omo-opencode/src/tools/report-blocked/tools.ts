@@ -1,7 +1,9 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin"
 import type { BackgroundManager } from "../../features/background-agent"
 
-export type ReportBlockedManager = Pick<BackgroundManager, "findBySession" | "notifyBlockedTask" | "cancelTask">
+export type ReportBlockedManager = Pick<BackgroundManager, "findBySession" | "notifyBlockedTask" | "cancelTask" | "failBlockedTask">
+
+const MAX_BLOCKED_PARKS = 3
 
 function formatBlockedReason(reason: string, needs: string): string {
   return `Reason: ${reason}\nNeeds from parent: ${needs}`
@@ -23,6 +25,13 @@ This notifies the parent, then parks the current background task until the paren
       }
 
       const blockedReason = formatBlockedReason(args.reason, args.needs)
+      const priorParks = task.blockedParkCount ?? 0
+      if (priorParks >= MAX_BLOCKED_PARKS) {
+        const recurringBlockError = `Recurring blocked state after ${priorParks} prior park attempts: ${blockedReason}`
+        await manager.failBlockedTask(task.id, recurringBlockError)
+        return `[ERROR] Background task failed after ${priorParks} prior park attempts because the blocked state recurred.`
+      }
+      task.blockedParkCount = priorParks + 1
       task.blockedAt = new Date()
       task.blockedReason = blockedReason
 

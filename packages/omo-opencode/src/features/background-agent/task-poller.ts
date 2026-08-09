@@ -146,6 +146,8 @@ async function interruptStaleTask(args: {
   timeoutConfigKey: "messageStalenessTimeoutMs" | "sessionGoneTimeoutMs" | "staleTimeoutMs"
   errorSuffix: string
   logReason: string
+  claimTaskInterruption: (taskId: string) => boolean
+  releaseTaskInterruption: (taskId: string) => void
 }): Promise<void> {
   const {
     task,
@@ -159,8 +161,12 @@ async function interruptStaleTask(args: {
     timeoutConfigKey,
     errorSuffix,
     logReason,
+    claimTaskInterruption,
+    releaseTaskInterruption,
   } = args
 
+  if (!claimTaskInterruption(task.id)) return
+  try {
   const aborted = await abortWithTimeout(client, sessionID)
   if (!aborted) {
     log("[background-agent] Task stale interruption skipped because session abort failed:", {
@@ -190,6 +196,9 @@ async function interruptStaleTask(args: {
   } catch (err) {
     log("[background-agent] Error in notifyParentSession for stale task:", { taskId: task.id, error: err })
   }
+  } finally {
+    releaseTaskInterruption(task.id)
+  }
 }
 
 export async function checkAndInterruptStaleTasks(args: {
@@ -202,6 +211,8 @@ export async function checkAndInterruptStaleTasks(args: {
   sessionStatuses?: SessionStatusMap
   onTaskInterrupted?: (task: BackgroundTask) => void
   getSessionActivity?: SessionActivityResolver
+  claimTaskInterruption?: (taskId: string) => boolean
+  releaseTaskInterruption?: (taskId: string) => void
 }): Promise<void> {
   const {
     tasks,
@@ -212,6 +223,8 @@ export async function checkAndInterruptStaleTasks(args: {
     notifyParentSession,
     sessionStatuses,
     onTaskInterrupted = (task) => removeTaskToastTracking(task.id),
+    claimTaskInterruption = () => true,
+    releaseTaskInterruption = () => {},
   } = args
   const staleTimeoutMs = config?.staleTimeoutMs ?? DEFAULT_STALE_TIMEOUT_MS
   const sessionGoneTimeoutMs = config?.sessionGoneTimeoutMs ?? DEFAULT_SESSION_GONE_TIMEOUT_MS
@@ -282,6 +295,8 @@ export async function checkAndInterruptStaleTasks(args: {
           timeoutConfigKey: sessionGone ? "sessionGoneTimeoutMs" : "messageStalenessTimeoutMs",
           errorSuffix: " since start",
           logReason: "no progress since start",
+          claimTaskInterruption,
+          releaseTaskInterruption,
         }),
       )
       continue
@@ -333,6 +348,8 @@ export async function checkAndInterruptStaleTasks(args: {
         timeoutConfigKey: sessionGone ? "sessionGoneTimeoutMs" : "staleTimeoutMs",
         errorSuffix: "",
         logReason: "stale timeout",
+        claimTaskInterruption,
+        releaseTaskInterruption,
       }),
     )
   }

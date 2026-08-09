@@ -30,19 +30,23 @@ export class BlockedEscalation {
       void this.options.onReminder(taskId)
     }, this.options.rewakeMs)
     const expiry = setTimeout(() => {
-      if (!this.timers.has(taskId)) return
-      this.cancel(taskId)
+      if (!this.claim(taskId)) return
       this.options.onExpiry(taskId)
     }, this.options.expiryMs)
     this.timers.set(taskId, { reminder, expiry })
   }
 
-  cancel(taskId: string): void {
+  claim(taskId: string): boolean {
     const timers = this.timers.get(taskId)
-    if (!timers) return
+    if (!timers) return false
     clearTimeout(timers.reminder)
     clearTimeout(timers.expiry)
     this.timers.delete(taskId)
+    return true
+  }
+
+  cancel(taskId: string): void {
+    this.claim(taskId)
   }
 
   shutdown(): void {

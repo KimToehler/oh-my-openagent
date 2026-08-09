@@ -1535,11 +1535,19 @@ The fallback retry session is now created and can be inspected directly.
         this.restoreTaskAfterSkippedResume(existingTask, resumeSnapshot, promptResult.status)
         return
       }
-      if (wasBlocked) {
+      if (wasBlocked && this.blockedEscalation.claim(existingTask.id)) {
         existingTask.blockedAt = undefined
         existingTask.blockedReason = undefined
         this.blockedNotificationTaskIds.delete(existingTask.id)
-        this.blockedEscalation.cancel(existingTask.id)
+        this.markForNotification(existingTask)
+        void this.enqueueNotificationForParent(existingTask.parentSessionId, () =>
+          this.notifyParentSession(existingTask, () =>
+            `<system-reminder>
+[BACKGROUND TASK ANSWER ACCEPTED]
+Task ${existingTask.id} resumed with parent answer.
+</system-reminder>`,
+          ),
+        )
         const blockedTimer = this.completionTimers.get(existingTask.id)
         if (blockedTimer) {
           clearTimeout(blockedTimer)
@@ -2539,6 +2547,18 @@ The task was re-queued on a fallback model after a retryable failure.
     this.scheduleTaskRemoval(taskId)
   }
 
+  async failBlockedTask(taskId: string, error: string): Promise<boolean> {
+    const task = this.tasks.get(taskId)
+    if (!task || task.status !== "running" || this.completingTaskIds.has(task.id)) return false
+    task.status = "error"
+    task.error = error
+    task.completedAt = new Date()
+    this.markForNotification(task)
+    await this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task))
+    this.scheduleTaskRemoval(task.id)
+    return true
+  }
+
   async cancelTask(
     taskId: string,
     options?: { source?: string; reason?: string; abortSession?: boolean; skipNotification?: boolean }
@@ -3130,6 +3150,12 @@ The task was re-queued on a fallback model after a retryable failure.
       concurrencyManager: this.concurrencyManager,
       notifyParentSession: (task) => this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)),
       sessionStatuses: allStatuses,
+      claimTaskInterruption: (taskId) => {
+        if (this.completingTaskIds.has(taskId)) return false
+        this.completingTaskIds.add(taskId)
+        return true
+      },
+      releaseTaskInterruption: (taskId) => this.completingTaskIds.delete(taskId),
     })
   }
 
