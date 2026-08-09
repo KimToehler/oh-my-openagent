@@ -78,6 +78,9 @@ describe("BackgroundManager blocked resume", () => {
     expect(task.status).toBe("running")
     expect(task.blockedAt).toBeUndefined()
     expect(task.blockedReason).toBeUndefined()
+    const blockedNotificationTaskIds = Reflect.get(manager, "blockedNotificationTaskIds")
+    expect(blockedNotificationTaskIds).toBeInstanceOf(Set)
+    expect(blockedNotificationTaskIds.has(task.id)).toBe(false)
   })
 
   test("#given a blocked task #when active-session gate skips resume #then blocked state remains answerable", async () => {

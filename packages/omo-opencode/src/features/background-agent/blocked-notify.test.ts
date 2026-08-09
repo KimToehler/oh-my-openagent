@@ -101,6 +101,40 @@ describe("BackgroundManager blocked task notification", () => {
     expect(manager.getPendingNotifications(task.parentSessionId)).toHaveLength(1)
   })
 
+  test("#given one blocked episode #when notifyBlockedTask runs twice #then within-episode dedupe emits one wake", async () => {
+    // given
+    const manager = createManager()
+    const task = createBlockedTask()
+    addTask(manager, task)
+    let wakeCount = 0
+    Reflect.set(manager, "enqueueNotificationForParent", async (_parentSessionID: string, operation: () => Promise<void>) => {
+      wakeCount += 1
+      await operation()
+    })
+
+    // when
+    await manager.notifyBlockedTask(task.id)
+    await manager.notifyBlockedTask(task.id)
+
+    // then
+    expect(wakeCount).toBe(1)
+  })
+
+  test("#given a blocked wake #when notifyParentSession queues it #then the parent is asked to reply", async () => {
+    // given
+    const manager = createManager()
+    const task = createBlockedTask()
+    const internals = addTask(manager, task)
+    Reflect.set(manager, "enableParentSessionNotifications", true)
+    Reflect.set(manager, "isSessionActive", async () => true)
+
+    // when
+    await Reflect.get(manager, "notifyParentSession").call(manager, task)
+
+    // then
+    expect(internals.parentWakeNotifier.getPendingParentWakes().get(task.parentSessionId)?.shouldReply).toBe(true)
+  })
+
   test("#given a blocked running task #when cancelTask parks it #then notification preparation covers the terminal-to-wake window", async () => {
     // given
     const manager = createManager()

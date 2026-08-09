@@ -441,6 +441,7 @@ export class BackgroundManager {
   private removeTask(task: BackgroundTask): void {
     this.archiveCompletedTask(task)
     archiveBackgroundTask(task)
+    this.blockedNotificationTaskIds.delete(task.id)
     this.tasks.delete(task.id)
     this.removeTaskFromParentIndex(task.id, task.parentSessionId)
   }
@@ -1528,6 +1529,7 @@ The fallback retry session is now created and can be inspected directly.
       if (wasBlocked) {
         existingTask.blockedAt = undefined
         existingTask.blockedReason = undefined
+        this.blockedNotificationTaskIds.delete(existingTask.id)
         const blockedTimer = this.completionTimers.get(existingTask.id)
         if (blockedTimer) {
           clearTimeout(blockedTimer)
@@ -2506,6 +2508,7 @@ The task was re-queued on a fallback model after a retryable failure.
   ): Promise<boolean> {
     const task = this.tasks.get(taskId)
     if (!task || (task.status !== "running" && task.status !== "pending") || this.completingTaskIds.has(task.id)) {
+      this.blockedNotificationTaskIds.delete(taskId)
       return false
     }
     this.completingTaskIds.add(task.id)
@@ -2836,7 +2839,8 @@ The task was re-queued on a fallback model after a retryable failure.
         })
 
         const isTaskFailure = task.status === "error" || task.status === "cancelled" || task.status === "interrupt"
-        const shouldReply = allComplete || isTaskFailure
+        const isBlocked = isTaskBlocked(task)
+        const shouldReply = allComplete || isTaskFailure || isBlocked
 
         const shouldDeferNotification = await this.isSessionActive(task.parentSessionId)
 
@@ -2973,7 +2977,7 @@ The task was re-queued on a fallback model after a retryable failure.
 
   /**
    * Test-only: resolves once the settled-flush count for this session exceeds
-   * `sinceCount` (captured before the flush was triggered). Deterministic — no
+   * `sinceCount` (captured before the flush was triggered). Deterministic: no
    * blind sleep past the debounce, and no registration-after-settle race.
    */
   awaitScheduledFlush(sessionID: string, sinceCount: number): Promise<void> {
