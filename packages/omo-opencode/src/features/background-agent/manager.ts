@@ -56,6 +56,7 @@ import {
 } from "./compaction-aware-message-resolver"
 import { ConcurrencyManager } from "./concurrency"
 import {
+  DEFAULT_BLOCKED_EXPIRY_MS,
   POLLING_INTERVAL_MS,
   type QueueItem,
   TASK_CLEANUP_DELAY_MS,
@@ -2407,6 +2408,20 @@ The task was re-queued on a fallback model after a retryable failure.
       const task = this.tasks.get(taskId)
       if (!task) return
 
+      const blockedAtTimestamp = task.blockedAt?.getTime()
+      const blockedExpiryMs = this.config?.blockedExpiryMs ?? DEFAULT_BLOCKED_EXPIRY_MS
+      if (isTaskBlocked(task) && blockedAtTimestamp !== undefined) {
+        const remainingBlockedLifetime = blockedExpiryMs - (Date.now() - blockedAtTimestamp)
+        if (remainingBlockedLifetime > 0) {
+          const blockedRetentionTimer = setTimeout(
+            () => this.scheduleTaskRemoval(taskId, rescheduleCount),
+            remainingBlockedLifetime,
+          )
+          this.completionTimers.set(taskId, blockedRetentionTimer)
+          return
+        }
+      }
+
       if (task.parentSessionId) {
         const siblings = this.getTasksByParentSession(task.parentSessionId)
         const runningOrPendingSiblings = siblings.filter(
@@ -2988,6 +3003,7 @@ The task was re-queued on a fallback model after a retryable failure.
       tasks: this.tasks,
       notifications: this.notifications,
       taskTtlMs: this.config?.taskTtlMs,
+      blockedExpiryMs: this.config?.blockedExpiryMs,
       sessionStatuses: allStatuses,
       onTaskPruned: (taskId, task, errorMessage) => {
         const wasPending = task.status === "pending"

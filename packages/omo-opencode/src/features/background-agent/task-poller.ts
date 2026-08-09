@@ -5,6 +5,7 @@ import type { ConcurrencyManager } from "./concurrency"
 import type { OpencodeClient } from "./opencode-client"
 
 import {
+  DEFAULT_BLOCKED_EXPIRY_MS,
   DEFAULT_MESSAGE_STALENESS_TIMEOUT_MS,
   DEFAULT_SESSION_GONE_TIMEOUT_MS,
   DEFAULT_STALE_TIMEOUT_MS,
@@ -14,6 +15,7 @@ import {
   TASK_TTL_MS,
 } from "./constants"
 import { abortWithTimeout } from "./abort-with-timeout"
+import { isTaskBlocked } from "./blocked-state"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 import { checkSessionExistence, MIN_SESSION_GONE_POLLS } from "./session-existence"
 
@@ -33,6 +35,7 @@ export function pruneStaleTasksAndNotifications(args: {
   notifications: Map<string, BackgroundTask[]>
   onTaskPruned: (taskId: string, task: BackgroundTask, errorMessage: string) => void
   taskTtlMs?: number
+  blockedExpiryMs?: number
   sessionStatuses?: SessionStatusMap
 }): void {
   const { tasks, notifications, onTaskPruned } = args
@@ -49,6 +52,10 @@ export function pruneStaleTasksAndNotifications(args: {
   for (const [taskId, task] of tasks.entries()) {
     if (TERMINAL_TASK_STATUSES.has(task.status)) {
       if (tasksWithPendingNotifications.has(taskId)) continue
+
+      const blockedAt = task.blockedAt?.getTime()
+      const blockedExpiryMs = args.blockedExpiryMs ?? DEFAULT_BLOCKED_EXPIRY_MS
+      if (isTaskBlocked(task) && blockedAt !== undefined && now - blockedAt < blockedExpiryMs) continue
 
       const completedAt = task.completedAt?.getTime()
       if (!completedAt) continue
