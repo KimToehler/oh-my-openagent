@@ -133,6 +133,8 @@ type ResumeTaskSnapshot = {
   error?: string
   startedAt?: Date
   progress?: BackgroundTask["progress"]
+  blockedAt?: Date
+  blockedReason?: string
   parentSessionId: string
   parentMessageId: string
   parentModel?: BackgroundTask["parentModel"]
@@ -498,6 +500,8 @@ export class BackgroundManager {
       error: task.error,
       startedAt: task.startedAt,
       progress: task.progress,
+      blockedAt: task.blockedAt,
+      blockedReason: task.blockedReason,
       parentSessionId: task.parentSessionId,
       parentMessageId: task.parentMessageId,
       parentModel: task.parentModel,
@@ -530,6 +534,8 @@ export class BackgroundManager {
     task.error = snapshot.error
     task.startedAt = snapshot.startedAt
     task.progress = snapshot.progress
+    task.blockedAt = snapshot.blockedAt
+    task.blockedReason = snapshot.blockedReason
     task.parentMessageId = snapshot.parentMessageId
     task.parentModel = snapshot.parentModel
     task.parentAgent = snapshot.parentAgent

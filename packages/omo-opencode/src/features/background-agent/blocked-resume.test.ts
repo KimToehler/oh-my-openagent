@@ -82,15 +82,22 @@ describe("BackgroundManager blocked resume", () => {
 
   test("#given a blocked task #when active-session gate skips resume #then blocked state remains answerable", async () => {
     // given
+    let blockedAtDuringGate: Date | undefined
+    let blockedReasonDuringGate: string | undefined
+    let task: BackgroundTask
     const client = {
       session: {
-        status: async () => ({ data: { "session-skipped": { type: "busy" } } }),
+        status: async () => {
+          blockedAtDuringGate = task.blockedAt
+          blockedReasonDuringGate = task.blockedReason
+          return { data: { "session-skipped": { type: "busy" } } }
+        },
         promptAsync: async () => ({}),
         abort: async () => ({}),
       },
     }
     const manager = createManager(client)
-    const task = addBlockedTask(manager, "session-skipped")
+    task = addBlockedTask(manager, "session-skipped")
     const blockedAt = task.blockedAt
 
     // when
@@ -98,6 +105,8 @@ describe("BackgroundManager blocked resume", () => {
 
     // then
     expect(task.status).toBe("cancelled")
+    expect(blockedAtDuringGate).toBe(blockedAt)
+    expect(blockedReasonDuringGate).toBe("Need parent input")
     expect(task.blockedAt).toBe(blockedAt)
     expect(task.blockedReason).toBe("Need parent input")
   })
