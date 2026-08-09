@@ -150,5 +150,23 @@ describe("blocked task retention", () => {
       // then
       expect(tasks.get(task.id)).toBe(task)
     })
+
+    test("#then removes an old terminal task once its block reaches hard expiry", () => {
+      // given
+      currentTime += TERMINAL_TASK_TTL_MS + 1
+      Date.now = () => currentTime
+      const task = createTask({
+        blockedAt: new Date(currentTime - DEFAULT_BLOCKED_EXPIRY_MS),
+        blockedReason: "Need input",
+        completedAt: new Date(currentTime - TERMINAL_TASK_TTL_MS - 1),
+      })
+      const tasks = new Map([[task.id, task]])
+
+      // when
+      prune(tasks)
+
+      // then
+      expect(tasks.has(task.id)).toBe(false)
+    })
   })
 })
