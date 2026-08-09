@@ -30,6 +30,23 @@ export async function handleDispatchedParentWakeWindowElapsed(
     return
   }
 
+  // A noReply dispatch is a DEPOSIT, not a turn: it is accepted precisely so it
+  // does NOT fork an assistant reply. Absence of assistant output is therefore
+  // its success condition, never evidence of a lost dispatch, so the no-output
+  // retry below cannot apply. Retrying here re-injected the identical
+  // notification text into the parent session (the tracked wake is cloned with
+  // shouldReply:false for admit-only deposits, so this covers both a plain
+  // shouldReply:false wake and an admit-only deposit of a reply-required one).
+  // Liveness for a retained reply-required wake is owned by the pending-queue
+  // flush machinery, which keeps its own entry and its own scheduled flush.
+  if (!input.wake.shouldReply) {
+    input.dispatchedTracker.clearWake(input.sessionID)
+    log("[background-agent] Cleared dispatched noReply parent wake without retry:", {
+      sessionID: input.sessionID,
+    })
+    return
+  }
+
   const retryCount = input.wake.noAssistantOutputRetryCount ?? 0
   if (retryCount >= MAX_NO_ASSISTANT_OUTPUT_RETRIES) {
     input.dispatchedTracker.clearWake(input.sessionID)
