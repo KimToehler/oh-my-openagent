@@ -173,4 +173,29 @@ describe("blocked task concurrency races", () => {
     expect(calls).toEqual(["fail"])
     expect(result).toContain("failed after 3 prior park attempts")
   })
+
+  test("#given concurrency acquisition throws #when resuming a blocked task #then the in-flight marker is released so expiry stays possible", async () => {
+    // given
+    const value = blockedManager({ promptAsync: async () => ({}), abort: async () => ({}) }, "race-acquire-throws")
+    const backgroundTask = task({
+      id: "race-acquire-throws", sessionId: "race-acquire-child", status: "cancelled",
+      blockedAt: new Date(), blockedReason: "Need parent input", completedAt: new Date(),
+      error: "Need parent input", concurrencyGroup: "explore",
+    })
+    addTask(value, backgroundTask)
+    const concurrency = Reflect.get(value, "concurrencyManager") as { acquire: (key: string) => Promise<void> }
+    concurrency.acquire = async () => { throw new Error("concurrency acquire failed") }
+
+    // when
+    let threw = false
+    try {
+      await value.resume({ sessionId: "race-acquire-child", prompt: "answer", parentSessionId: "race-parent", parentMessageId: "answer-message" })
+    } catch {
+      threw = true
+    }
+
+    // then
+    expect(threw).toBe(true)
+    expect((Reflect.get(value, "resumingBlockedTaskIds") as Set<string>).size).toBe(0)
+  })
 })

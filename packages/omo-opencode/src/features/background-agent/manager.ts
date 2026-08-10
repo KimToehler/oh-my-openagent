@@ -1411,7 +1411,12 @@ The fallback retry session is now created and can be inspected directly.
     const concurrencyKey = this.concurrencyManager.getConcurrencyKey(
       existingTask.concurrencyGroup ?? existingTask.agent,
     )
-    await this.concurrencyManager.acquire(concurrencyKey)
+    try {
+      await this.concurrencyManager.acquire(concurrencyKey)
+    } catch (error) {
+      this.resumingBlockedTaskIds.delete(existingTask.id)
+      throw error
+    }
     existingTask.concurrencyKey = concurrencyKey
     existingTask.concurrencyGroup = concurrencyKey
 
