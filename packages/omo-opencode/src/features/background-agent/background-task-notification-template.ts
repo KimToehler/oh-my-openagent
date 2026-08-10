@@ -1,4 +1,5 @@
 import { buildBlockedAnswerInstruction } from "./blocked-answer-instruction"
+import { sanitizeUntrustedText } from "./untrusted-text"
 import type { BackgroundTaskAttempt, BackgroundTaskStatus } from "./types"
 
 export type BackgroundTaskNotificationStatus = "COMPLETED" | "BLOCKED" | "CANCELLED" | "INTERRUPTED" | "ERROR"
@@ -73,8 +74,9 @@ export function buildBackgroundTaskNotificationText(input: {
 }): string {
   const { task, duration, statusText, allComplete, remainingCount, completedTasks } = input
 
-  const safeDescription = (t: BackgroundTaskNotificationTask): string => t.description || t.id
-  const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
+  const safeDescription = (t: BackgroundTaskNotificationTask): string =>
+    sanitizeUntrustedText(t.description || t.id, 200)
+  const errorInfo = task.error ? `\n**Error:** ${sanitizeUntrustedText(task.error)}` : ""
   const isBlocked = statusText === "BLOCKED"
 
   if (allComplete && !isBlocked) {
@@ -131,7 +133,7 @@ ${resultCollectionInstruction}${hasFailures ? `\n\n**ACTION REQUIRED:** ${failed
       .join("\n")
     : ""
   const blockedInstruction = isBlocked
-    ? `\n\n**Blocked:** ${task.blockedReason ?? task.error ?? "No reason provided"}\n${buildBlockedAnswerInstruction(task.sessionId ?? "unknown-session")}${completedSiblingText ? `\n\n**Completed siblings:**\n${completedSiblingText}` : ""}`
+    ? `\n\n**Blocked:** ${sanitizeUntrustedText(task.blockedReason ?? task.error ?? "No reason provided")}\n${buildBlockedAnswerInstruction(task.sessionId ?? "unknown-session")}${completedSiblingText ? `\n\n**Completed siblings:**\n${completedSiblingText}` : ""}`
     : ""
 
   // The `| session: \`ses_...\`` suffix is the machine-parsable handle the
