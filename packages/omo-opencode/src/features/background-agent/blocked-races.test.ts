@@ -17,6 +17,17 @@ function task(overrides: Partial<BackgroundTask> = {}): BackgroundTask {
   }
 }
 
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms))
+
+function blockedManager(session: Record<string, unknown>, directory: string): BackgroundManager {
+  const value = new BackgroundManager({
+    pluginContext: { client: { session }, directory: `/tmp/${directory}` } as PluginInput,
+    config: { blockedRewakeMs: 60_000, blockedExpiryMs: 60 },
+  } as never)
+  managers.push(value)
+  return value
+}
+
 function manager(session: Record<string, unknown>): BackgroundManager {
   const value = new BackgroundManager({ pluginContext: { client: { session }, directory: "/tmp/blocked-races" } as PluginInput })
   managers.push(value)
@@ -38,29 +49,53 @@ afterEach(() => {
 })
 
 describe("blocked task concurrency races", () => {
-  test("#given accepted answer and due expiry #when both claim one block #then answer wins with one distinct parent notification", async () => {
+  test("#given an accepted resume still in flight #when the expiry deadline passes #then the answer wins and the task is not expired", async () => {
     // given
-    jest.useFakeTimers()
-    const notifications: string[] = []
-    const value = manager({ promptAsync: async () => ({}), abort: async () => ({}) })
-    const backgroundTask = task({ status: "cancelled", blockedAt: new Date(), blockedReason: "Need parent input", completedAt: new Date(), concurrencyGroup: "explore" })
-    addTask(value, backgroundTask)
-    Reflect.set(value, "enqueueNotificationForParent", async (_parent: string, notify: () => Promise<void>) => notify())
-    Reflect.set(value, "notifyParentSession", async (_task: BackgroundTask, transform?: (text: string) => string) => {
-      notifications.push(transform?.("[BACKGROUND TASK BLOCKED]") ?? "[BACKGROUND TASK ANSWER ACCEPTED]")
+    const value = blockedManager(
+      { promptAsync: async () => { await sleep(300); return {} }, abort: async () => ({}) },
+      "race-inflight",
+    )
+    const backgroundTask = task({
+      id: "race-inflight", sessionId: "race-inflight-child", status: "cancelled",
+      blockedAt: new Date(), blockedReason: "Need parent input", completedAt: new Date(),
+      error: "Need parent input", concurrencyGroup: "explore",
     })
+    addTask(value, backgroundTask)
     await value.notifyBlockedTask(backgroundTask.id)
-    notifications.length = 0
 
     // when
-    await value.resume({ sessionId: "race-child", prompt: "answer", parentSessionId: "race-parent", parentMessageId: "answer-message" })
-    await flush()
-    jest.runOnlyPendingTimers()
+    const resuming = value.resume({ sessionId: "race-inflight-child", prompt: "answer", parentSessionId: "race-parent", parentMessageId: "answer-message" })
+    await sleep(150)
+    const inFlightDuringExpiry = (Reflect.get(value, "resumingBlockedTaskIds") as Set<string>).has(backgroundTask.id)
+    await resuming
+    await sleep(400)
 
     // then
+    expect(inFlightDuringExpiry).toBe(true)
     expect(backgroundTask.status).toBe("running")
-    expect(notifications.filter((text) => text.includes("ANSWER ACCEPTED"))).toHaveLength(1)
-    expect(mergeParentWakeNotifications([notifications[0] ?? ""], notifications[1] ?? "")).toHaveLength(2)
+    expect(backgroundTask.blockedAt).toBeUndefined()
+    expect(backgroundTask.error).toBeUndefined()
+    expect((Reflect.get(value, "resumingBlockedTaskIds") as Set<string>).size).toBe(0)
+  })
+
+  test("#given a blocked task nobody answers #when the expiry deadline passes #then expiry wins and the deferral is not a permanent leak", async () => {
+    // given
+    const value = blockedManager({ promptAsync: async () => ({}), abort: async () => ({}) }, "race-unanswered")
+    const backgroundTask = task({
+      id: "race-unanswered", sessionId: "race-unanswered-child", status: "cancelled",
+      blockedAt: new Date(), blockedReason: "Need parent input", completedAt: new Date(),
+      error: "Need parent input", concurrencyGroup: "explore",
+    })
+    addTask(value, backgroundTask)
+
+    // when
+    await value.notifyBlockedTask(backgroundTask.id)
+    await sleep(300)
+
+    // then
+    expect(backgroundTask.status).toBe("cancelled")
+    expect(backgroundTask.error).toContain("expired unanswered")
+    expect((Reflect.get(value, "resumingBlockedTaskIds") as Set<string>).size).toBe(0)
   })
 
   test("#given self-cancel and stale poller interrupt #when abort overlaps #then one cancellation wins and one parent notification dispatches", async () => {
