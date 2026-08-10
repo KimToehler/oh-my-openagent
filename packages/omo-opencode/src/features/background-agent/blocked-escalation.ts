@@ -5,6 +5,7 @@ type BlockedEscalationOptions = {
   readonly expiryMs: number
   readonly onReminder: (taskId: string) => void | Promise<void>
   readonly onExpiry: (taskId: string) => void
+  readonly shouldDeferExpiry?: (taskId: string) => boolean
 }
 
 type BlockedEscalationTimers = {
@@ -29,11 +30,20 @@ export class BlockedEscalation {
       if (!this.timers.has(taskId)) return
       void this.options.onReminder(taskId)
     }, this.options.rewakeMs)
-    const expiry = setTimeout(() => {
+    this.timers.set(taskId, { reminder, expiry: this.armExpiry(taskId) })
+  }
+
+  private armExpiry(taskId: string): Timer {
+    return setTimeout(() => {
+      if (this.options.shouldDeferExpiry?.(taskId) === true) {
+        const timers = this.timers.get(taskId)
+        if (!timers) return
+        this.timers.set(taskId, { reminder: timers.reminder, expiry: this.armExpiry(taskId) })
+        return
+      }
       if (!this.claim(taskId)) return
       this.options.onExpiry(taskId)
     }, this.options.expiryMs)
-    this.timers.set(taskId, { reminder, expiry })
   }
 
   claim(taskId: string): boolean {

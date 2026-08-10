@@ -292,6 +292,7 @@ export class BackgroundManager {
   private readonly scheduledFlushSettledWaiters = new Map<string, Array<() => void>>()
   private readonly completingTaskIds = new Set<string>()
   private readonly blockedNotificationTaskIds = new Set<string>()
+  private readonly resumingBlockedTaskIds = new Set<string>()
   private readonly blockedEscalation: BlockedEscalation
 
   constructor(config: BackgroundManagerConfig) {
@@ -310,6 +311,7 @@ export class BackgroundManager {
       expiryMs: this.config?.blockedExpiryMs ?? DEFAULT_BLOCKED_EXPIRY_MS,
       onReminder: async (taskId) => this.notifyBlockedReminder(taskId),
       onExpiry: (taskId) => this.expireBlockedTask(taskId),
+      shouldDeferExpiry: (taskId) => this.resumingBlockedTaskIds.has(taskId),
     })
     this.tmuxEnabled = options?.tmuxConfig?.enabled ?? false
     this.onSubagentSessionCreated = options?.onSubagentSessionCreated
@@ -1395,7 +1397,9 @@ The fallback retry session is now created and can be inspected directly.
 
     const resumeSnapshot = this.captureResumeTaskSnapshot(existingTask)
     const wasBlocked = existingTask.blockedAt !== undefined
-    if (!wasBlocked) {
+    if (wasBlocked) {
+      this.resumingBlockedTaskIds.add(existingTask.id)
+    } else {
       const completionTimer = this.completionTimers.get(existingTask.id)
       if (completionTimer) {
         clearTimeout(completionTimer)
@@ -1535,7 +1539,8 @@ The fallback retry session is now created and can be inspected directly.
         this.restoreTaskAfterSkippedResume(existingTask, resumeSnapshot, promptResult.status)
         return
       }
-      if (wasBlocked && this.blockedEscalation.claim(existingTask.id)) {
+      if (wasBlocked) {
+        this.blockedEscalation.claim(existingTask.id)
         existingTask.blockedAt = undefined
         existingTask.blockedReason = undefined
         this.blockedNotificationTaskIds.delete(existingTask.id)
@@ -1592,6 +1597,8 @@ Task ${existingTask.id} resumed with parent answer.
       this.enqueueNotificationForParent(existingTask.parentSessionId, () => this.notifyParentSession(existingTask)).catch(err => {
         log("[background-agent] Failed to notify on resume error:", err)
       })
+    }).finally(() => {
+      this.resumingBlockedTaskIds.delete(existingTask.id)
     })
 
     return existingTask
