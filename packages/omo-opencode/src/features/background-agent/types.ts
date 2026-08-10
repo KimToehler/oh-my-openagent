@@ -101,6 +101,8 @@ export interface BackgroundTask {
   consecutiveMissedPolls?: number
   /** Number of consecutive polls where the session activity lookup failed */
   consecutiveActivityUnavailablePolls?: number
+  /** Number of times this task has parked for parent input */
+  blockedParkCount?: number
   blockedAt?: Date
   blockedReason?: string
 }

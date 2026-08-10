@@ -48,6 +48,7 @@ import {
   type BackgroundTaskNotificationTask,
   buildBackgroundTaskNotificationText,
 } from "./background-task-notification-template"
+import { BlockedEscalation, buildBlockedReminderNotification } from "./blocked-escalation"
 import { isTaskBlocked } from "./blocked-state"
 import { writeBackgroundTaskMarker } from "./background-task-marker"
 import {
@@ -57,6 +58,7 @@ import {
 import { ConcurrencyManager } from "./concurrency"
 import {
   DEFAULT_BLOCKED_EXPIRY_MS,
+  DEFAULT_BLOCKED_REWAKE_MS,
   POLLING_INTERVAL_MS,
   type QueueItem,
   TASK_CLEANUP_DELAY_MS,
@@ -290,6 +292,8 @@ export class BackgroundManager {
   private readonly scheduledFlushSettledWaiters = new Map<string, Array<() => void>>()
   private readonly completingTaskIds = new Set<string>()
   private readonly blockedNotificationTaskIds = new Set<string>()
+  private readonly resumingBlockedTaskIds = new Set<string>()
+  private readonly blockedEscalation: BlockedEscalation
 
   constructor(config: BackgroundManagerConfig) {
     const { pluginContext, ...options } = config
@@ -302,6 +306,13 @@ export class BackgroundManager {
     this.directory = pluginContext.directory
     this.concurrencyManager = new ConcurrencyManager(options.config)
     this.config = options.config
+    this.blockedEscalation = new BlockedEscalation({
+      rewakeMs: this.config?.blockedRewakeMs ?? DEFAULT_BLOCKED_REWAKE_MS,
+      expiryMs: this.config?.blockedExpiryMs ?? DEFAULT_BLOCKED_EXPIRY_MS,
+      onReminder: async (taskId) => this.notifyBlockedReminder(taskId),
+      onExpiry: (taskId) => this.expireBlockedTask(taskId),
+      shouldDeferExpiry: (taskId) => this.resumingBlockedTaskIds.has(taskId),
+    })
     this.tmuxEnabled = options?.tmuxConfig?.enabled ?? false
     this.onSubagentSessionCreated = options?.onSubagentSessionCreated
     this.onSubagentSessionDeleted = options?.onSubagentSessionDeleted
@@ -1386,7 +1397,9 @@ The fallback retry session is now created and can be inspected directly.
 
     const resumeSnapshot = this.captureResumeTaskSnapshot(existingTask)
     const wasBlocked = existingTask.blockedAt !== undefined
-    if (!wasBlocked) {
+    if (wasBlocked) {
+      this.resumingBlockedTaskIds.add(existingTask.id)
+    } else {
       const completionTimer = this.completionTimers.get(existingTask.id)
       if (completionTimer) {
         clearTimeout(completionTimer)
@@ -1398,7 +1411,12 @@ The fallback retry session is now created and can be inspected directly.
     const concurrencyKey = this.concurrencyManager.getConcurrencyKey(
       existingTask.concurrencyGroup ?? existingTask.agent,
     )
-    await this.concurrencyManager.acquire(concurrencyKey)
+    try {
+      await this.concurrencyManager.acquire(concurrencyKey)
+    } catch (error) {
+      this.resumingBlockedTaskIds.delete(existingTask.id)
+      throw error
+    }
     existingTask.concurrencyKey = concurrencyKey
     existingTask.concurrencyGroup = concurrencyKey
 
@@ -1527,9 +1545,19 @@ The fallback retry session is now created and can be inspected directly.
         return
       }
       if (wasBlocked) {
+        this.blockedEscalation.claim(existingTask.id)
         existingTask.blockedAt = undefined
         existingTask.blockedReason = undefined
         this.blockedNotificationTaskIds.delete(existingTask.id)
+        this.markForNotification(existingTask)
+        void this.enqueueNotificationForParent(existingTask.parentSessionId, () =>
+          this.notifyParentSession(existingTask, () =>
+            `<system-reminder>
+[BACKGROUND TASK ANSWER ACCEPTED]
+Task ${existingTask.id} resumed with parent answer.
+</system-reminder>`,
+          ),
+        )
         const blockedTimer = this.completionTimers.get(existingTask.id)
         if (blockedTimer) {
           clearTimeout(blockedTimer)
@@ -1574,6 +1602,8 @@ The fallback retry session is now created and can be inspected directly.
       this.enqueueNotificationForParent(existingTask.parentSessionId, () => this.notifyParentSession(existingTask)).catch(err => {
         log("[background-agent] Failed to notify on resume error:", err)
       })
+    }).finally(() => {
+      this.resumingBlockedTaskIds.delete(existingTask.id)
     })
 
     return existingTask
@@ -2500,6 +2530,45 @@ The task was re-queued on a fallback model after a retryable failure.
     this.blockedNotificationTaskIds.add(taskId)
     this.markForNotification(task)
     await this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task))
+    this.blockedEscalation.arm(taskId)
+  }
+
+  private async notifyBlockedReminder(taskId: string): Promise<void> {
+    const task = this.tasks.get(taskId)
+    if (!task || !isTaskBlocked(task)) return
+    this.markForNotification(task)
+    await this.enqueueNotificationForParent(task.parentSessionId, () =>
+      this.notifyParentSession(task, (notification) =>
+        buildBlockedReminderNotification(
+          notification,
+          this.config?.blockedRewakeMs ?? DEFAULT_BLOCKED_REWAKE_MS,
+        ),
+      ),
+    )
+  }
+
+  private expireBlockedTask(taskId: string): void {
+    const task = this.tasks.get(taskId)
+    if (!task || !isTaskBlocked(task)) return
+    task.blockedAt = undefined
+    task.blockedReason = undefined
+    task.status = "cancelled"
+    task.completedAt = new Date()
+    task.error = "Blocked task expired unanswered"
+    this.blockedNotificationTaskIds.delete(taskId)
+    this.scheduleTaskRemoval(taskId)
+  }
+
+  async failBlockedTask(taskId: string, error: string): Promise<boolean> {
+    const task = this.tasks.get(taskId)
+    if (!task || task.status !== "running" || this.completingTaskIds.has(task.id)) return false
+    task.status = "error"
+    task.error = error
+    task.completedAt = new Date()
+    this.markForNotification(task)
+    await this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task))
+    this.scheduleTaskRemoval(task.id)
+    return true
   }
 
   async cancelTask(
@@ -2758,7 +2827,10 @@ The task was re-queued on a fallback model after a retryable failure.
     }
   }
 
-  private async notifyParentSession(task: BackgroundTask): Promise<void> {
+  private async notifyParentSession(
+    task: BackgroundTask,
+    transformNotification: (notification: string) => string = (notification) => notification,
+  ): Promise<void> {
     const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
 
     log("[background-agent] notifyParentSession called for task:", task.id)
@@ -2820,14 +2892,14 @@ The task was re-queued on a fallback model after a retryable failure.
           : task.status === "error"
             ? "ERROR"
             : "CANCELLED"
-    const notification = buildBackgroundTaskNotificationText({
+    const notification = transformNotification(buildBackgroundTaskNotificationText({
       task,
       duration,
       statusText,
       allComplete,
       remainingCount,
       completedTasks,
-    })
+    }))
 
       if (this.enableParentSessionNotifications) {
         const parentPromptContext = await this.resolveParentWakePromptContext(task)
@@ -3090,6 +3162,12 @@ The task was re-queued on a fallback model after a retryable failure.
       concurrencyManager: this.concurrencyManager,
       notifyParentSession: (task) => this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)),
       sessionStatuses: allStatuses,
+      claimTaskInterruption: (taskId) => {
+        if (this.completingTaskIds.has(taskId)) return false
+        this.completingTaskIds.add(taskId)
+        return true
+      },
+      releaseTaskInterruption: (taskId) => this.completingTaskIds.delete(taskId),
     })
   }
 
@@ -3340,6 +3418,7 @@ The task was re-queued on a fallback model after a retryable failure.
     }
     this.idleDeferralTimers.clear()
 
+    this.blockedEscalation.shutdown()
     this.parentWakeNotifier.shutdown()
 
     for (const sessionID of trackedSessionIDs) {
