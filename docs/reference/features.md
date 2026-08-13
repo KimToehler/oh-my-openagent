@@ -861,12 +861,12 @@ record_lesson({
 **Behavior**:
 
 - Lessons are stored as markdown files in `~/.omo/rules/lessons/` (user storage, default) or `.omo/rules/lessons/` (project storage). `OMO_LESSONS_DIR` overrides both.
-- Each lesson is one file named `<YYYYMMDD>-<slug>-<6hex>.md`. The slug is derived from the title and capped at 40 characters.
+- Each lesson is one file named `<slug>-<16hexhash>.md`. The slug is derived from the title and capped at 40 characters, and the hash is the semantic content hash. Because the filename is derived from that hash, two concurrent identical calls target the same path: one wins the exclusive create and the other returns a duplicate no-op. The recording date lives in the body's `Recorded:` line rather than the filename. A `-<6hex>` suffix is appended only on the rare retry path where an existing file carries a different hash.
 - The tool refuses universal globs (`*`, `**`, `**/*`, `**/*.*`). Lessons use user-global storage by default and the rules matcher has no repo identity, so an unscoped lesson would fire in every project the user opens. Provide narrow globs instead.
 - Citations (1 to 5) are verified before any write. Accepted forms are repo-relative paths with an optional `:line` or `:start-end` range, `.omo/evidence/<dir>`, a full or abbreviated git commit sha, and `<path>::<test name>`. An unverifiable citation aborts the call and writes nothing.
 - Globs must be 1 to 8 entries. At least one glob is required.
 - The store is append-only: `record_lesson` never rewrites or deletes an existing lesson. At either cap the write is rejected and the agent is told to consolidate or delete existing lessons.
-- Duplicate detection is by content hash over the title, `what_went_wrong`, `rule_for_next_time`, and sorted globs. Recording the same lesson twice returns the existing lesson id without writing a second file.
+- Duplicate detection is by content hash over the title, `what_went_wrong`, `rule_for_next_time`, and sorted globs. Recording the same lesson twice returns the existing lesson id without writing a second file. Two trade-offs follow from having no write lock: a lesson restated in different words is a different hash and writes a second file, and concurrent writers can transiently exceed `max_files` by the number of calls in flight, which the next call rejects.
 - Every lesson records the model it was learned against, the origin repo name, and the current commit sha.
 
 **Caveat**: a new lesson is visible in future sessions, not the session that wrote it. Session rule caches clear only on session end.
