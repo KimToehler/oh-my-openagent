@@ -7836,9 +7836,6 @@
             "project"
           ]
         },
-        "directory": {
-          "type": "string"
-        },
         "max_files": {
           "default": 200,
           "type": "number",
