@@ -58,8 +58,15 @@ export function computeLessonHash(body: string): string {
  * never over the rendered body, because the body embeds the hash line itself.
  */
 export function computeSemanticLessonHash(input: RenderLessonInput): string {
-  const globs = [...input.globs].sort()
-  return createContentHash([input.title, input.whatWentWrong, input.ruleForNextTime, ...globs].join("\n\u0000\n"))
+  const globs = [...new Set(input.globs.map((glob) => glob.trim()))].sort()
+  return createContentHash(
+    [
+      collapseToSingleLine(input.title),
+      input.whatWentWrong.trim(),
+      input.ruleForNextTime.trim(),
+      ...globs,
+    ].join("\n\u0000\n"),
+  )
 }
 
 function renderFrontmatter(input: RenderLessonInput): string {
@@ -82,15 +89,24 @@ function renderBody(input: RenderLessonInput): string {
     `Lesson hash: ${input.lessonHash}`,
     "",
     "## What went wrong",
-    input.whatWentWrong,
+    sanitizeLessonSection(input.whatWentWrong),
     "",
     "## Rule for next time",
-    input.ruleForNextTime,
+    sanitizeLessonSection(input.ruleForNextTime),
     "",
     "## Evidence",
     evidence,
     "",
   ].join("\n")
+}
+
+
+/** Zero-width separators keep quoted control syntax readable without leaving active markers. */
+function sanitizeLessonSection(value: string): string {
+  return value
+    .trim()
+    .replace(/^(\s*)\[(Rule|Match):/gm, "$1[\u200B$2:")
+    .replace(/<(\/?)(system-reminder|rules)(?=[\s>])/gi, "<\u200B$1$2")
 }
 
 function collapseToSingleLine(value: string): string {
