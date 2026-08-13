@@ -2557,23 +2557,40 @@ The task was re-queued on a fallback model after a retryable failure.
     task.completedAt = new Date()
     task.error = "Blocked task expired unanswered"
     this.blockedNotificationTaskIds.delete(taskId)
-    // Every other terminal transition logs; expiry did not, which made a
-    // never-answered park indistinguishable from a timer that never fired.
+    // Expiry notifies nobody by design (see the plan's todo 10), so without this it
+    // leaves no trace at all - a never-answered park is indistinguishable from a
+    // timer that never fired, both in production and to the QA probe.
     log("[background-agent] Blocked task expired unanswered:", {
       taskId,
       sessionID: task.sessionId,
       parentSessionID: task.parentSessionId,
     })
-    // A park whose session abort failed leaves the child RUNNING while its task
-    // record goes terminal here. Without this retry the child keeps executing with
-    // no owner: nothing polls it, nothing can cancel it, and its work is invisible.
-    if (wasRunning && task.sessionId) {
-      const sessionId = task.sessionId
-      void this.abortSessionWithLogging(sessionId, "blocked task expiry").then(aborted => {
-        if (!aborted) return
-        clearDelegatedChildSessionBootstrap(sessionId)
-        SessionCategoryRegistry.remove(sessionId)
-      })
+    // wasRunning here means the park's abort FAILED: cancelTask bailed at
+    // `if (!aborted) return false`, which sits before every release it would
+    // otherwise have done. So this branch owes the whole terminal tail, not just a
+    // retried abort - the child is still running AND still holding its slot, its
+    // descendant registration and its parent's pending entry. The accounting is owed
+    // whether or not the retry succeeds, because the record goes terminal regardless.
+    if (wasRunning) {
+      if (task.rootSessionId) this.unregisterRootDescendant(task.rootSessionId)
+      if (task.concurrencyKey) {
+        this.concurrencyManager.release(task.concurrencyKey)
+        task.concurrencyKey = undefined
+      }
+      this.taskHistory.record(task.parentSessionId, { id: task.id, sessionID: task.sessionId, agent: task.agent, description: task.description, status: "cancelled", category: task.category, startedAt: task.startedAt, completedAt: task.completedAt })
+      this.cleanupPendingByParent(task)
+      removeTaskToastTracking(task.id)
+      this.updateBackgroundTaskMarker(task.parentSessionId)
+      if (task.sessionId) {
+        const sessionId = task.sessionId
+        void this.abortSessionWithLogging(sessionId, "blocked task expiry").then(aborted => {
+          if (!aborted) return
+          clearDelegatedChildSessionBootstrap(sessionId)
+          SessionCategoryRegistry.remove(sessionId)
+        }).catch(error => {
+          log("[background-agent] blocked-expiry session cleanup failed:", { sessionId, error })
+        })
+      }
     }
     this.scheduleTaskRemoval(taskId)
   }

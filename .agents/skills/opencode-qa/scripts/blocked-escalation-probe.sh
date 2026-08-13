@@ -21,11 +21,18 @@
 #      "(reminder 1 of 1, waiting Nm)"
 #   3. exactly ONE reminder arrives, never two
 #   4. ~120s in, the task goes terminal with "expired unanswered"
-#   5. the child session is ABORTED at expiry rather than left running
-#      (the F5 finding-7 regression: a park whose abort failed used to orphan it)
 #
-# ISOLATION: everything runs under oqa_mk_isolated_xdg. The real
-# ~/.local/share/opencode DB is counted before and after and must be UNCHANGED.
+# What it does NOT assert: that the child session was aborted at expiry (the F5
+# finding-7 path). That branch only runs when the park's own abort FAILED, which this
+# probe has no way to induce against a healthy server - the park always succeeds
+# here, so the task is already terminal by expiry and the retry never fires. That
+# path is covered by unit tests instead
+# (blocked-escalation.test.ts, "a park whose abort failed"). Do not add the claim
+# back without an assertion behind it.
+#
+# ISOLATION: everything runs under oqa_mk_isolated_xdg. Isolation is asserted by
+# session IDENTITY, not by a count - the operator may be using opencode concurrently,
+# which moves the count without any leakage.
 #
 # Usage:
 #   bash blocked-escalation-probe.sh [--evidence-dir DIR]
@@ -194,6 +201,11 @@ JSON
 MOCK_PORT="$MOCK_PORT_N" MOCK_SCRIPT_FILE="$SCRIPT_FILE" MOCK_LOG="$MOCK_LOG_FILE" \
   node "$SCRIPT_DIR/lib/mock-model.mjs" >"$SANDBOX/mock.out" 2>&1 &
 MOCK_PID=$!
+# Register with oqa_cleanup's EXIT trap. The explicit kills further down only cover
+# the two success paths; every `exit 1` between here and them (both config guards,
+# the server-start failure, the plugin-loaded assertion) would otherwise orphan a
+# listening node process. OQA_CURL_PIDS is the generic PID list the trap reaps.
+OQA_CURL_PIDS+=("$MOCK_PID")
 for _ in $(seq 1 50); do grep -q MOCK_LISTENING "$SANDBOX/mock.out" 2>/dev/null && break; sleep 0.1; done
 grep -q MOCK_LISTENING "$SANDBOX/mock.out" || { oqa_log "mock model never listened"; kill "$MOCK_PID" 2>/dev/null; exit 1; }
 
@@ -283,7 +295,7 @@ assert_plugin_used_sandbox() {
   deadline=$(( $(date +%s) + 30 ))
   while [ "$(date +%s)" -lt "$deadline" ]; do
     if [ -f "$PLUGIN_LOG" ]; then
-      entry="$(tail -n "+$((PLUGIN_LOG_LINES_BEFORE + 1))" "$PLUGIN_LOG" | grep -a "ENTRY - plugin loading" | tail -1)"
+      entry="$(grep -a "ENTRY - plugin loading" <(tail -n "+$((PLUGIN_LOG_LINES_BEFORE + 1))" "$PLUGIN_LOG") | tail -1)"
       [ -n "$entry" ] && break
     fi
     sleep 1
@@ -344,8 +356,15 @@ while [ "$(date +%s)" -lt "$DEADLINE" ]; do
   # expireBlockedTask notifies nobody: it mutates the task and schedules removal
   # without markForNotification/enqueueNotificationForParent, so no wake and no
   # session event ever reaches the parent. Watching SSE for it waits forever.
+  # NOTE the process substitution: `tail ... | grep -q` is a FALSE-NEGATIVE trap under
+  # `set -o pipefail`. grep -q exits on the first match, tail then dies of SIGPIPE
+  # (141), and pipefail promotes that to the pipeline status - so a marker that IS
+  # present reads as absent whenever enough lines follow it. The target log is a
+  # shared multi-megabyte file appended to by every concurrent opencode process, so
+  # that race is routine: it reported "task never expired" on a run whose expiry had
+  # fired on time. Redirecting keeps grep's own exit status authoritative.
   if [ -z "$EXPIRY_AT" ] && [ -f "$PLUGIN_LOG" ] \
-     && tail -n "+$((PLUGIN_LOG_LINES_BEFORE + 1))" "$PLUGIN_LOG" | grep -aq 'Blocked task expired unanswered'; then
+     && grep -aq 'Blocked task expired unanswered' <(tail -n "+$((PLUGIN_LOG_LINES_BEFORE + 1))" "$PLUGIN_LOG"); then
     EXPIRY_AT=$(( $(date +%s) - START )); oqa_log "observed: expiry at +${EXPIRY_AT}s"
     break
   fi
@@ -353,7 +372,10 @@ while [ "$(date +%s)" -lt "$DEADLINE" ]; do
 done
 
 SANDBOX_DB="$XDG_DATA_HOME/opencode/opencode.db"
-REMINDER_COUNT="$(grep -c 'reminder 1 of 1' "$SSE_FILE" 2>/dev/null || printf '0')"
+# `grep -c` prints 0 AND exits 1 on no-match, so a `|| printf 0` fallback appends a
+# SECOND zero and reports "saw 00".
+REMINDER_COUNT="$(grep -ac 'reminder 1 of 1' "$SSE_FILE" 2>/dev/null)"
+REMINDER_COUNT="${REMINDER_COUNT:-0}"
 CHILD_SESSION="$(grep -o 'ses_[A-Za-z0-9]*' "$SSE_FILE" 2>/dev/null | sort -u | grep -v "$PARENT_SESSION" | head -1)"
 
 REAL_DB_AFTER="$(sqlite3 "$REAL_DB" 'SELECT count(*) FROM session' 2>/dev/null)"
@@ -366,6 +388,11 @@ fails=0
 [ "$REMINDER_COUNT" = "1" ] || { oqa_log "FAIL: expected exactly 1 reminder, saw $REMINDER_COUNT"; fails=$((fails+1)); }
 if [ -n "$REMINDER_AT" ] && [ "$REMINDER_AT" -lt 45 ]; then
   oqa_log "FAIL: reminder fired at +${REMINDER_AT}s, far below the ${REWAKE_MS}ms deadline"; fails=$((fails+1))
+fi
+# Lower bound, symmetrical with the reminder floor. Without it an expiry regression
+# firing at +65s against a 120000ms knob still passes on ordering alone.
+if [ -n "$EXPIRY_AT" ] && [ "$EXPIRY_AT" -lt 100 ]; then
+  oqa_log "FAIL: expiry fired at +${EXPIRY_AT}s, far below the ${EXPIRY_MS}ms deadline"; fails=$((fails+1))
 fi
 if [ -n "$EXPIRY_AT" ] && [ -n "$REMINDER_AT" ] && [ "$EXPIRY_AT" -le "$REMINDER_AT" ]; then
   oqa_log "FAIL: expiry (+${EXPIRY_AT}s) did not follow the reminder (+${REMINDER_AT}s)"; fails=$((fails+1))
