@@ -79,8 +79,9 @@ const toolFactories: NonNullable<Parameters<typeof createToolRegistry>[0]["toolF
   createTeamListTool: mock(() => fakeTool),
 }
 
-type PluginConfigOverrides = Omit<Partial<OhMyOpenCodeConfig>, "team_mode"> & {
+type PluginConfigOverrides = Omit<Partial<OhMyOpenCodeConfig>, "team_mode" | "lessons"> & {
   team_mode?: Partial<NonNullable<OhMyOpenCodeConfig["team_mode"]>>
+  lessons?: Partial<NonNullable<OhMyOpenCodeConfig["lessons"]>>
 }
 
 function createPluginConfig(overrides: PluginConfigOverrides = {}): OhMyOpenCodeConfig {
@@ -312,6 +313,95 @@ describe("#given team_mode configuration", () => {
     const registeredTeamToolNames = Object.keys(result.filteredTools).filter((toolName) => toolName.startsWith("team_"))
 
     expect(registeredTeamToolNames).toHaveLength(0)
+  })
+})
+
+describe("#given lessons configuration", () => {
+  function buildRegistry(pluginConfig: OhMyOpenCodeConfig): ReturnType<typeof createToolRegistry> {
+    syncSessionCreatedCallbacks.length = 0
+
+    return createToolRegistry({
+      ctx: { directory: "/tmp" } as Parameters<typeof createToolRegistry>[0]["ctx"],
+      pluginConfig,
+      managers: {
+        backgroundManager: {},
+        tmuxSessionManager: {},
+        skillMcpManager: {},
+      } as Parameters<typeof createToolRegistry>[0]["managers"],
+      skillContext: {
+        mergedSkills: [],
+        availableSkills: [],
+        browserProvider: "playwright",
+        disabledSkills: new Set(),
+      },
+      availableCategories: [],
+      toolFactories,
+    })
+  }
+
+  test("#when lessons is omitted #then record_lesson is not registered", () => {
+    // given
+    const pluginConfig = createPluginConfig()
+
+    // when
+    const result = buildRegistry(pluginConfig)
+
+    // then
+    expect(pluginConfig.lessons).toBeUndefined()
+    expect(result.filteredTools).not.toHaveProperty("record_lesson")
+  })
+
+  test("#when lessons is disabled #then record_lesson is not registered", () => {
+    // given
+    const pluginConfig = createPluginConfig({ lessons: { enabled: false } })
+
+    // when
+    const result = buildRegistry(pluginConfig)
+
+    // then
+    expect(pluginConfig.lessons?.enabled).toBe(false)
+    expect(result.filteredTools).not.toHaveProperty("record_lesson")
+  })
+
+  test("#when lessons is enabled #then record_lesson is registered", () => {
+    // given
+    const pluginConfig = createPluginConfig({ lessons: { enabled: true } })
+
+    // when
+    const result = buildRegistry(pluginConfig)
+
+    // then
+    expect(pluginConfig.lessons?.enabled).toBe(true)
+    expect(result.filteredTools).toHaveProperty("record_lesson")
+  })
+
+  test("#when lessons is enabled #then exactly one tool is added over the disabled registry", () => {
+    // given
+    const disabledTools = buildRegistry(createPluginConfig({ lessons: { enabled: false } })).filteredTools
+
+    // when
+    const enabledTools = buildRegistry(createPluginConfig({ lessons: { enabled: true } })).filteredTools
+
+    // then
+    const added = Object.keys(enabledTools).filter((toolName) => !(toolName in disabledTools))
+    expect(added).toEqual(["record_lesson"])
+  })
+
+  test("#when lessons is enabled alongside team_mode #then the 12 team tools stay intact", () => {
+    // given
+    const teamOnly = buildRegistry(createPluginConfig({ team_mode: { enabled: true } })).filteredTools
+
+    // when
+    const teamWithLessons = buildRegistry(
+      createPluginConfig({ team_mode: { enabled: true }, lessons: { enabled: true } }),
+    ).filteredTools
+
+    // then
+    const countTeamTools = (tools: ToolsRecord): number =>
+      Object.keys(tools).filter((toolName) => toolName.startsWith("team_")).length
+    expect(countTeamTools(teamOnly)).toBe(12)
+    expect(countTeamTools(teamWithLessons)).toBe(12)
+    expect(teamWithLessons).toHaveProperty("record_lesson")
   })
 })
 
