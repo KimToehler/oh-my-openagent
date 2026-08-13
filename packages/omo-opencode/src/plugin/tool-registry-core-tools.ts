@@ -11,6 +11,8 @@ import { createGoalController, type GoalController } from "../hooks/goal/control
 import { createGoalTools } from "../hooks/goal/tools"
 import * as openclawRuntimeDispatch from "../openclaw/runtime-dispatch"
 import { log } from "../shared"
+import { getSessionModel } from "../shared/session-model-state"
+import { createRecordLessonTool } from "../tools/record-lesson"
 import { getSisyphusJuniorModelOverride } from "./tool-registry-team-tools"
 import { createNativeSkills, getPluginInputNativeSkills } from "./native-skills"
 import { createSkillContext } from "./skill-context"
@@ -146,6 +148,20 @@ export function createCoreTools(args: {
       controller: goalController,
       getSessionID: getMainSessionID,
     }))
+  }
+
+  if (pluginConfig.lessons?.enabled) {
+    tools.record_lesson = createRecordLessonTool({
+      projectDir: ctx.directory,
+      config: pluginConfig.lessons,
+      getModelId: () => {
+        const sessionID = getMainSessionID()
+        const sessionModel = sessionID === undefined ? undefined : getSessionModel(sessionID)
+        // Recorded lessons are matched against the model that learned them, so an
+        // unresolved session model must stay visibly unknown instead of guessing.
+        return sessionModel === undefined ? "unknown" : `${sessionModel.providerID}/${sessionModel.modelID}`
+      },
+    })
   }
 
   return tools
