@@ -1,14 +1,17 @@
 import { randomBytes } from "node:crypto"
 import {
   existsSync as nodeExistsSync,
+  linkSync as nodeLinkSync,
   lstatSync as nodeLstatSync,
   mkdirSync as nodeMkdirSync,
   readFileSync as nodeReadFileSync,
   readdirSync as nodeReaddirSync,
   realpathSync as nodeRealpathSync,
+  unlinkSync as nodeUnlinkSync,
   writeFileSync as nodeWriteFileSync,
 } from "node:fs"
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path"
+import { normalizeSemanticLessonTitle } from "./render"
 
 export type StoreDeps = {
   readonly now?: () => Date
@@ -18,8 +21,10 @@ export type StoreDeps = {
   readonly readFileSync?: (path: string) => string
   readonly writeFileSync?: (path: string, content: string, options: { readonly flag: "wx" }) => void
   readonly mkdirSync?: (path: string, options?: { readonly recursive: true }) => unknown
+  readonly linkSync?: (existingPath: string, newPath: string) => void
   readonly lstatSync?: (path: string) => { readonly isSymbolicLink: () => boolean }
   readonly realpathSync?: (path: string) => string
+  readonly unlinkSync?: (path: string) => void
 }
 
 export type WriteResult =
@@ -50,7 +55,7 @@ function normalizeSlug(source: string): string {
 
 /** Semantic hash determines normal-path identity. Clock and randomness cannot change it. */
 export function generateLessonId(slugSource: string, semanticHash: string, _deps: StoreDeps = {}): string {
-  return `${normalizeSlug(slugSource)}-${semanticHash}`
+  return `${normalizeSlug(normalizeSemanticLessonTitle(slugSource))}-${semanticHash}`
 }
 
 function errorMessage(error: unknown): string {
@@ -65,6 +70,27 @@ function contentWithLessonId(content: string, lessonId: string): string {
   return content.replace(/^Lesson id: .*$/m, `Lesson id: ${lessonId}`)
 }
 
+function publishAtomically(
+  tempPath: string,
+  targetPath: string,
+  content: string,
+  writeFileSync: NonNullable<StoreDeps["writeFileSync"]>,
+  linkSync: NonNullable<StoreDeps["linkSync"]>,
+  unlinkSync: NonNullable<StoreDeps["unlinkSync"]>,
+): void {
+  try {
+    writeFileSync(tempPath, content, { flag: "wx" })
+  } catch (error) {
+    if (!isFileSystemError(error, "EEXIST")) unlinkSync(tempPath)
+    throw error
+  }
+  try {
+    linkSync(tempPath, targetPath)
+  } finally {
+    unlinkSync(tempPath)
+  }
+}
+
 export function writeLessonExclusive(args: WriteLessonExclusiveArgs): WriteResult {
   const deps = args.deps ?? {}
   const mkdirSync = deps.mkdirSync ?? nodeMkdirSync
@@ -72,7 +98,11 @@ export function writeLessonExclusive(args: WriteLessonExclusiveArgs): WriteResul
   const readFileSync = deps.readFileSync ?? ((path: string) => nodeReadFileSync(path, "utf8"))
   const realpathSync = deps.realpathSync ?? ((path: string) => nodeRealpathSync(path))
   const randomHex = deps.randomHex ?? defaultRandomHex
+  const unlinkSync = deps.unlinkSync ?? nodeUnlinkSync
   const writeFileSync = deps.writeFileSync ?? nodeWriteFileSync
+  const linkSync = deps.linkSync ?? (deps.writeFileSync === undefined
+    ? nodeLinkSync
+    : (existingPath: string, newPath: string) => writeFileSync(newPath, readFileSync(existingPath), { flag: "wx" }))
 
   try {
     mkdirSync(args.lessonsDir, { recursive: true })
@@ -97,12 +127,17 @@ export function writeLessonExclusive(args: WriteLessonExclusiveArgs): WriteResul
         return { ok: false, error: `Error: lesson target escapes lessons directory: ${path}` }
       }
 
-      writeFileSync(path, contentWithLessonId(args.content, lessonId), { flag: "wx" })
+      const tempPath = resolve(resolvedParent, `.${lessonId}.${randomHex()}.tmp`)
+      publishAtomically(tempPath, path, contentWithLessonId(args.content, lessonId), writeFileSync, linkSync, unlinkSync)
       return { ok: true, duplicate: false, lessonId, path }
     } catch (error) {
       if (!isFileSystemError(error, "EEXIST")) return { ok: false, error: errorMessage(error) }
       try {
-        if (LESSON_HASH_LINE.exec(readFileSync(path))?.[1] === args.semanticHash) {
+        const existingHash = LESSON_HASH_LINE.exec(readFileSync(path))?.[1]
+        if (existingHash === undefined) {
+          return { ok: false, error: `Error: existing lesson has no parsable Lesson hash: line: ${path}` }
+        }
+        if (existingHash === args.semanticHash) {
           return { ok: true, duplicate: true, lessonId, path }
         }
       } catch (readError) {

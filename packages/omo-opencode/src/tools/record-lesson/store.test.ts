@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test"
-import { mkdtempSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
+import { mkdtempSync, readFileSync, readdirSync, realpathSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
+import { computeSemanticLessonHash, type RenderLessonInput } from "./render"
 
 const STORE_SOURCE = readFileSync(new URL("./store.ts", import.meta.url), "utf8")
 
@@ -76,6 +77,16 @@ function createMemoryFs(initial: Record<string, string> = {}): {
       if (content === undefined) throw new Error(`missing file: ${path}`)
       return content
     },
+    linkSync: (existingPath, newPath) => {
+      if (files.has(newPath)) {
+        const error = new Error("file exists") as NodeJS.ErrnoException
+        error.code = "EEXIST"
+        throw error
+      }
+      const content = files.get(existingPath)
+      if (content === undefined) throw new Error(`missing file: ${existingPath}`)
+      files.set(newPath, content)
+    },
     lstatSync: () => ({ isSymbolicLink: () => false }),
     realpathSync: (path) => path,
     unlinkSync: (path) => { files.delete(path) },
@@ -141,6 +152,33 @@ describe("generateLessonId", () => {
     // then
     expect(lessonId).toBe("lesson-0123456789abcdef")
   })
+
+  test("#given titles with equal semantic hashes #when ids are generated #then the ids are equal", () => {
+    // given
+    const baseInput: RenderLessonInput = {
+      description: "description",
+      globs: ["src/**"],
+      title: "FooBar",
+      repoName: "repo",
+      commitSha: "abcdef123",
+      model: "model",
+      recordedDate: "2026-08-14",
+      lessonId: "placeholder",
+      lessonHash: "placeholder",
+      whatWentWrong: "wrong",
+      ruleForNextTime: "rule",
+      citations: ["src/file.ts:1"],
+    }
+    const titles = ["FooBar", "Foo\u200BBar"]
+    const hashes = titles.map((title) => computeSemanticLessonHash({ ...baseInput, title }))
+
+    // when
+    const ids = titles.map((title, index) => generateLessonId(title, hashes[index] ?? ""))
+
+    // then
+    expect(new Set(hashes).size).toBe(1)
+    expect(new Set(ids).size).toBe(1)
+  })
 })
 
 describe("listLessons", () => {
@@ -164,6 +202,55 @@ describe("listLessons", () => {
 
     // then
     expect(lessons).toEqual([])
+  })
+})
+
+describe("atomic lesson publication", () => {
+  const content = "Lesson id: placeholder\nLesson hash: 0123456789abcdef\n"
+
+  test("#given an empty target file #when the same lesson is written #then it errors without creating another lesson", () => {
+    // given
+    const lessonsDir = createTempDir()
+    const target = join(lessonsDir, "lesson-a-0123456789abcdef.md")
+    writeFileSync(target, "")
+
+    // when
+    const result = writeLessonExclusive({
+      lessonsDir,
+      content,
+      slugSource: "Lesson A",
+      semanticHash: "0123456789abcdef",
+      deps: { randomHex: sequence(["f55e57", "8d2c7c", "6f8a55", "282b1b"]) },
+    })
+
+    // then
+    expect(result).toEqual({ ok: false, error: `Error: existing lesson has no parsable Lesson hash: line: ${realpathSync(target)}` })
+    expect(readdirSync(lessonsDir)).toEqual(["lesson-a-0123456789abcdef.md"])
+  })
+
+  test("#given a successful publication #when the write completes #then no temporary file survives", () => {
+    // given
+    const lessonsDir = createTempDir()
+
+    // when
+    const result = writeLessonExclusive({ lessonsDir, content, slugSource: "Lesson A", semanticHash: "0123456789abcdef" })
+
+    // then
+    expect(result.ok).toBe(true)
+    expect(readdirSync(lessonsDir)).toEqual(["lesson-a-0123456789abcdef.md"])
+  })
+
+  test("#given a hash-line-less target #when publication fails #then no temporary file survives", () => {
+    // given
+    const lessonsDir = createTempDir()
+    writeFileSync(join(lessonsDir, "lesson-a-0123456789abcdef.md"), "truncated")
+
+    // when
+    const result = writeLessonExclusive({ lessonsDir, content, slugSource: "Lesson A", semanticHash: "0123456789abcdef" })
+
+    // then
+    expect(result.ok).toBe(false)
+    expect(readdirSync(lessonsDir)).toEqual(["lesson-a-0123456789abcdef.md"])
   })
 })
 

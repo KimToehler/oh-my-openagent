@@ -58,11 +58,15 @@ export function computeLessonHash(body: string): string {
  * Dedup key over semantic content only (title, both lesson sections, sorted globs),
  * never over the rendered body, because the body embeds the hash line itself.
  */
+export function normalizeSemanticLessonTitle(title: string): string {
+  return collapseToSingleLine(canonicalizeLessonText(title))
+}
+
 export function computeSemanticLessonHash(input: RenderLessonInput): string {
   const globs = [...new Set(input.globs.map((glob) => glob.trim()))].sort()
   return createContentHash(
     [
-      collapseToSingleLine(canonicalizeLessonText(input.title)),
+      normalizeSemanticLessonTitle(input.title),
       canonicalizeLessonText(input.whatWentWrong).trim(),
       canonicalizeLessonText(input.ruleForNextTime).trim(),
       ...globs,
