@@ -24,7 +24,8 @@ const FRONTMATTER_DELIMITER = "---"
  * needs lives in the body, because only the body is injected into context.
  */
 export function renderLesson(input: RenderLessonInput): string {
-  return `${renderFrontmatter(input)}\n${renderBody(input)}`
+  const normalized = normalizeRenderInput(input)
+  return `${renderFrontmatter(normalized)}\n${renderBody(normalized)}`
 }
 
 /**
@@ -61,9 +62,9 @@ export function computeSemanticLessonHash(input: RenderLessonInput): string {
   const globs = [...new Set(input.globs.map((glob) => glob.trim()))].sort()
   return createContentHash(
     [
-      collapseToSingleLine(input.title),
-      input.whatWentWrong.trim(),
-      input.ruleForNextTime.trim(),
+      collapseToSingleLine(canonicalizeLessonText(input.title)),
+      canonicalizeLessonText(input.whatWentWrong).trim(),
+      canonicalizeLessonText(input.ruleForNextTime).trim(),
       ...globs,
     ].join("\n\u0000\n"),
   )
@@ -89,10 +90,10 @@ function renderBody(input: RenderLessonInput): string {
     `Lesson hash: ${input.lessonHash}`,
     "",
     "## What went wrong",
-    sanitizeLessonSection(input.whatWentWrong),
+    sanitizeLessonText(input.whatWentWrong),
     "",
     "## Rule for next time",
-    sanitizeLessonSection(input.ruleForNextTime),
+    sanitizeLessonText(input.ruleForNextTime),
     "",
     "## Evidence",
     evidence,
@@ -101,12 +102,31 @@ function renderBody(input: RenderLessonInput): string {
 }
 
 
-/** Zero-width separators keep quoted control syntax readable without leaving active markers. */
-function sanitizeLessonSection(value: string): string {
-  return value
+/**
+ * Normalizes every model-controlled string at the render boundary. Zero-width
+ * separators preserve readable quoted syntax while making control markers inert.
+ */
+function normalizeRenderInput(input: RenderLessonInput): RenderLessonInput {
+  return {
+    ...input,
+    description: sanitizeLessonText(input.description),
+    title: sanitizeLessonText(input.title),
+    whatWentWrong: sanitizeLessonText(input.whatWentWrong),
+    ruleForNextTime: sanitizeLessonText(input.ruleForNextTime),
+    citations: input.citations.map(sanitizeLessonText),
+  }
+}
+
+function sanitizeLessonText(value: string): string {
+  return canonicalizeLessonText(value)
     .trim()
     .replace(/^(\s*)\[(Rule|Match):/gm, "$1[\u200B$2:")
     .replace(/<(\/?)(system-reminder|rules)(?=[\s>])/gi, "<\u200B$1$2")
+}
+
+/** Hashing removes only separators inserted by sanitizeLessonText. */
+function canonicalizeLessonText(value: string): string {
+  return value.replaceAll("\u200B", "")
 }
 
 function collapseToSingleLine(value: string): string {
