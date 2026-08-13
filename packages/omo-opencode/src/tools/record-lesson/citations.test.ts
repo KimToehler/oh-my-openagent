@@ -183,6 +183,17 @@ describe("verifyCitations", () => {
     expect(result).toEqual({ ok: false, failed: "packages/does-not-exist.ts:12", reason: "path does not exist" })
   })
 
+  test("#given the production call shape without injected deps #when a missing line is verified #then it is rejected", () => {
+    // given
+    const citation = "package.json:999999"
+
+    // when
+    const result = verifyCitations([citation], process.cwd())
+
+    // then
+    expect(result).toEqual({ ok: false, failed: citation, reason: "invalid or missing line" })
+  })
+
   test("#given a path citation with an existing line #when verified #then file line count is checked", () => {
     // given
     const checked: string[] = []
@@ -219,6 +230,23 @@ describe("verifyCitations", () => {
       expect(result).toEqual({ ok: false, failed: citation, reason: "invalid or missing line" })
     },
   )
+
+  test("#given a path line reader throws #when verified #then line verification fails closed", () => {
+    // given
+    const citation = "src/x.ts:1"
+
+    // when
+    const result = verifyCitations([citation], REPO_ROOT, {
+      existsSync: () => true,
+      readFileSync: () => {
+        throw new Error("read failed")
+      },
+      runGit: createRunGitSpy(0).runGit,
+    })
+
+    // then
+    expect(result).toEqual({ ok: false, failed: citation, reason: "invalid or missing line" })
+  })
 
   test("#given exponential line syntax #when verified #then it is unrecognized rather than accepted as a path", () => {
     // given

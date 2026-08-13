@@ -53,7 +53,13 @@ function createTool(memory: ReturnType<typeof createMemoryFs>, overrides = {}) {
     getCommitSha: () => "65dcd0bef",
     now: () => FIXED_DATE,
     storeDeps: memory.deps,
-    citationDeps: { existsSync: (path) => path.includes("tool-registry-core-tools.ts") },
+    citationDeps: {
+      existsSync: (path) => path.includes("tool-registry-core-tools.ts"),
+      readFileSync: (path) => {
+        if (!path.includes("tool-registry-core-tools.ts")) throw new Error(`missing file: ${path}`)
+        return Array.from({ length: Number(VALID_ARGS.citations[0].split(":").at(-1)) }, (_, index) => `line ${index + 1}`).join("\n")
+      },
+    },
     ...overrides,
   })
 }
