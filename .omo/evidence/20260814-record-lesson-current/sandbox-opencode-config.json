@@ -1,0 +1,11 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": [
+    "file:///Users/tim/git/oh-my-openagent/.worktrees/record-lesson-pr1/dist/index.js"
+  ],
+  "provider_keys_only": [
+    "anthropic",
+    "onara",
+    "openai"
+  ]
+}

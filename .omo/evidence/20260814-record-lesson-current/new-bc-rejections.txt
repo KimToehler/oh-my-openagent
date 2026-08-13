@@ -1,0 +1,26 @@
+== NEW CHECK B: repo-root-anchored glob rejected with suggested rewrite ==
+-- tool_use count --
+1
+-- ALL record_lesson inputs --
+{"title":"repo root anchored glob probe","what_went_wrong":"A glob was written relative to the repository root even though the package it targets carries its own project marker.","rule_for_next_time":"Anchor every glob at the nearest project marker above the files it targets.","globs":["packages/omo-opencode/src/**/*.ts"],"citations":["package.json:1"],"description":"repo root anchored glob probe"}
+-- ALL record_lesson outputs --
+Error: glob is anchored above its nearest project marker: packages/omo-opencode/src/**/*.ts. Use src/**/*.ts instead.
+
+== NEW CHECK C: out-of-range citation line rejected ==
+-- tool_use count --
+1
+-- ALL record_lesson inputs --
+{"title":"out of range citation probe","what_went_wrong":"A citation pointed at a line number far beyond the end of the cited file.","rule_for_next_time":"Verify that a cited line number exists in the cited file before recording it.","globs":["src/tools/**/*.ts"],"citations":["package.json:999999"],"description":"out of range citation probe"}
+-- ALL record_lesson outputs --
+Error: unverifiable citation: package.json:999999 (invalid or missing line)
+
+== lessons dir count before B/C ==
+1
+== lessons dir after B and C ==
+.
+..
+new-tool-families-must-be-config-gated-3ae9436b1413a7d1.md
+== .md count after ==
+1
+== total entries after (residue check) ==
+1

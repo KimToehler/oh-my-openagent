@@ -1,0 +1,1 @@
+78f821e24a48a3155181874fe309b269b01409718ca2055d98d147cd5fc410f3  /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.7ffxvlTfLA/qahome/.omo/rules/lessons/new-tool-families-must-be-config-gated-3ae9436b1413a7d1.md

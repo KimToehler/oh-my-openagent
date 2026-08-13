@@ -1,0 +1,24 @@
+== ls -la $QA_HOME/.omo/rules/lessons ==
+total 8
+drwxr-xr-x  3 tim  staff   96 14 Aug. 01:47 .
+drwxr-xr-x  3 tim  staff   96 14 Aug. 01:47 ..
+-rw-r--r--  1 tim  staff  751 14 Aug. 01:47 new-tool-families-must-be-config-gated-3ae9436b1413a7d1.md
+
+== ls -a (dotfile / lock / tmp residue check) ==
+.
+..
+new-tool-families-must-be-config-gated-3ae9436b1413a7d1.md
+
+== .md count ==
+1
+== TOTAL entries (excluding . and ..) ==
+1
+== residue probe: lock / tmp / reclaim ==
+0
+== filename scheme assertion ==
+basename: new-tool-families-must-be-config-gated-3ae9436b1413a7d1.md
+SCHEME MATCH: <slug>-<16hexhash>.md  PASS
+NO DATE PREFIX  PASS
+hash segment: 3ae9436b1413a7d1.md
+== project dir must NOT have a lessons dir ==
+no project lessons dir  PASS

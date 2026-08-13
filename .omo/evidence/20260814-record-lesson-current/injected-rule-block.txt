@@ -1,0 +1,21 @@
+== full injected rule block as seen by the model (from the read tool output part) ==
+1006:[Rule: .omo/rules/lessons/new-tool-families-must-be-config-gated-3ae9436b1413a7d1.md]
+1007-[Match: glob: src/plugin/**/*.ts]
+1008-
+1009-# Lesson: new tool families must be config gated
+1010-
+1011-Learned in: oh-my-openagent @ 84943a391
+1012-Learned against model: onara/unspecified-low
+1013-Recorded: 2026-08-13
+1014-Lesson id: new-tool-families-must-be-config-gated-3ae9436b1413a7d1
+1015-Lesson hash: 3ae9436b1413a7d1
+1016-
+1017-## What went wrong
+1018-A new tool family was registered unconditionally in the tool registry, so every session paid for it even when the feature was unwanted.
+1019-
+1020-## Rule for next time
+1021-Register every new tool family behind an explicit config flag that defaults to off, and assert both the on and the off case in the registry test.
+1022-
+1023-## Evidence
+1024-- packages/omo-opencode/src/plugin/tool-registry-core-tools.ts:143
+1025-

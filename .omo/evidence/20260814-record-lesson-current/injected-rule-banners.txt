@@ -1,0 +1,8 @@
+== STEP 8: injected rule banners (sorted unique) ==
+[Rule: .omo/rules/lessons/new-tool-families-must-be-config-gated-3ae9436b1413a7d1.md]
+
+== lessons banner present? ==
+[Rule: .omo/rules/lessons/new-tool-families-must-be-config-gated-3ae9436b1413a7d1.md]
+
+== does the banner name the step-7 file? ==
+BANNER NAMES STEP-7 FILE  PASS

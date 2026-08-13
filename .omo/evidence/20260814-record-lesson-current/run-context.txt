@@ -1,0 +1,10 @@
+== git HEAD ==
+84943a39198ad22cbca9e9bb1a0adcdef2c8ab06
+== opencode --version ==
+1.18.15
+== bun --version ==
+1.3.14
+== dist/index.js sha256 ==
+9fb4521346da53a6e0358187698314b86932236c80d5b36822223c279d545c56  /Users/tim/git/oh-my-openagent/.worktrees/record-lesson-pr1/dist/index.js
+== date ==
+2026-08-13T23:45:38Z
