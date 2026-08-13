@@ -2,7 +2,7 @@
 
 **Origin:** Merged PR `fd8d10ef2` (blocked-subagent escalation: `report_blocked` tool + probe script).
 **Scope:** Documentation only. No production code changes.
-**Status:** Open. Three non-blocking gaps found during review.
+**Status:** Resolved. Three gaps closed: 6380531b7 (features.md row), 09e85aa54 (AGENTS.md counts), 2a516c28a (SKILL.md script rows). Fourth gap discovered and fixed: 8073003e7 (indexed lsp-e2e.sh). Fifth gap discovered and fixed: d6f98fce5 (docs/AGENTS.md file count).
 
 ---
 
@@ -32,18 +32,18 @@ The blocked-subagent escalation feature shipped `report_blocked` (a new always-o
 **Acceptance criteria:**
 - Change `Always on (12 registry tools)` to `Always on (13 registry tools)`.
 - Add `report_blocked` to the tool list on that line, positioned after `background_cancel`.
-- The overview line (line 61) that says `12-38 registry tools` must also update to `13-38 registry tools`.
+- The overview line (line 61) that says `12-38 registry tools` must also update to `13-39 registry tools` (13 always-on plus 26 conditional = 39 total).
 - Do NOT change any other content in `AGENTS.md`.
 
 ### 3. Register `blocked-escalation-probe.sh` in opencode-qa `SKILL.md`
 
 **Target file:** `.agents/skills/opencode-qa/SKILL.md`
 
-**Gap:** The script table (lines 57-64) lists all probe/helper scripts but does not include `scripts/blocked-escalation-probe.sh`, which already exists on disk.
+**Gap:** The script index table (starting at line 180) lists all probe/helper scripts but does not include `scripts/blocked-escalation-probe.sh`, which already exists on disk.
 
 **Acceptance criteria:**
 - Add a row to the script table in `.agents/skills/opencode-qa/SKILL.md` for `blocked-escalation-probe.sh`.
-- Description must state: proves the `report_blocked` escalation path fires by driving a background subagent to block and asserting the parent receives the `[BACKGROUND TASK BLOCKED]` wake notification.
+- Description in the Self-test column must state: `--self-test` mode asserts that the `report_blocked` notification injects the expected JSON structure (`reason` and `needs` fields) into the parked prompt. (Live-run behavior, where a background subagent blocks and parent receives the wake notification, belongs in the ROUTER table column, not here.)
 - Include the correct category column (B for hook/event proof, matching `sse-hook-probe.sh`).
 - Do NOT modify the script itself or any other part of the SKILL.md.
 
