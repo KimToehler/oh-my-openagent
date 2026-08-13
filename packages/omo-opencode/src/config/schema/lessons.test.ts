@@ -9,23 +9,24 @@ describe("LessonsConfigSchema", () => {
     expect(result.storage).toBe("user")
     expect(result.max_files).toBe(200)
     expect(result.max_body_chars).toBe(3000)
-    expect(result.directory).toBeUndefined()
   })
 
   test("parses explicit lessons config", () => {
     const result = LessonsConfigSchema.parse({
       enabled: true,
       storage: "project",
-      directory: "/tmp/lessons",
       max_files: 10,
       max_body_chars: 500,
     })
 
     expect(result.enabled).toBe(true)
     expect(result.storage).toBe("project")
-    expect(result.directory).toBe("/tmp/lessons")
     expect(result.max_files).toBe(10)
     expect(result.max_body_chars).toBe(500)
+  })
+
+  test("rejects a configured lessons directory", () => {
+    expect(() => LessonsConfigSchema.parse({ directory: "/tmp/lessons" })).toThrow()
   })
 
   test("rejects out-of-range max files", () => {

@@ -9,23 +9,28 @@ export type ResolveLessonsDirArgs = {
   readonly projectDir: string
 }
 
+export type ResolveLessonsDirResult =
+  | { readonly ok: true; readonly path: string }
+  | { readonly ok: false; readonly error: string }
+
 function readNonBlank(value: string | undefined): string | undefined {
   if (value === undefined) return undefined
   return value.trim().length > 0 ? value : undefined
 }
 
-export function resolveLessonsDir(args: ResolveLessonsDirArgs): string {
+export function resolveLessonsDir(args: ResolveLessonsDirArgs): ResolveLessonsDirResult {
   const env = args.env ?? {}
 
   const envOverride = readNonBlank(env.OMO_LESSONS_DIR)
-  if (envOverride !== undefined) return envOverride
+  if (envOverride !== undefined) return { ok: true, path: envOverride }
 
-  const configuredDirectory = readNonBlank(args.config?.directory)
-  if (configuredDirectory !== undefined) return configuredDirectory
+  if (args.config?.directory !== undefined) {
+    return { ok: false, error: "Error: lessons.directory is not supported. Use OMO_LESSONS_DIR for an explicit user-controlled override." }
+  }
 
-  if (args.config?.storage === "project") return join(args.projectDir, LESSONS_RELATIVE_DIR)
+  if (args.config?.storage === "project") return { ok: true, path: join(args.projectDir, LESSONS_RELATIVE_DIR) }
 
   // Home precedence must match the config loader (`env.HOME ?? env.USERPROFILE ?? process.cwd()`)
   // so a sandboxed HOME redirects the lessons dir together with the config read.
-  return join(resolveHomeDir(env), LESSONS_RELATIVE_DIR)
+  return { ok: true, path: join(resolveHomeDir(env), LESSONS_RELATIVE_DIR) }
 }

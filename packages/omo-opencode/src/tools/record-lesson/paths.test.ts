@@ -20,12 +20,12 @@ describe("#given an env override, a config directory and project storage", () =>
     const resolved = resolveLessonsDir(args)
 
     // then
-    expect(resolved).toBe("/override/lessons")
+    expect(resolved).toEqual({ ok: true, path: "/override/lessons" })
   })
 })
 
 describe("#given no env override but a config directory and project storage", () => {
-  test("#when the lessons dir is resolved #then the config directory wins over storage", () => {
+  test("#when the lessons dir is resolved #then the untrusted directory is rejected", () => {
     // given
     const args = {
       env: { HOME: "/home/tester" },
@@ -37,7 +37,7 @@ describe("#given no env override but a config directory and project storage", ()
     const resolved = resolveLessonsDir(args)
 
     // then
-    expect(resolved).toBe("/configured/lessons")
+    expect(resolved).toEqual({ ok: false, error: "Error: lessons.directory is not supported. Use OMO_LESSONS_DIR for an explicit user-controlled override." })
   })
 })
 
@@ -50,7 +50,7 @@ describe("#given project storage without an env override or config directory", (
     const resolved = resolveLessonsDir(args)
 
     // then
-    expect(resolved).toBe(join("/repo", LESSONS_SUFFIX))
+    expect(resolved).toEqual({ ok: true, path: join("/repo", LESSONS_SUFFIX) })
   })
 })
 
@@ -63,7 +63,7 @@ describe("#given user storage without an env override or config directory", () =
     const resolved = resolveLessonsDir(args)
 
     // then
-    expect(resolved).toBe(join("/home/tester", LESSONS_SUFFIX))
+    expect(resolved).toEqual({ ok: true, path: join("/home/tester", LESSONS_SUFFIX) })
   })
 })
 
@@ -76,7 +76,7 @@ describe("#given no lessons config at all", () => {
     const resolved = resolveLessonsDir(args)
 
     // then
-    expect(resolved).toBe(join("/home/tester", LESSONS_SUFFIX))
+    expect(resolved).toEqual({ ok: true, path: join("/home/tester", LESSONS_SUFFIX) })
   })
 })
 
@@ -89,12 +89,12 @@ describe("#given HOME is unset and USERPROFILE is set", () => {
     const resolved = resolveLessonsDir(args)
 
     // then
-    expect(resolved).toBe(join("/users/tester", LESSONS_SUFFIX))
+    expect(resolved).toEqual({ ok: true, path: join("/users/tester", LESSONS_SUFFIX) })
   })
 })
 
 describe("#given a whitespace-only env override and a whitespace-only config directory", () => {
-  test("#when the lessons dir is resolved #then both blanks are ignored and storage decides", () => {
+  test("#when the lessons dir is resolved #then the configured directory is still rejected", () => {
     // given
     const args = {
       env: { HOME: "/home/tester", OMO_LESSONS_DIR: "   " },
@@ -106,6 +106,6 @@ describe("#given a whitespace-only env override and a whitespace-only config dir
     const resolved = resolveLessonsDir(args)
 
     // then
-    expect(resolved).toBe(join("/repo", LESSONS_SUFFIX))
+    expect(resolved).toEqual({ ok: false, error: "Error: lessons.directory is not supported. Use OMO_LESSONS_DIR for an explicit user-controlled override." })
   })
 })
