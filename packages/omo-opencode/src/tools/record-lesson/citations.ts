@@ -1,4 +1,4 @@
-import { existsSync as nodeExistsSync } from "node:fs"
+import { existsSync as nodeExistsSync, readFileSync as nodeReadFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { spawnSync } from "../../shared/bun-spawn-shim"
@@ -13,7 +13,12 @@ export type ParsedCitation =
 
 export type VerifyCitationsDeps = {
   readonly existsSync?: (p: string) => boolean
+  readonly readFileSync?: (p: string) => string
   readonly runGit?: (args: readonly string[], cwd: string) => { readonly exitCode: number }
+}
+
+export type ParseCitationDeps = {
+  readonly pathExists?: (p: string) => boolean
 }
 
 export type VerifyResult = { readonly ok: true } | { readonly ok: false; readonly failed: string; readonly reason: string }
@@ -21,10 +26,12 @@ export type VerifyResult = { readonly ok: true } | { readonly ok: false; readonl
 const EVIDENCE_PREFIX = ".omo/evidence/"
 const SHA_RE = /^[0-9a-f]{7,40}$/
 const PATH_RE = /^[A-Za-z0-9._@+-]+(?:\/[A-Za-z0-9._@+-]+)*$/
-const LINE_SUFFIX_RE = /^(?<pathPart>.+?)(?::(?<startLine>\d+)(?:-(?<endLine>\d+))?)?$/
+const LINE_SUFFIX_RE = /^(?<pathPart>.+?)(?::(?<startLine>\d+)(?:(?:-|:)(?<endLine>\d+))?)?$/
+const TEST_NAME_RE = /^[A-Za-z0-9 _.,:()#[\]{}+*/'"=-]+$/
 const WINDOWS_DRIVE_RE = /^[A-Za-z]:/
 
 export const REASON_PATH_MISSING = "path does not exist"
+export const REASON_LINE_INVALID = "invalid or missing line"
 export const REASON_COMMIT_MISSING = "commit not found"
 export const REASON_UNRECOGNIZED = "unrecognized citation form"
 export const REASON_NOT_REPO_RELATIVE = "citation must be repo-relative"
@@ -37,8 +44,7 @@ function isUnsafe(raw: string): boolean {
 }
 
 function looksLikePath(candidate: string): boolean {
-  if (!PATH_RE.test(candidate)) return false
-  return candidate.includes("/") || candidate.includes(".")
+  return PATH_RE.test(candidate)
 }
 
 function parsePathWithLines(raw: string): ParsedCitation {
@@ -60,7 +66,7 @@ function parsePathWithLines(raw: string): ParsedCitation {
   }
 }
 
-export function parseCitation(raw: string): ParsedCitation {
+export function parseCitation(raw: string, deps: ParseCitationDeps = {}): ParsedCitation {
   if (isUnsafe(raw)) {
     return { form: "unsafe", raw }
   }
@@ -69,7 +75,7 @@ export function parseCitation(raw: string): ParsedCitation {
   if (testSeparator !== -1) {
     const pathPart = raw.slice(0, testSeparator)
     const testName = raw.slice(testSeparator + 2)
-    if (looksLikePath(pathPart) && testName.length > 0) {
+    if (looksLikePath(pathPart) && TEST_NAME_RE.test(testName)) {
       return { form: "test", raw, pathPart, testName }
     }
     return { form: "unknown", raw }
@@ -83,7 +89,7 @@ export function parseCitation(raw: string): ParsedCitation {
     return { form: "unknown", raw }
   }
 
-  if (SHA_RE.test(raw)) {
+  if (SHA_RE.test(raw) && deps.pathExists?.(raw) !== true) {
     return { form: "commit", raw, sha: raw }
   }
 
@@ -95,7 +101,12 @@ function defaultRunGit(args: readonly string[], cwd: string): { readonly exitCod
   return { exitCode: result.exitCode }
 }
 
-function verifyOne(parsed: ParsedCitation, repoRoot: string, deps: Required<VerifyCitationsDeps>): string | null {
+function verifyOne(
+  parsed: ParsedCitation,
+  repoRoot: string,
+  deps: Required<VerifyCitationsDeps>,
+  verifyLines: boolean,
+): string | null {
   switch (parsed.form) {
     case "unsafe":
       return REASON_NOT_REPO_RELATIVE
@@ -105,7 +116,23 @@ function verifyOne(parsed: ParsedCitation, repoRoot: string, deps: Required<Veri
       return deps.runGit(["cat-file", "-e", `${parsed.sha}^{commit}`], repoRoot).exitCode === 0
         ? null
         : REASON_COMMIT_MISSING
-    case "path":
+    case "path": {
+      const absolutePath = join(repoRoot, parsed.pathPart)
+      if (!deps.existsSync(absolutePath)) return REASON_PATH_MISSING
+      if (parsed.startLine === undefined || !verifyLines) return null
+      const content = deps.readFileSync(absolutePath)
+      const lineCount = content.length === 0 ? 0 : content.split(/\r?\n/).length - (content.endsWith("\n") ? 1 : 0)
+      if (!Number.isSafeInteger(parsed.startLine) || parsed.startLine < 1 || parsed.startLine > lineCount) {
+        return REASON_LINE_INVALID
+      }
+      if (
+        parsed.endLine !== undefined &&
+        (!Number.isSafeInteger(parsed.endLine) || parsed.endLine < parsed.startLine || parsed.endLine > lineCount)
+      ) {
+        return REASON_LINE_INVALID
+      }
+      return null
+    }
     case "evidence":
     case "test":
       return deps.existsSync(join(repoRoot, parsed.pathPart)) ? null : REASON_PATH_MISSING
@@ -119,11 +146,17 @@ export function verifyCitations(
 ): VerifyResult {
   const resolved: Required<VerifyCitationsDeps> = {
     existsSync: deps.existsSync ?? nodeExistsSync,
+    readFileSync: deps.readFileSync ?? ((path) => nodeReadFileSync(path, "utf8")),
     runGit: deps.runGit ?? defaultRunGit,
   }
 
   for (const citation of citations) {
-    const reason = verifyOne(parseCitation(citation), repoRoot, resolved)
+    const reason = verifyOne(
+      parseCitation(citation, { pathExists: (path) => resolved.existsSync(join(repoRoot, path)) }),
+      repoRoot,
+      resolved,
+      deps.readFileSync !== undefined,
+    )
     if (reason !== null) {
       return { ok: false, failed: citation, reason }
     }
