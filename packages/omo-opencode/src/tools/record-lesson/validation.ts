@@ -1,4 +1,5 @@
 import { existsSync as nodeExistsSync, readdirSync as nodeReaddirSync } from "node:fs"
+import picomatch from "picomatch"
 
 export type ValidationResult = { readonly ok: true } | { readonly ok: false; readonly error: string }
 
@@ -10,15 +11,26 @@ export type ValidateFileCountDeps = {
 const MIN_GLOBS = 1
 const MAX_GLOBS = 8
 const LESSON_EXTENSION = ".md"
+const REPO_ROOT_PACKAGE_PREFIX = "packages/"
+const UNIVERSAL_GLOB_PROBE_GROUPS = [
+  ["a.txt", "x/y/z.bin", "LICENSE", ".env", "deep/nested/thing.q", "Makefile"],
+  ["a.txt", "x/y/z.bin", ".env", "deep/nested/thing.q"],
+] as const
+// Keep aligned with packages/rules-engine/src/matcher.ts PICOMATCH_OPTIONS.
+const PICOMATCH_OPTIONS = { dot: true, bash: true } as const
 
 /**
  * Globs are the only enforceable scoping mechanism for a lesson. Lessons default to
  * user-global storage (~/.omo/rules/lessons) and the rules matcher receives no repo
  * identity, so a universal glob would fire the lesson in every project the user ever
- * opens. Reject the universal forms outright; a scoped glob that merely contains `**`
- * stays valid.
+ * opens. Require match-all within either the mixed-path or extension-bearing probe
+ * group instead of match-most, which could reject a glob legitimately scoped by type.
+ * The second group catches universal extension patterns that omit extensionless files.
  */
-const UNIVERSAL_GLOBS: readonly string[] = ["*", "**", "**/*", "**/*.*"]
+function isUniversalGlob(glob: string): boolean {
+  const matcher = picomatch(glob, PICOMATCH_OPTIONS)
+  return UNIVERSAL_GLOB_PROBE_GROUPS.some((probes) => probes.every((path) => matcher(path)))
+}
 
 export function validateGlobs(globs: readonly string[]): ValidationResult {
   if (globs.length < MIN_GLOBS) {
@@ -39,10 +51,17 @@ export function validateGlobs(globs: readonly string[]): ValidationResult {
       return { ok: false, error: "Error: empty glob entry." }
     }
 
-    if (UNIVERSAL_GLOBS.includes(trimmed)) {
+    if (isUniversalGlob(trimmed)) {
       return {
         ok: false,
         error: `Error: universal glob rejected: ${trimmed}. Scope the lesson to the files it actually applies to.`,
+      }
+    }
+
+    if (trimmed.startsWith(REPO_ROOT_PACKAGE_PREFIX)) {
+      return {
+        ok: false,
+        error: `Error: repo-root-anchored glob rejected: ${trimmed}. Use a package-relative glob such as src/**/*.ts, or a rootless glob such as **/*.ts when the lesson applies across packages.`,
       }
     }
   }
