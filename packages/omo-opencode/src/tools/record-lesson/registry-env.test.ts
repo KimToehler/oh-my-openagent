@@ -41,7 +41,7 @@ async function recordLesson(projectDir: string): Promise<string> {
     title: "Keep production environment plumbing",
     what_went_wrong: "Registry construction omitted environment variables, so user storage resolved beneath the launch directory instead of HOME. ".repeat(3),
     rule_for_next_time: "Exercise production construction paths without injecting dependencies unavailable at the real call site. ".repeat(3),
-    globs: ["packages/omo-opencode/src/plugin/**/*.ts"],
+    globs: ["src/plugin/**/*.ts"],
     citations: ["packages/omo-opencode/src/plugin/tool-registry-core-tools.ts"],
   }, unsafeTestValue({}))
 }

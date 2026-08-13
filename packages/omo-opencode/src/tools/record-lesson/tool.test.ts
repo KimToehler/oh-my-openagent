@@ -177,12 +177,12 @@ describe("createRecordLessonTool", () => {
     const memory = createMemoryFs()
 
     // when
-    await execute(createTool(memory), { ...VALID_ARGS, globs: ["  packages/omo-opencode/src/tools/**/*.ts  "] })
+    await execute(createTool(memory), { ...VALID_ARGS, globs: ["  src/tools/**/*.ts  "] })
 
     // then
     const content = [...memory.files.values()][0]!
-    expect(content).toContain('  - "packages/omo-opencode/src/tools/**/*.ts"')
-    expect(content).not.toContain('  - "  packages/omo-opencode/src/tools/**/*.ts  "')
+    expect(content).toContain('  - "src/tools/**/*.ts"')
+    expect(content).not.toContain('  - "  src/tools/**/*.ts  "')
   })
 
   test("#given a duplicate on Windows-style storage #when recorded #then duplicate path uses platform join semantics", async () => {
