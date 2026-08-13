@@ -16,6 +16,7 @@ export type RepoOrigin = {
 export const UNKNOWN_COMMIT_SHA = "unknown"
 
 const SCP_REMOTE_RE = /^[^/]+@[^/:]+:(?<path>.+)$/
+const SAFE_REPO_NAME_RE = /^[A-Za-z0-9._-]{1,64}$/
 
 function defaultRunGit(args: readonly string[], cwd: string): GitRunResult {
   const result = spawnSync(["git", ...args], { cwd, stdout: "pipe", stderr: "pipe" })
@@ -47,7 +48,8 @@ function repoNameFromCommonDir(commonDir: string): string | undefined {
 function resolveRepoName(runGit: NonNullable<ResolveRepoOriginDeps["runGit"]>, projectDir: string): string {
   const remoteUrl = readGit(runGit, ["remote", "get-url", "origin"], projectDir)
   const fromRemote = remoteUrl === undefined ? undefined : repoNameFromRemoteUrl(remoteUrl)
-  if (fromRemote !== undefined) return fromRemote
+  if (fromRemote !== undefined && SAFE_REPO_NAME_RE.test(fromRemote)) return fromRemote
+  if (remoteUrl !== undefined) return basename(projectDir)
 
   // Worktrees share the main checkout's common git dir, so its parent names the repo
   // even when basename(projectDir) is only the worktree folder.
