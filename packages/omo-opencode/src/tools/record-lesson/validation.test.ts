@@ -63,7 +63,7 @@ describe("validateGlobs", () => {
     })
   })
 
-  test.each([["*"], ["**"], ["**/*"], ["**/*.*"]])(
+  test.each([["*"], ["**"], ["**/*"], ["**/*.*"], ["./**"], ["**/**"], ["{,**/}*"], ["?*"], ["**/?*"], ["**/*?"]])(
     "#given the universal glob %p #when validated #then it is rejected and the message names it",
     (glob) => {
       // given
@@ -77,6 +77,20 @@ describe("validateGlobs", () => {
         ok: false,
         error: `Error: universal glob rejected: ${glob}. Scope the lesson to the files it actually applies to.`,
       })
+    },
+  )
+
+  test.each([["src/**/*.ts"], ["packages/omo-opencode/src/plugin/**/*.ts"], ["**/*.test.ts"], ["docs/**"]])(
+    "#given the scoped glob %p #when validated #then it is accepted",
+    (glob) => {
+      // given
+      const globs = [glob]
+
+      // when
+      const result = validateGlobs(globs)
+
+      // then
+      expect(result).toEqual({ ok: true })
     },
   )
 
