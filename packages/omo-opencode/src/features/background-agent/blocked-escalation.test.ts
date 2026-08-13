@@ -6,7 +6,7 @@ import {
   BlockedEscalation,
   buildBlockedReminderNotification,
 } from "./blocked-escalation"
-import { DEFAULT_BLOCKED_EXPIRY_MS, DEFAULT_BLOCKED_REWAKE_MS } from "./constants"
+import { DEFAULT_BLOCKED_EXPIRY_MS, DEFAULT_BLOCKED_REWAKE_MS, TERMINAL_TASK_TTL_MS } from "./constants"
 import { BackgroundManager } from "./manager"
 import {
   isFailureParentWake,
@@ -70,6 +70,24 @@ afterEach(() => {
   jest.useRealTimers()
 })
 
+describe("BlockedEscalation defaults", () => {
+  test("#given the shipped escalation defaults #when they are read #then the reminder is 10m and hard expiry is 20m, ordered and inside the terminal TTL", () => {
+    // given
+    // The live-harness QA that proves these timers shortens both knobs, so the
+    // real shipped values are only ever asserted here.
+
+    // when
+    const rewakeMinutes = DEFAULT_BLOCKED_REWAKE_MS / 60_000
+    const expiryMinutes = DEFAULT_BLOCKED_EXPIRY_MS / 60_000
+
+    // then
+    expect(rewakeMinutes).toBe(10)
+    expect(expiryMinutes).toBe(20)
+    expect(DEFAULT_BLOCKED_REWAKE_MS).toBeLessThan(DEFAULT_BLOCKED_EXPIRY_MS)
+    expect(DEFAULT_BLOCKED_EXPIRY_MS).toBeLessThan(TERMINAL_TASK_TTL_MS)
+  })
+})
+
 describe("BlockedEscalation", () => {
   test("#given an unanswered block #when time passes beyond both deadlines #then exactly one reminder fires before expiry", async () => {
     // given
@@ -108,6 +126,32 @@ describe("BlockedEscalation", () => {
     expect(task.blockedAt).toBeUndefined()
     expect(task.blockedReason).toBeUndefined()
     expect(task.error).toContain("expired unanswered")
+  })
+
+  test("#given a park whose abort failed so the child still runs #when hard expiry fires #then the child session is aborted rather than orphaned", async () => {
+    // given
+    jest.useFakeTimers()
+    const abortedSessions: string[] = []
+    const manager = createManager({
+      promptAsync: async () => ({}),
+      abort: async ({ path }: { path: { id: string } }) => {
+        abortedSessions.push(path.id)
+        return {}
+      },
+    })
+    const task = createTask("orphan-child")
+    task.status = "running"
+    task.completedAt = undefined
+    addTask(manager, task)
+    await manager.notifyBlockedTask(task.id)
+
+    // when
+    jest.advanceTimersByTime(DEFAULT_BLOCKED_EXPIRY_MS)
+    await flushAsyncWork()
+
+    // then
+    expect(task.status).toBe("cancelled")
+    expect(abortedSessions).toEqual(["orphan-child"])
   })
 
   test("#given a blocked task #when accepted resume answers it #then both escalation timers are cancelled", async () => {

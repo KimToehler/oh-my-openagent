@@ -2550,12 +2550,31 @@ The task was re-queued on a fallback model after a retryable failure.
   private expireBlockedTask(taskId: string): void {
     const task = this.tasks.get(taskId)
     if (!task || !isTaskBlocked(task)) return
+    const wasRunning = task.status === "running"
     task.blockedAt = undefined
     task.blockedReason = undefined
     task.status = "cancelled"
     task.completedAt = new Date()
     task.error = "Blocked task expired unanswered"
     this.blockedNotificationTaskIds.delete(taskId)
+    // Every other terminal transition logs; expiry did not, which made a
+    // never-answered park indistinguishable from a timer that never fired.
+    log("[background-agent] Blocked task expired unanswered:", {
+      taskId,
+      sessionID: task.sessionId,
+      parentSessionID: task.parentSessionId,
+    })
+    // A park whose session abort failed leaves the child RUNNING while its task
+    // record goes terminal here. Without this retry the child keeps executing with
+    // no owner: nothing polls it, nothing can cancel it, and its work is invisible.
+    if (wasRunning && task.sessionId) {
+      const sessionId = task.sessionId
+      void this.abortSessionWithLogging(sessionId, "blocked task expiry").then(aborted => {
+        if (!aborted) return
+        clearDelegatedChildSessionBootstrap(sessionId)
+        SessionCategoryRegistry.remove(sessionId)
+      })
+    }
     this.scheduleTaskRemoval(taskId)
   }
 
