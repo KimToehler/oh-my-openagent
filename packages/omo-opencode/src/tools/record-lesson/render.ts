@@ -108,18 +108,25 @@ function renderBody(input: RenderLessonInput): string {
  */
 function normalizeRenderInput(input: RenderLessonInput): RenderLessonInput {
   return {
-    ...input,
-    description: sanitizeLessonText(input.description),
-    title: sanitizeLessonText(input.title),
+    description: collapseToSingleLine(sanitizeLessonText(input.description)),
+    globs: input.globs.map((glob) => collapseToSingleLine(sanitizeLessonText(glob))),
+    title: collapseToSingleLine(sanitizeLessonText(input.title)),
+    repoName: collapseToSingleLine(sanitizeLessonText(input.repoName)),
+    commitSha: collapseToSingleLine(sanitizeLessonText(input.commitSha)),
+    model: collapseToSingleLine(sanitizeLessonText(input.model)),
+    recordedDate: collapseToSingleLine(sanitizeLessonText(input.recordedDate)),
+    lessonId: collapseToSingleLine(sanitizeLessonText(input.lessonId)),
+    lessonHash: collapseToSingleLine(sanitizeLessonText(input.lessonHash)),
     whatWentWrong: sanitizeLessonText(input.whatWentWrong),
     ruleForNextTime: sanitizeLessonText(input.ruleForNextTime),
-    citations: input.citations.map(sanitizeLessonText),
+    citations: input.citations.map((citation) => collapseToSingleLine(sanitizeLessonText(citation))),
   }
 }
 
 function sanitizeLessonText(value: string): string {
   return canonicalizeLessonText(value)
     .trim()
+    // Load-bearing: hydration requires `]\n[Match:` adjacency, so every line-anchored Match banner must stay inert.
     .replace(/^(\s*)\[(Rule|Match):/gm, "$1[\u200B$2:")
     .replace(/<(\/?)(system-reminder|rules)(?=[\s>])/gi, "<\u200B$1$2")
 }
