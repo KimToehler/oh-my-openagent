@@ -31,6 +31,7 @@
 | Codex telemetry internals | [docs/reference/codex-telemetry.md](reference/codex-telemetry.md) |
 | Monitor tool reference | [docs/reference/monitor.md](reference/monitor.md) |
 | Web-terminal visual QA helper | [docs/reference/web-terminal-visual-qa.md](reference/web-terminal-visual-qa.md) |
+| Blocked-subagent escalation doc follow-ups | [docs/reference/blocked-escalation-follow-up.md](reference/blocked-escalation-follow-up.md) |
 | Sample configs | [docs/examples/](examples) (default, coding-focused, planning-focused) |
 | Privacy & ToS | [docs/legal/](legal) |
 | Manifesto | [docs/manifesto.md](manifesto.md) |
