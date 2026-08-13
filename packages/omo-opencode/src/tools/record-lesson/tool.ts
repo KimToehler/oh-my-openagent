@@ -7,7 +7,7 @@ import { verifyCitations } from "./citations"
 import { resolveRepoOrigin, type RepoOrigin } from "./origin"
 import { resolveLessonsDir } from "./paths"
 import { computeSemanticLessonHash, extractBody, renderLesson, type RenderLessonInput } from "./render"
-import { findLessonByHash, generateLessonId, writeLessonExclusive, type StoreDeps } from "./store"
+import { findLessonByHash, generateLessonId, withLessonStoreLock, writeLessonExclusive, type StoreDeps } from "./store"
 import type { RecordLessonArgs, RecordLessonDeps } from "./types"
 import { validateBodySize, validateFileCount, validateGlobs } from "./validation"
 
@@ -77,7 +77,9 @@ function idMatchingStoreDeps(base: StoreDeps | undefined, initialId: string): St
 
 async function executeRecordLesson(args: RecordLessonArgs, deps: RecordLessonDeps): Promise<string> {
   const normalizedArgs: RecordLessonArgs = { ...args, globs: args.globs.map((glob) => glob.trim()) }
-  const lessonsDir = resolveLessonsDir({ env: deps.env, config: deps.config, projectDir: deps.projectDir })
+  const lessonsDirResult = resolveLessonsDir({ env: deps.env, config: deps.config, projectDir: deps.projectDir })
+  if (!lessonsDirResult.ok) return lessonsDirResult.error
+  const lessonsDir = lessonsDirResult.path
   const globsResult = validateGlobs(normalizedArgs.globs)
   if (!globsResult.ok) return globsResult.error
 
@@ -91,26 +93,29 @@ async function executeRecordLesson(args: RecordLessonArgs, deps: RecordLessonDep
 
   const initialId = generateLessonId(normalizedArgs.title, { ...deps.storeDeps, now: deps.now ?? deps.storeDeps?.now })
   const input = createRenderInput(normalizedArgs, deps, initialId)
-  const duplicate = findLessonByHash(lessonsDir, input.lessonHash, deps.storeDeps)
-  if (duplicate !== undefined) return `Existing lesson ${join(lessonsDir, duplicate)}; duplicate no-op.`
-
-  const countResult = validateFileCount(lessonsDir, deps.config?.max_files ?? DEFAULT_MAX_FILES, deps.storeDeps)
-  if (!countResult.ok) return countResult.error
-
   const rendered = renderLesson(input)
   const bodyResult = validateBodySize(extractBody(rendered), deps.config?.max_body_chars ?? DEFAULT_MAX_BODY_CHARS)
   if (!bodyResult.ok) return bodyResult.error
 
-  const writeResult = writeLessonExclusive({
-    lessonsDir,
-    content: rendered,
-    slugSource: normalizedArgs.title,
-    maxFiles: deps.config?.max_files ?? DEFAULT_MAX_FILES,
-    deps: idMatchingStoreDeps({ ...deps.storeDeps, now: deps.now ?? deps.storeDeps?.now }, initialId),
-  })
-  if (!writeResult.ok) return writeResult.error
+  const storeDeps = idMatchingStoreDeps({ ...deps.storeDeps, now: deps.now ?? deps.storeDeps?.now }, initialId)
+  const locked = withLessonStoreLock(lessonsDir, storeDeps, () => {
+    const duplicate = findLessonByHash(lessonsDir, input.lessonHash, storeDeps)
+    if (duplicate !== undefined) return `Existing lesson ${join(lessonsDir, duplicate)}; duplicate no-op.`
 
-  return `Recorded lesson ${writeResult.lessonId}\nPath: ${writeResult.path}\nApplies to future sessions, not the current one.`
+    const countResult = validateFileCount(lessonsDir, deps.config?.max_files ?? DEFAULT_MAX_FILES, storeDeps)
+    if (!countResult.ok) return countResult.error
+
+    const writeResult = writeLessonExclusive({
+      lessonsDir,
+      content: rendered,
+      slugSource: normalizedArgs.title,
+      deps: storeDeps,
+    })
+    if (!writeResult.ok) return writeResult.error
+    return `Recorded lesson ${writeResult.lessonId}\nPath: ${writeResult.path}\nApplies to future sessions, not the current one.`
+  })
+
+  return locked.ok ? locked.value : locked.error
 }
 
 export function createRecordLessonTool(deps: RecordLessonDeps): ToolDefinition {

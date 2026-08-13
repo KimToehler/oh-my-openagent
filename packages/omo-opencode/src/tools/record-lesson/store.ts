@@ -32,7 +32,6 @@ export type WriteLessonExclusiveArgs = {
   readonly lessonsDir: string
   readonly content: string
   readonly slugSource: string
-  readonly maxFiles?: number
   readonly deps?: StoreDeps
 }
 
@@ -40,6 +39,13 @@ const MAX_SLUG_LENGTH = 40
 const MAX_WRITE_ATTEMPTS = 5
 const ALLOCATION_ERROR = `Error: could not allocate a unique lesson id after ${MAX_WRITE_ATTEMPTS} attempts.`
 const LESSON_HASH_LINE = /^Lesson hash: ([0-9a-f]{16})$/m
+
+const MAX_LOCK_ATTEMPTS = 5
+const LOCK_FILENAME = ".record-lesson.lock"
+
+export type LockResult<T> =
+  | { readonly ok: true; readonly value: T }
+  | { readonly ok: false; readonly error: string }
 
 function defaultRandomHex(): string {
   return randomBytes(3).toString("hex")
@@ -65,8 +71,40 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
-function capError(maxFiles: number): string {
-  return `Error: lesson cap reached (${maxFiles} files). Consolidate or delete existing lessons before recording a new one.`
+export function withLessonStoreLock<T>(
+  lessonsDir: string,
+  deps: StoreDeps,
+  criticalSection: () => T,
+): LockResult<T> {
+  const mkdirSync = deps.mkdirSync ?? nodeMkdirSync
+  const writeFileSync = deps.writeFileSync ?? nodeWriteFileSync
+  const unlinkSync = deps.unlinkSync ?? nodeUnlinkSync
+  const lockPath = join(lessonsDir, LOCK_FILENAME)
+
+  try {
+    mkdirSync(lessonsDir, { recursive: true })
+  } catch (error) {
+    return { ok: false, error: errorMessage(error) }
+  }
+
+  for (let attempt = 0; attempt < MAX_LOCK_ATTEMPTS; attempt += 1) {
+    try {
+      writeFileSync(lockPath, "", { flag: "wx" })
+    } catch (error) {
+      if (error instanceof Error && "code" in error && error.code === "EEXIST") continue
+      return { ok: false, error: errorMessage(error) }
+    }
+
+    try {
+      return { ok: true, value: criticalSection() }
+    } catch (error) {
+      return { ok: false, error: errorMessage(error) }
+    } finally {
+      unlinkSync(lockPath)
+    }
+  }
+
+  return { ok: false, error: `Error: lesson store is busy after ${MAX_LOCK_ATTEMPTS} lock attempts.` }
 }
 
 export function writeLessonExclusive(args: WriteLessonExclusiveArgs): WriteResult {
@@ -74,7 +112,6 @@ export function writeLessonExclusive(args: WriteLessonExclusiveArgs): WriteResul
   const mkdirSync = deps.mkdirSync ?? nodeMkdirSync
   const lstatSync = deps.lstatSync ?? nodeLstatSync
   const realpathSync = deps.realpathSync ?? ((path: string) => nodeRealpathSync(path))
-  const unlinkSync = deps.unlinkSync ?? nodeUnlinkSync
   const writeFileSync = deps.writeFileSync ?? nodeWriteFileSync
 
   try {
@@ -99,10 +136,6 @@ export function writeLessonExclusive(args: WriteLessonExclusiveArgs): WriteResul
       }
 
       writeFileSync(path, args.content, { flag: "wx" })
-      if (args.maxFiles !== undefined && listLessons(lessonsRoot, deps).length > args.maxFiles) {
-        unlinkSync(path)
-        return { ok: false, error: capError(args.maxFiles) }
-      }
       return { ok: true, lessonId, path }
     } catch (error) {
       if (error instanceof Error && "code" in error && error.code === "EEXIST") {
