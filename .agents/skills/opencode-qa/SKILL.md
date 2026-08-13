@@ -187,6 +187,8 @@ isolated sandbox and clean up on exit.
 | `scripts/server-smoke.sh` | B | `/global/health` healthy, `/doc` >=100 paths, no-auth -> 401 |
 | `scripts/sse-hook-probe.sh` | B | `/event` opens and delivers `server.connected` |
 | `scripts/tui-smoke.sh` | C | TUI renders under tmux, tears down, real DB untouched |
+| `scripts/blocked-escalation-probe.sh` | B | `task` and `report_blocked` tool calls emitted; reminder matcher rejects a no-reminder stream and accepts a reminder marker; duplicate reminders counted |
+| `scripts/serve-wake-split-probe.sh` | B | serve-topology wake runner-split reproduces and fixes under the fake LLM server |
 
 ## Risks and caveats
 
