@@ -1,12 +1,10 @@
 import { z } from "zod"
 
-export const LessonsConfigSchema = z.object({
+export const LessonsConfigSchema = z.strictObject({
   /** Enable the lessons subsystem (default: false) */
   enabled: z.boolean().default(false),
   /** Where lessons are stored: "user" writes to ~/.omo/rules/lessons, "project" writes to .omo/rules/lessons */
   storage: z.enum(["user", "project"]).default("user"),
-  /** Absolute path override for the lessons directory. Wins over `storage` when set. */
-  directory: z.string().optional(),
   /** Maximum number of lesson files kept in the lessons directory (default: 200) */
   max_files: z.number().min(1).max(1000).default(200),
   /** Maximum character length of a single lesson body (default: 3000) */

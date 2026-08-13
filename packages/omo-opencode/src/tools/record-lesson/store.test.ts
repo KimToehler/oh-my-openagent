@@ -4,6 +4,7 @@ import {
   findLessonByHash,
   generateLessonId,
   listLessons,
+  withLessonStoreLock,
   writeLessonExclusive,
   type StoreDeps,
 } from "./store"
@@ -219,28 +220,53 @@ describe("writeLessonExclusive", () => {
     expect(memory.writeAttempts).toEqual([])
   })
 
-  test("#given a concurrent write pushes the store over its cap #when written #then only the new file is removed", () => {
+})
+
+describe("withLessonStoreLock", () => {
+  test("#given lock contention #when the critical section runs #then acquisition retries before entering", () => {
     // given
-    const existingPath = "/lessons/existing.md"
-    const memory = createMemoryFs({ [existingPath]: "PREEXISTING" })
+    const events: string[] = []
+    let attempts = 0
+    const deps: StoreDeps = {
+      mkdirSync: () => undefined,
+      writeFileSync: () => {
+        attempts += 1
+        events.push(`acquire-${attempts}`)
+        if (attempts === 1) {
+          const error = new Error("lock exists") as NodeJS.ErrnoException
+          error.code = "EEXIST"
+          throw error
+        }
+      },
+      unlinkSync: () => { events.push("release") },
+    }
 
     // when
-    const result = writeLessonExclusive({
-      lessonsDir: "/lessons",
-      content: "NEW CONTENT",
-      slugSource: "Store",
-      maxFiles: 1,
-      deps: {
-        ...memory.deps,
-        unlinkSync: (path) => { memory.files.delete(path) },
-        now: () => FIXED_DATE,
-        randomHex: () => "111111",
-      },
+    const result = withLessonStoreLock("/lessons", deps, () => {
+      events.push("critical")
+      return "done"
     })
 
     // then
-    expect(result).toEqual({ ok: false, error: "Error: lesson cap reached (1 files). Consolidate or delete existing lessons before recording a new one." })
-    expect(memory.files).toEqual(new Map([[existingPath, "PREEXISTING"]]))
+    expect(result).toEqual({ ok: true, value: "done" })
+    expect(events).toEqual(["acquire-1", "acquire-2", "critical", "release"])
+  })
+
+  test("#given a critical section error #when the lock scope exits #then the lock is removed", () => {
+    // given
+    const removed: string[] = []
+    const deps: StoreDeps = {
+      mkdirSync: () => undefined,
+      writeFileSync: () => undefined,
+      unlinkSync: (path) => { removed.push(path) },
+    }
+
+    // when
+    const result = withLessonStoreLock("/lessons", deps, () => { throw new Error("dedup read failed") })
+
+    // then
+    expect(result).toEqual({ ok: false, error: "dedup read failed" })
+    expect(removed).toEqual(["/lessons/.record-lesson.lock"])
   })
 })
 

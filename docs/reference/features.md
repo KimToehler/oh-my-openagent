@@ -882,7 +882,6 @@ record_lesson({
   "lessons": {
     "enabled": false,
     "storage": "user",
-    "directory": null,
     "max_files": 200,
     "max_body_chars": 3000
   }
@@ -891,11 +890,11 @@ record_lesson({
 
 - `enabled` (default `false`) gates the `record_lesson` tool.
 - `storage` (default `"user"`) chooses between `~/.omo/rules/lessons/` and `.omo/rules/lessons/`.
-- `directory` overrides `storage` with an absolute path when set.
+- `lessons.directory` is rejected because project config has no trusted provenance marker. Use `OMO_LESSONS_DIR` for an explicit user-controlled path override.
 - `max_files` (default `200`) caps the number of lesson files. The cap rejects writes rather than evicting.
 - `max_body_chars` (default `3000`) caps the character length of the rendered lesson body.
 
-The `OMO_LESSONS_DIR` environment variable wins over both `storage` and `directory`.
+The `OMO_LESSONS_DIR` environment variable wins over `storage` and is the only arbitrary-path override.
 
 ## Hooks
 

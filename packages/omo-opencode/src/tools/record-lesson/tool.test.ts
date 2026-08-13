@@ -103,7 +103,7 @@ describe("createRecordLessonTool", () => {
 
     // then
     expect(result).toBe("Error: lesson cap reached (200 files). Consolidate or delete existing lessons before recording a new one.")
-    expect(memory.writes).toEqual([])
+    expect(memory.writes.filter((path) => path.endsWith(".md"))).toEqual([])
   })
 
   test("#given a body above the configured limit #when recording #then body error is returned without writing", async () => {
