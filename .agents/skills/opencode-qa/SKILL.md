@@ -189,6 +189,7 @@ isolated sandbox and clean up on exit.
 | `scripts/tui-smoke.sh` | C | TUI renders under tmux, tears down, real DB untouched |
 | `scripts/blocked-escalation-probe.sh` | B | `task` and `report_blocked` tool calls emitted; reminder matcher rejects a no-reminder stream and accepts a reminder marker; duplicate reminders counted |
 | `scripts/serve-wake-split-probe.sh` | B | serve-topology wake runner-split reproduces and fixes under the fake LLM server |
+| `scripts/lsp-e2e.sh` | B | LSP daemon HTTP/SSE integration: health checks, event stream retry logic, terminal tool error handling |
 
 ## Risks and caveats
 
