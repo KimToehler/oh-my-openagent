@@ -20,6 +20,8 @@ export type StoreDeps = {
   readonly existsSync?: (path: string) => boolean
   readonly readdirSync?: (path: string) => string[]
   readonly readFileSync?: (path: string) => string
+  readonly isProcessAlive?: (processId: number) => boolean
+  readonly warn?: (message: string) => void
   readonly writeFileSync?: (path: string, content: string, options: { readonly flag: "wx" }) => void
   readonly mkdirSync?: (path: string, options?: { readonly recursive: true }) => unknown
   readonly lstatSync?: (path: string) => { readonly isSymbolicLink: () => boolean }
@@ -88,19 +90,50 @@ function defaultSleepSync(milliseconds: number): void {
   Atomics.wait(LOCK_SLEEP_VIEW, 0, 0, milliseconds)
 }
 
+function defaultIsProcessAlive(processId: number): boolean {
+  try {
+    process.kill(processId, 0)
+    return true
+  } catch (error) {
+    if (isFileSystemError(error, "ESRCH")) return false
+    return true
+  }
+}
+
+function lockOwnerProcessId(content: string): number | undefined {
+  const match = /^pid=(\d+)$/m.exec(content)
+  if (match?.[1] === undefined) return undefined
+  const processId = Number(match[1])
+  return Number.isSafeInteger(processId) && processId > 0 ? processId : undefined
+}
+
+function releaseOwnedLock(lockPath: string, token: string, deps: StoreDeps): void {
+  const readFileSync = deps.readFileSync ?? ((path: string) => nodeReadFileSync(path, "utf8"))
+  const unlinkSync = deps.unlinkSync ?? nodeUnlinkSync
+  const warn = deps.warn ?? ((message: string) => console.warn(message))
+
+  try {
+    if (readFileSync(lockPath) !== token) return
+    unlinkSync(lockPath)
+  } catch (error) {
+    if (isFileSystemError(error, "ENOENT")) return
+    warn(`Warning: failed to release lesson store lock ${lockPath}: ${errorMessage(error)}`)
+  }
+}
+
 function reclaimStaleLock(lockPath: string, deps: StoreDeps): void {
   const now = deps.now ?? (() => new Date())
   const processId = deps.processId ?? process.pid
   const randomHex = deps.randomHex ?? defaultRandomHex
+  const readFileSync = deps.readFileSync ?? ((path: string) => nodeReadFileSync(path, "utf8"))
+  const isProcessAlive = deps.isProcessAlive ?? defaultIsProcessAlive
   const renameSync = deps.renameSync ?? nodeRenameSync
   const statSync = deps.statSync ?? nodeStatSync
   const unlinkSync = deps.unlinkSync ?? nodeUnlinkSync
 
-  let observedInode: number
   try {
     const observed = statSync(lockPath)
     if (now().getTime() - observed.mtimeMs <= LOCK_STALE_AFTER_MS) return
-    observedInode = observed.ino
   } catch (error) {
     if (isFileSystemError(error, "ENOENT")) return
     throw error
@@ -115,9 +148,17 @@ function reclaimStaleLock(lockPath: string, deps: StoreDeps): void {
   }
 
   try {
-    if (statSync(quarantinePath).ino === observedInode) unlinkSync(quarantinePath)
-  } catch (error) {
-    if (!isFileSystemError(error, "ENOENT")) throw error
+    const ownerProcessId = lockOwnerProcessId(readFileSync(quarantinePath))
+    if (ownerProcessId !== undefined && isProcessAlive(ownerProcessId)) {
+      renameSync(quarantinePath, lockPath)
+      return
+    }
+  } finally {
+    try {
+      unlinkSync(quarantinePath)
+    } catch (error) {
+      if (!isFileSystemError(error, "ENOENT")) throw error
+    }
   }
 }
 
@@ -129,9 +170,10 @@ export function withLessonStoreLock<T>(
   const mkdirSync = deps.mkdirSync ?? nodeMkdirSync
   const now = deps.now ?? (() => new Date())
   const processId = deps.processId ?? process.pid
+  const randomHex = deps.randomHex ?? defaultRandomHex
+  const readFileSync = deps.readFileSync ?? ((path: string) => nodeReadFileSync(path, "utf8"))
   const sleepSync = deps.sleepSync ?? defaultSleepSync
   const writeFileSync = deps.writeFileSync ?? nodeWriteFileSync
-  const unlinkSync = deps.unlinkSync ?? nodeUnlinkSync
   const lockPath = join(lessonsDir, LOCK_FILENAME)
 
   try {
@@ -141,9 +183,10 @@ export function withLessonStoreLock<T>(
   }
 
   for (let attempt = 0; attempt <= LOCK_RETRY_DELAYS_MS.length; attempt += 1) {
+    const createdAt = now().toISOString()
+    const token = `pid=${processId}\nnonce=${randomHex()}\ncreated=${createdAt}\n`
     try {
-      const createdAt = now().toISOString()
-      writeFileSync(lockPath, `pid=${processId}\ncreated=${createdAt}\n`, { flag: "wx" })
+      writeFileSync(lockPath, token, { flag: "wx" })
     } catch (error) {
       if (!isFileSystemError(error, "EEXIST")) return { ok: false, error: errorMessage(error) }
       try {
@@ -157,11 +200,13 @@ export function withLessonStoreLock<T>(
     }
 
     try {
+      if (readFileSync(lockPath) !== token) continue
       return { ok: true, value: criticalSection() }
     } catch (error) {
+      if (isFileSystemError(error, "ENOENT")) continue
       return { ok: false, error: errorMessage(error) }
     } finally {
-      unlinkSync(lockPath)
+      releaseOwnedLock(lockPath, token, deps)
     }
   }
 

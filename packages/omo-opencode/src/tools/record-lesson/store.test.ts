@@ -1,4 +1,7 @@
-import { describe, expect, test } from "bun:test"
+import { afterEach, describe, expect, test } from "bun:test"
+import { mkdtempSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import {
   findLessonByHash,
@@ -8,6 +11,39 @@ import {
   writeLessonExclusive,
   type StoreDeps,
 } from "./store"
+
+const TEMP_DIRS: string[] = []
+
+afterEach(() => {
+  for (const dir of TEMP_DIRS.splice(0)) rmSync(dir, { recursive: true, force: true })
+})
+
+function createTempDir(): string {
+  const dir = mkdtempSync(join(tmpdir(), "record-lesson-lock-"))
+  TEMP_DIRS.push(dir)
+  return dir
+}
+
+async function waitForFile(path: string): Promise<void> {
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    try {
+      readFileSync(path)
+      return
+    } catch (error) {
+      if (!(error instanceof Error) || Reflect.get(error, "code") !== "ENOENT") throw error
+    }
+    await Bun.sleep(5)
+  }
+  throw new Error(`timed out waiting for ${path}`)
+}
+
+function spawnLockProcess(script: string, args: readonly string[]): ReturnType<typeof Bun.spawn> {
+  return Bun.spawn([process.execPath, "-e", script, ...args], {
+    cwd: import.meta.dir,
+    stdout: "pipe",
+    stderr: "pipe",
+  })
+}
 
 const FIXED_DATE = new Date("2026-08-13T00:00:00Z")
 
@@ -223,6 +259,67 @@ describe("writeLessonExclusive", () => {
 })
 
 describe("withLessonStoreLock", () => {
+
+  test("#given stale observation followed by a live replacement #when two real processes acquire #then critical sections never overlap", async () => {
+    // given
+    const lessonsDir = createTempDir()
+    const storeUrl = new URL("./store.ts", import.meta.url).href
+    const lockPath = join(lessonsDir, ".record-lesson.lock")
+    const observedPath = join(lessonsDir, "observed")
+    const proceedPath = join(lessonsDir, "proceed")
+    const victimEnteredPath = join(lessonsDir, "victim-entered")
+    const releaseVictimPath = join(lessonsDir, "release-victim")
+    const overlapPath = join(lessonsDir, "overlap")
+    writeFileSync(lockPath, "abandoned")
+
+    const reclaimer = spawnLockProcess(`
+      import { existsSync, statSync, writeFileSync } from "node:fs";
+      import { withLessonStoreLock } from ${JSON.stringify(storeUrl)};
+      const [lessonsDir, observedPath, proceedPath, victimEnteredPath, overlapPath] = process.argv.slice(1);
+      const result = withLessonStoreLock(lessonsDir, {
+        statSync: (path) => {
+          const stat = statSync(path);
+          if (path.endsWith(".record-lesson.lock") && !existsSync(observedPath)) {
+            writeFileSync(observedPath, "observed");
+            while (!existsSync(proceedPath)) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+            return { ino: stat.ino, mtimeMs: 0 };
+          }
+          return { ino: stat.ino, mtimeMs: stat.mtimeMs };
+        },
+      }, () => {
+        if (existsSync(victimEnteredPath)) writeFileSync(overlapPath, "overlap");
+        return "done";
+      });
+      if (!result.ok) throw new Error(result.error);
+    `, [lessonsDir, observedPath, proceedPath, victimEnteredPath, overlapPath])
+    await waitForFile(observedPath)
+    unlinkSync(lockPath)
+
+    const victim = spawnLockProcess(`
+      import { existsSync, unlinkSync, writeFileSync } from "node:fs";
+      import { withLessonStoreLock } from ${JSON.stringify(storeUrl)};
+      const [lessonsDir, enteredPath, releasePath] = process.argv.slice(1);
+      const result = withLessonStoreLock(lessonsDir, {}, () => {
+        writeFileSync(enteredPath, "entered");
+        while (!existsSync(releasePath)) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+        unlinkSync(enteredPath);
+        return "done";
+      });
+      if (!result.ok) throw new Error(result.error);
+    `, [lessonsDir, victimEnteredPath, releaseVictimPath])
+    await waitForFile(victimEnteredPath)
+
+    // when
+    writeFileSync(proceedPath, "proceed")
+    await Bun.sleep(100)
+    writeFileSync(releaseVictimPath, "release")
+    const [reclaimerExit, victimExit] = await Promise.all([reclaimer.exited, victim.exited])
+
+    // then
+    expect(reclaimerExit).toBe(0)
+    expect(victimExit).toBe(0)
+    expect(readdirSync(lessonsDir)).not.toContain("overlap")
+  })
   test("#given a stale lock #when acquisition retries #then the stale lock is reclaimed and the critical section runs", () => {
     // given
     const lockPath = "/lessons/.record-lesson.lock"
@@ -232,6 +329,7 @@ describe("withLessonStoreLock", () => {
       mkdirSync: () => undefined,
       now: () => FIXED_DATE,
       processId: 42,
+      readFileSync: (path) => files.get(path) ?? "",
       statSync: () => ({ ino: 10, mtimeMs: FIXED_DATE.getTime() - 60_001 }),
       renameSync: (source, destination) => {
         const content = files.get(source)
@@ -332,7 +430,10 @@ describe("withLessonStoreLock", () => {
     const deps: StoreDeps = {
       mkdirSync: () => undefined,
       now: () => FIXED_DATE,
+      processId: 1,
       statSync: () => ({ ino: 10, mtimeMs: FIXED_DATE.getTime() }),
+      readFileSync: () => "pid=1\nnonce=mock\ncreated=2026-08-13T00:00:00.000Z\n",
+      randomHex: () => "mock",
       sleepSync: (milliseconds) => { events.push(`sleep-${milliseconds}`) },
       writeFileSync: () => {
         attempts += 1
@@ -365,6 +466,8 @@ describe("withLessonStoreLock", () => {
       mkdirSync: () => undefined,
       now: () => FIXED_DATE,
       processId: 42,
+      randomHex: () => "abcdef",
+      readFileSync: () => writes.at(-1) ?? "",
       writeFileSync: (_path, content) => { writes.push(content) },
       unlinkSync: (path) => { removed.push(path) },
     }
@@ -374,7 +477,7 @@ describe("withLessonStoreLock", () => {
 
     // then
     expect(result).toEqual({ ok: true, value: "done" })
-    expect(writes).toEqual(["pid=42\ncreated=2026-08-13T00:00:00.000Z\n"])
+    expect(writes).toEqual(["pid=42\nnonce=abcdef\ncreated=2026-08-13T00:00:00.000Z\n"])
     expect(removed).toEqual(["/lessons/.record-lesson.lock"])
   })
 
@@ -383,6 +486,10 @@ describe("withLessonStoreLock", () => {
     const removed: string[] = []
     const deps: StoreDeps = {
       mkdirSync: () => undefined,
+      now: () => FIXED_DATE,
+      processId: 1,
+      randomHex: () => "abcdef",
+      readFileSync: () => "pid=1\nnonce=abcdef\ncreated=2026-08-13T00:00:00.000Z\n",
       writeFileSync: () => undefined,
       unlinkSync: (path) => { removed.push(path) },
     }
@@ -393,6 +500,71 @@ describe("withLessonStoreLock", () => {
     // then
     expect(result).toEqual({ ok: false, error: "dedup read failed" })
     expect(removed).toEqual(["/lessons/.record-lesson.lock"])
+  })
+
+
+  test("#given successful critical section and missing lock #when release runs #then success stays inside Result API", () => {
+    // given
+    const missing = new Error("lock missing") as NodeJS.ErrnoException
+    missing.code = "ENOENT"
+
+    // when
+    const result = withLessonStoreLock("/lessons", {
+      mkdirSync: () => undefined,
+      now: () => FIXED_DATE,
+      processId: 1,
+      randomHex: () => "abcdef",
+      readFileSync: () => "pid=1\nnonce=abcdef\ncreated=2026-08-13T00:00:00.000Z\n",
+      writeFileSync: () => undefined,
+      unlinkSync: () => { throw missing },
+    }, () => "written")
+
+    // then
+    expect(result).toEqual({ ok: true, value: "written" })
+  })
+
+  test("#given stale quarantine inode mismatch #when reclamation finishes #then quarantine is removed", () => {
+    // given
+    const lockPath = "/lessons/.record-lesson.lock"
+    const quarantinePath = `${lockPath}.reclaim-42-abcdef`
+    const files = new Map([[lockPath, "stale owner"]])
+    let attempts = 0
+    const deps: StoreDeps = {
+      mkdirSync: () => undefined,
+      now: () => FIXED_DATE,
+      processId: 42,
+      randomHex: () => "abcdef",
+      readFileSync: (path) => files.get(path) ?? "",
+      statSync: (path) => ({
+        ino: path === lockPath ? 10 : 11,
+        mtimeMs: FIXED_DATE.getTime() - 60_001,
+      }),
+      renameSync: (source, destination) => {
+        const content = files.get(source)
+        if (content === undefined) throw new Error("missing source")
+        files.delete(source)
+        files.set(destination, content)
+      },
+      sleepSync: () => undefined,
+      unlinkSync: (path) => { files.delete(path) },
+      writeFileSync: (path, content) => {
+        attempts += 1
+        if (files.has(path)) {
+          const error = new Error("lock exists") as NodeJS.ErrnoException
+          error.code = "EEXIST"
+          throw error
+        }
+        files.set(path, content)
+      },
+    }
+
+    // when
+    const result = withLessonStoreLock("/lessons", deps, () => "done")
+
+    // then
+    expect(result).toEqual({ ok: true, value: "done" })
+    expect(attempts).toBe(2)
+    expect(files.has(quarantinePath)).toBe(false)
   })
 })
 
