@@ -94,23 +94,25 @@ describe("validateGlobs", () => {
     },
   )
 
-  test("#given a repo-root package glob #when validated #then it is rejected with stable alternatives", () => {
+  test.each([
+    ["packages/omo-opencode/src/plugin/**/*.ts"],
+    ["apps/web/src/**/*.ts"],
+    ["libs/core/**/*.ts"],
+    ["crates/runtime/src/**/*.rs"],
+    ["services/api/**/*.go"],
+  ])("#given a precise repo-root glob %p #when validated #then it is accepted", (glob) => {
     // given
-    const globs = ["packages/omo-opencode/src/plugin/**/*.ts"]
+    const globs = [glob]
 
     // when
     const result = validateGlobs(globs)
 
     // then
-    expect(result).toEqual({
-      ok: false,
-      error:
-        "Error: repo-root-anchored glob rejected: packages/omo-opencode/src/plugin/**/*.ts. Use a package-relative glob such as src/**/*.ts, or a rootless glob such as **/*.ts when the lesson applies across packages.",
-    })
+    expect(result).toEqual({ ok: true })
   })
 
-  test.each([["src/plugin/**/*.ts"], ["**/*.ts"]])(
-    "#given the root-stable glob %p #when validated #then it is accepted",
+  test.each([["src/plugin/**/*.ts"], ["**/*.ts"], ["*.md"], ["**/*.{ts,tsx}"], ["*/**"], ["[a-z]*"], ["[!x]*"], ["**/*[!z]"], ["**/.*"]])(
+    "#given the non-literal-match-everything glob %p #when validated #then it is accepted",
     (glob) => {
       // given
       const globs = [glob]
