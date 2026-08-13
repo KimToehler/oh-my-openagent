@@ -223,12 +223,117 @@ describe("writeLessonExclusive", () => {
 })
 
 describe("withLessonStoreLock", () => {
-  test("#given lock contention #when the critical section runs #then acquisition retries before entering", () => {
+  test("#given a stale lock #when acquisition retries #then the stale lock is reclaimed and the critical section runs", () => {
+    // given
+    const lockPath = "/lessons/.record-lesson.lock"
+    const files = new Map([[lockPath, "stale owner"]])
+    let attempts = 0
+    const deps: StoreDeps = {
+      mkdirSync: () => undefined,
+      now: () => FIXED_DATE,
+      processId: 42,
+      statSync: () => ({ ino: 10, mtimeMs: FIXED_DATE.getTime() - 60_001 }),
+      renameSync: (source, destination) => {
+        const content = files.get(source)
+        if (content === undefined) throw new Error("missing source")
+        files.delete(source)
+        files.set(destination, content)
+      },
+      sleepSync: () => undefined,
+      unlinkSync: (path) => { files.delete(path) },
+      writeFileSync: (path, content) => {
+        attempts += 1
+        if (files.has(path)) {
+          const error = new Error("lock exists") as NodeJS.ErrnoException
+          error.code = "EEXIST"
+          throw error
+        }
+        files.set(path, content)
+      },
+    }
+
+    // when
+    const result = withLessonStoreLock("/lessons", deps, () => "done")
+
+    // then
+    expect(result).toEqual({ ok: true, value: "done" })
+    expect(attempts).toBe(2)
+    expect(files.size).toBe(0)
+  })
+
+  test("#given a fresh lock #when all acquisitions contend #then retries wait and fail without stealing the lock", () => {
+    // given
+    const lockPath = "/lessons/.record-lesson.lock"
+    const delays: number[] = []
+    const deps: StoreDeps = {
+      mkdirSync: () => undefined,
+      now: () => FIXED_DATE,
+      statSync: () => ({ ino: 10, mtimeMs: FIXED_DATE.getTime() - 1_000 }),
+      sleepSync: (milliseconds) => { delays.push(milliseconds) },
+      writeFileSync: () => {
+        const error = new Error("lock exists") as NodeJS.ErrnoException
+        error.code = "EEXIST"
+        throw error
+      },
+    }
+
+    // when
+    const result = withLessonStoreLock("/lessons", deps, () => "unreachable")
+
+    // then
+    expect(result).toEqual({ ok: false, error: `Error: lesson store lock is busy after 6 attempts: ${lockPath}` })
+    expect(delays).toEqual([25, 50, 100, 200, 400])
+  })
+
+  test("#given a replacement lock appears during stale reclamation #when ownership is checked #then the replacement is restored rather than deleted", () => {
+    // given
+    const lockPath = "/lessons/.record-lesson.lock"
+    const quarantinePath = `${lockPath}.reclaim-42-abcdef`
+    const files = new Map([[lockPath, "stale owner"]])
+    let statCalls = 0
+    const deps: StoreDeps = {
+      mkdirSync: () => undefined,
+      now: () => FIXED_DATE,
+      processId: 42,
+      statSync: (path) => {
+        statCalls += 1
+        if (path === lockPath && statCalls === 1) return { ino: 10, mtimeMs: FIXED_DATE.getTime() - 60_001 }
+        if (path === quarantinePath) return { ino: 10, mtimeMs: FIXED_DATE.getTime() - 60_001 }
+        return { ino: 11, mtimeMs: FIXED_DATE.getTime() }
+      },
+      renameSync: (source, destination) => {
+        const content = files.get(source)
+        if (content === undefined) throw new Error("missing source")
+        files.delete(source)
+        files.set(destination, content)
+        if (source === lockPath) files.set(lockPath, "replacement owner")
+      },
+      sleepSync: () => undefined,
+      unlinkSync: (path) => { files.delete(path) },
+      writeFileSync: () => {
+        const error = new Error("lock exists") as NodeJS.ErrnoException
+        error.code = "EEXIST"
+        throw error
+      },
+    }
+
+    // when
+    withLessonStoreLock("/lessons", deps, () => "unreachable")
+
+    // then
+    expect(files.get(lockPath)).toBe("replacement owner")
+    expect(files.has(quarantinePath)).toBe(false)
+  })
+
+  test("#given one contended acquisition #when the critical section runs #then retry is delayed before entering", () => {
     // given
     const events: string[] = []
     let attempts = 0
     const deps: StoreDeps = {
       mkdirSync: () => undefined,
+      now: () => FIXED_DATE,
+      statSync: () => ({ ino: 10, mtimeMs: FIXED_DATE.getTime() }),
+      sleepSync: (milliseconds) => { events.push(`sleep-${milliseconds}`) },
       writeFileSync: () => {
         attempts += 1
         events.push(`acquire-${attempts}`)
@@ -249,7 +354,28 @@ describe("withLessonStoreLock", () => {
 
     // then
     expect(result).toEqual({ ok: true, value: "done" })
-    expect(events).toEqual(["acquire-1", "acquire-2", "critical", "release"])
+    expect(events).toEqual(["acquire-1", "sleep-25", "acquire-2", "critical", "release"])
+  })
+
+  test("#given successful acquisition #when the critical section completes #then lock metadata identifies its owner and the lock is removed", () => {
+    // given
+    const writes: string[] = []
+    const removed: string[] = []
+    const deps: StoreDeps = {
+      mkdirSync: () => undefined,
+      now: () => FIXED_DATE,
+      processId: 42,
+      writeFileSync: (_path, content) => { writes.push(content) },
+      unlinkSync: (path) => { removed.push(path) },
+    }
+
+    // when
+    const result = withLessonStoreLock("/lessons", deps, () => "done")
+
+    // then
+    expect(result).toEqual({ ok: true, value: "done" })
+    expect(writes).toEqual(["pid=42\ncreated=2026-08-13T00:00:00.000Z\n"])
+    expect(removed).toEqual(["/lessons/.record-lesson.lock"])
   })
 
   test("#given a critical section error #when the lock scope exits #then the lock is removed", () => {
