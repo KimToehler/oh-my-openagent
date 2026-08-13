@@ -148,6 +148,27 @@ describe("createRecordLessonTool", () => {
     expect(second).toContain([...memory.files.keys()][0]!)
   })
 
+  test("#given no origin deps #when recording from a worktree #then the origin line names the repo and a real sha", async () => {
+    // given
+    const memory = createMemoryFs()
+    const tool = createTool(memory, {
+      projectDir: process.cwd(),
+      getRepoName: undefined,
+      getCommitSha: undefined,
+    })
+
+    // when
+    await execute(tool)
+
+    // then
+    const content = [...memory.files.values()][0]!
+    const originLine = content.match(/^Learned in: (?<origin>.*)$/m)?.groups?.origin
+    expect(originLine).toBeDefined()
+    expect(originLine).not.toContain("unknown")
+    expect(originLine).not.toContain(basename(process.cwd()))
+    expect(originLine).toMatch(/^oh-my-openagent @ [0-9a-f]{7,40}$/)
+  })
+
   test("#given a bad citation and full store #when recording #then citation rejection wins before cap validation", async () => {
     // given
     const memory = createMemoryFs(Object.fromEntries(Array.from({ length: 200 }, (_, index) => [`/lessons/${index}.md`, "x"])))

@@ -4,6 +4,7 @@ import { writeFileSync as nodeWriteFileSync } from "node:fs"
 import { basename } from "node:path"
 
 import { verifyCitations } from "./citations"
+import { resolveRepoOrigin, type RepoOrigin } from "./origin"
 import { resolveLessonsDir } from "./paths"
 import { computeSemanticLessonHash, extractBody, renderLesson, type RenderLessonInput } from "./render"
 import { findLessonByHash, generateLessonId, writeLessonExclusive, type StoreDeps } from "./store"
@@ -19,13 +20,27 @@ function recordedDate(deps: RecordLessonDeps): string {
   return (deps.now?.() ?? new Date()).toISOString().slice(0, 10)
 }
 
+function resolveOrigin(deps: RecordLessonDeps): RepoOrigin {
+  const injectedRepoName = deps.getRepoName?.()
+  const injectedCommitSha = deps.getCommitSha?.()
+  if (injectedRepoName !== undefined && injectedCommitSha !== undefined) {
+    return { repoName: injectedRepoName, commitSha: injectedCommitSha }
+  }
+  const resolved = resolveRepoOrigin(deps.projectDir)
+  return {
+    repoName: injectedRepoName ?? resolved.repoName,
+    commitSha: injectedCommitSha ?? resolved.commitSha,
+  }
+}
+
 function createRenderInput(args: RecordLessonArgs, deps: RecordLessonDeps, lessonId: string): RenderLessonInput {
+  const origin = resolveOrigin(deps)
   const input = {
     description: args.description ?? args.title,
     globs: args.globs,
     title: args.title,
-    repoName: deps.getRepoName?.() ?? basename(deps.projectDir),
-    commitSha: deps.getCommitSha?.() ?? "unknown",
+    repoName: origin.repoName,
+    commitSha: origin.commitSha,
     model: deps.getModelId(),
     recordedDate: recordedDate(deps),
     lessonId,
