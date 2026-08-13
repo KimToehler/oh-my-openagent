@@ -153,6 +153,7 @@ export function createCoreTools(args: {
   if (pluginConfig.lessons?.enabled) {
     tools.record_lesson = createRecordLessonTool({
       projectDir: ctx.directory,
+      env: process.env,
       config: pluginConfig.lessons,
       getModelId: () => {
         const sessionID = getMainSessionID()
