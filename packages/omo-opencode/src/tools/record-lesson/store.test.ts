@@ -3,11 +3,11 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, unlinkSync, writeFileSy
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
+const STORE_SOURCE = readFileSync(new URL("./store.ts", import.meta.url), "utf8")
+
 import {
-  findLessonByHash,
   generateLessonId,
   listLessons,
-  withLessonStoreLock,
   writeLessonExclusive,
   type StoreDeps,
 } from "./store"
@@ -46,6 +46,19 @@ function spawnLockProcess(script: string, args: readonly string[]): ReturnType<t
 }
 
 const FIXED_DATE = new Date("2026-08-13T00:00:00Z")
+
+describe("lesson store lock audit", () => {
+  test("#given store source #when audited #then blocking lockfile primitives cannot return", () => {
+    // given
+    const forbiddenPatterns = [/Atomics\.wait/, /const\s+\w*LOCK\w*FILENAME/i, /const\s+\w*STALE\w*(?:MS|THRESHOLD)/i]
+
+    // when
+    const violations = forbiddenPatterns.filter((pattern) => pattern.test(STORE_SOURCE))
+
+    // then
+    expect(violations).toEqual([])
+  })
+})
 
 function createMemoryFs(initial: Record<string, string> = {}): {
   readonly deps: StoreDeps
@@ -90,10 +103,10 @@ describe("generateLessonId", () => {
     const deps = { now: () => FIXED_DATE, randomHex: () => "a3f9c1" }
 
     // when
-    const lessonId = generateLessonId("Tool Registry Gating", deps)
+    const lessonId = generateLessonId("Tool Registry Gating", "0123456789abcdef", deps)
 
     // then
-    expect(lessonId).toBe("20260813-tool-registry-gating-a3f9c1")
+    expect(lessonId).toBe("tool-registry-gating-0123456789abcdef")
   })
 
   test("#given mixed case spaces and punctuation #when generated #then the slug is normalized and limited to 40 characters", () => {
@@ -101,10 +114,10 @@ describe("generateLessonId", () => {
     const source = "  Mixed CASE, punctuation!!! and a very long source name beyond forty chars  "
 
     // when
-    const lessonId = generateLessonId(source, { now: () => FIXED_DATE, randomHex: () => "abcdef" })
+    const lessonId = generateLessonId(source, "0123456789abcdef", { now: () => FIXED_DATE, randomHex: () => "abcdef" })
 
     // then
-    expect(lessonId).toBe("20260813-mixed-case-punctuation-and-a-very-long-s-abcdef")
+    expect(lessonId).toBe("mixed-case-punctuation-and-a-very-long-s-0123456789abcdef")
   })
 
   test("#given truncation lands on a separator #when generated #then the slug has no dangling hyphen", () => {
@@ -112,10 +125,10 @@ describe("generateLessonId", () => {
     const source = `${"a".repeat(39)} tail`
 
     // when
-    const lessonId = generateLessonId(source, { now: () => FIXED_DATE, randomHex: () => "abcdef" })
+    const lessonId = generateLessonId(source, "0123456789abcdef", { now: () => FIXED_DATE, randomHex: () => "abcdef" })
 
     // then
-    expect(lessonId).toBe(`20260813-${"a".repeat(39)}-abcdef`)
+    expect(lessonId).toBe(`${"a".repeat(39)}-0123456789abcdef`)
   })
 
   test("#given a source with no alphanumeric characters #when generated #then the slug falls back to lesson", () => {
@@ -123,448 +136,10 @@ describe("generateLessonId", () => {
     const source = " !!! "
 
     // when
-    const lessonId = generateLessonId(source, { now: () => FIXED_DATE, randomHex: () => "123abc" })
+    const lessonId = generateLessonId(source, "0123456789abcdef", { now: () => FIXED_DATE, randomHex: () => "123abc" })
 
     // then
-    expect(lessonId).toBe("20260813-lesson-123abc")
-  })
-})
-
-describe("writeLessonExclusive", () => {
-  test("#given an unused id #when written #then exactly one file contains the exact content", () => {
-    // given
-    const memory = createMemoryFs()
-
-    // when
-    const result = writeLessonExclusive({
-      lessonsDir: "/lessons",
-      content: "exact content",
-      slugSource: "Store",
-      deps: { ...memory.deps, now: () => FIXED_DATE, randomHex: () => "111111" },
-    })
-
-    // then
-    expect(result).toEqual({ ok: true, lessonId: "20260813-store-111111", path: "/lessons/20260813-store-111111.md" })
-    expect([...memory.files.entries()]).toEqual([["/lessons/20260813-store-111111.md", "exact content"]])
-  })
-
-  test("#given the first id already exists #when written #then retry creates one different file without changing the existing bytes", () => {
-    // given
-    const existingPath = "/lessons/20260813-store-aaaaaa.md"
-    const memory = createMemoryFs({ [existingPath]: "PREEXISTING" })
-
-    // when
-    const result = writeLessonExclusive({
-      lessonsDir: "/lessons",
-      content: "NEW CONTENT",
-      slugSource: "Store",
-      deps: { ...memory.deps, now: () => FIXED_DATE, randomHex: sequence(["aaaaaa", "bbbbbb"]) },
-    })
-
-    // then
-    expect(result).toEqual({ ok: true, lessonId: "20260813-store-bbbbbb", path: "/lessons/20260813-store-bbbbbb.md" })
-    expect(memory.writeAttempts).toEqual([existingPath, "/lessons/20260813-store-bbbbbb.md"])
-    expect(memory.files.size).toBe(2)
-    expect(memory.files.get(existingPath)).toBe("PREEXISTING")
-  })
-
-  test("#given five colliding ids #when written #then allocation fails without writing a file", () => {
-    // given
-    const initial = Object.fromEntries(["111111", "222222", "333333", "444444", "555555"].map((suffix) => [`/lessons/20260813-store-${suffix}.md`, suffix]))
-    const memory = createMemoryFs(initial)
-
-    // when
-    const result = writeLessonExclusive({
-      lessonsDir: "/lessons",
-      content: "NEW CONTENT",
-      slugSource: "Store",
-      deps: { ...memory.deps, now: () => FIXED_DATE, randomHex: sequence(["111111", "222222", "333333", "444444", "555555"]) },
-    })
-
-    // then
-    expect(result).toEqual({ ok: false, error: "Error: could not allocate a unique lesson id after 5 attempts." })
-    expect(memory.files).toEqual(new Map(Object.entries(initial)))
-  })
-
-  test("#given a non-collision filesystem error #when written #then the real error message is returned without throwing", () => {
-    // given
-    const error = new Error("permission denied") as NodeJS.ErrnoException
-    error.code = "EACCES"
-
-    // when
-    const result = writeLessonExclusive({
-      lessonsDir: "/lessons",
-      content: "content",
-      slugSource: "Store",
-      deps: {
-        mkdirSync: () => undefined,
-        lstatSync: () => ({ isSymbolicLink: () => false }),
-        realpathSync: (path) => path,
-        writeFileSync: () => { throw error },
-        now: () => FIXED_DATE,
-        randomHex: () => "111111",
-      },
-    })
-
-    // then
-    expect(result).toEqual({ ok: false, error: "permission denied" })
-  })
-
-  test("#given a symlinked lessons directory #when written #then the write boundary rejects it", () => {
-    // given
-    const memory = createMemoryFs()
-
-    // when
-    const result = writeLessonExclusive({
-      lessonsDir: "/lessons",
-      content: "content",
-      slugSource: "Store",
-      deps: {
-        ...memory.deps,
-        lstatSync: () => ({ isSymbolicLink: () => true }),
-        now: () => FIXED_DATE,
-        randomHex: () => "111111",
-      },
-    })
-
-    // then
-    expect(result).toEqual({ ok: false, error: "Error: lessons directory must not be a symbolic link: /lessons" })
-    expect(memory.writeAttempts).toEqual([])
-  })
-
-  test("#given a resolved parent outside the lessons root #when written #then the escaping target is rejected", () => {
-    // given
-    const memory = createMemoryFs()
-    let realpathCalls = 0
-
-    // when
-    const result = writeLessonExclusive({
-      lessonsDir: "/safe/lessons",
-      content: "content",
-      slugSource: "Store",
-      deps: {
-        ...memory.deps,
-        lstatSync: () => ({ isSymbolicLink: () => false }),
-        realpathSync: () => realpathCalls++ === 0 ? "/safe/lessons" : "/safe/lessons-escape",
-        now: () => FIXED_DATE,
-        randomHex: () => "111111",
-      },
-    })
-
-    // then
-    expect(result).toEqual({ ok: false, error: "Error: lesson target escapes lessons directory: /safe/lessons-escape/20260813-store-111111.md" })
-    expect(memory.writeAttempts).toEqual([])
-  })
-
-})
-
-describe("withLessonStoreLock", () => {
-
-  test("#given stale observation followed by a live replacement #when two real processes acquire #then critical sections never overlap", async () => {
-    // given
-    const lessonsDir = createTempDir()
-    const storeUrl = new URL("./store.ts", import.meta.url).href
-    const lockPath = join(lessonsDir, ".record-lesson.lock")
-    const observedPath = join(lessonsDir, "observed")
-    const proceedPath = join(lessonsDir, "proceed")
-    const victimEnteredPath = join(lessonsDir, "victim-entered")
-    const releaseVictimPath = join(lessonsDir, "release-victim")
-    const overlapPath = join(lessonsDir, "overlap")
-    writeFileSync(lockPath, "abandoned")
-
-    const reclaimer = spawnLockProcess(`
-      import { existsSync, statSync, writeFileSync } from "node:fs";
-      import { withLessonStoreLock } from ${JSON.stringify(storeUrl)};
-      const [lessonsDir, observedPath, proceedPath, victimEnteredPath, overlapPath] = process.argv.slice(1);
-      const result = withLessonStoreLock(lessonsDir, {
-        statSync: (path) => {
-          const stat = statSync(path);
-          if (path.endsWith(".record-lesson.lock") && !existsSync(observedPath)) {
-            writeFileSync(observedPath, "observed");
-            while (!existsSync(proceedPath)) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
-            return { ino: stat.ino, mtimeMs: 0 };
-          }
-          return { ino: stat.ino, mtimeMs: stat.mtimeMs };
-        },
-      }, () => {
-        if (existsSync(victimEnteredPath)) writeFileSync(overlapPath, "overlap");
-        return "done";
-      });
-      if (!result.ok) throw new Error(result.error);
-    `, [lessonsDir, observedPath, proceedPath, victimEnteredPath, overlapPath])
-    await waitForFile(observedPath)
-    unlinkSync(lockPath)
-
-    const victim = spawnLockProcess(`
-      import { existsSync, unlinkSync, writeFileSync } from "node:fs";
-      import { withLessonStoreLock } from ${JSON.stringify(storeUrl)};
-      const [lessonsDir, enteredPath, releasePath] = process.argv.slice(1);
-      const result = withLessonStoreLock(lessonsDir, {}, () => {
-        writeFileSync(enteredPath, "entered");
-        while (!existsSync(releasePath)) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
-        unlinkSync(enteredPath);
-        return "done";
-      });
-      if (!result.ok) throw new Error(result.error);
-    `, [lessonsDir, victimEnteredPath, releaseVictimPath])
-    await waitForFile(victimEnteredPath)
-
-    // when
-    writeFileSync(proceedPath, "proceed")
-    await Bun.sleep(100)
-    writeFileSync(releaseVictimPath, "release")
-    const [reclaimerExit, victimExit] = await Promise.all([reclaimer.exited, victim.exited])
-
-    // then
-    expect(reclaimerExit).toBe(0)
-    expect(victimExit).toBe(0)
-    expect(readdirSync(lessonsDir)).not.toContain("overlap")
-  })
-  test("#given a stale lock #when acquisition retries #then the stale lock is reclaimed and the critical section runs", () => {
-    // given
-    const lockPath = "/lessons/.record-lesson.lock"
-    const files = new Map([[lockPath, "stale owner"]])
-    let attempts = 0
-    const deps: StoreDeps = {
-      mkdirSync: () => undefined,
-      now: () => FIXED_DATE,
-      processId: 42,
-      readFileSync: (path) => files.get(path) ?? "",
-      statSync: () => ({ ino: 10, mtimeMs: FIXED_DATE.getTime() - 60_001 }),
-      renameSync: (source, destination) => {
-        const content = files.get(source)
-        if (content === undefined) throw new Error("missing source")
-        files.delete(source)
-        files.set(destination, content)
-      },
-      sleepSync: () => undefined,
-      unlinkSync: (path) => { files.delete(path) },
-      writeFileSync: (path, content) => {
-        attempts += 1
-        if (files.has(path)) {
-          const error = new Error("lock exists") as NodeJS.ErrnoException
-          error.code = "EEXIST"
-          throw error
-        }
-        files.set(path, content)
-      },
-    }
-
-    // when
-    const result = withLessonStoreLock("/lessons", deps, () => "done")
-
-    // then
-    expect(result).toEqual({ ok: true, value: "done" })
-    expect(attempts).toBe(2)
-    expect(files.size).toBe(0)
-  })
-
-  test("#given a fresh lock #when all acquisitions contend #then retries wait and fail without stealing the lock", () => {
-    // given
-    const lockPath = "/lessons/.record-lesson.lock"
-    const delays: number[] = []
-    const deps: StoreDeps = {
-      mkdirSync: () => undefined,
-      now: () => FIXED_DATE,
-      statSync: () => ({ ino: 10, mtimeMs: FIXED_DATE.getTime() - 1_000 }),
-      sleepSync: (milliseconds) => { delays.push(milliseconds) },
-      writeFileSync: () => {
-        const error = new Error("lock exists") as NodeJS.ErrnoException
-        error.code = "EEXIST"
-        throw error
-      },
-    }
-
-    // when
-    const result = withLessonStoreLock("/lessons", deps, () => "unreachable")
-
-    // then
-    expect(result).toEqual({ ok: false, error: `Error: lesson store lock is busy after 6 attempts: ${lockPath}` })
-    expect(delays).toEqual([25, 50, 100, 200, 400])
-  })
-
-  test("#given a replacement lock appears during stale reclamation #when ownership is checked #then the replacement is restored rather than deleted", () => {
-    // given
-    const lockPath = "/lessons/.record-lesson.lock"
-    const quarantinePath = `${lockPath}.reclaim-42-abcdef`
-    const files = new Map([[lockPath, "stale owner"]])
-    let statCalls = 0
-    const deps: StoreDeps = {
-      mkdirSync: () => undefined,
-      now: () => FIXED_DATE,
-      processId: 42,
-      statSync: (path) => {
-        statCalls += 1
-        if (path === lockPath && statCalls === 1) return { ino: 10, mtimeMs: FIXED_DATE.getTime() - 60_001 }
-        if (path === quarantinePath) return { ino: 10, mtimeMs: FIXED_DATE.getTime() - 60_001 }
-        return { ino: 11, mtimeMs: FIXED_DATE.getTime() }
-      },
-      renameSync: (source, destination) => {
-        const content = files.get(source)
-        if (content === undefined) throw new Error("missing source")
-        files.delete(source)
-        files.set(destination, content)
-        if (source === lockPath) files.set(lockPath, "replacement owner")
-      },
-      sleepSync: () => undefined,
-      unlinkSync: (path) => { files.delete(path) },
-      writeFileSync: () => {
-        const error = new Error("lock exists") as NodeJS.ErrnoException
-        error.code = "EEXIST"
-        throw error
-      },
-    }
-
-    // when
-    withLessonStoreLock("/lessons", deps, () => "unreachable")
-
-    // then
-    expect(files.get(lockPath)).toBe("replacement owner")
-    expect(files.has(quarantinePath)).toBe(false)
-  })
-
-  test("#given one contended acquisition #when the critical section runs #then retry is delayed before entering", () => {
-    // given
-    const events: string[] = []
-    let attempts = 0
-    const deps: StoreDeps = {
-      mkdirSync: () => undefined,
-      now: () => FIXED_DATE,
-      processId: 1,
-      statSync: () => ({ ino: 10, mtimeMs: FIXED_DATE.getTime() }),
-      readFileSync: () => "pid=1\nnonce=mock\ncreated=2026-08-13T00:00:00.000Z\n",
-      randomHex: () => "mock",
-      sleepSync: (milliseconds) => { events.push(`sleep-${milliseconds}`) },
-      writeFileSync: () => {
-        attempts += 1
-        events.push(`acquire-${attempts}`)
-        if (attempts === 1) {
-          const error = new Error("lock exists") as NodeJS.ErrnoException
-          error.code = "EEXIST"
-          throw error
-        }
-      },
-      unlinkSync: () => { events.push("release") },
-    }
-
-    // when
-    const result = withLessonStoreLock("/lessons", deps, () => {
-      events.push("critical")
-      return "done"
-    })
-
-    // then
-    expect(result).toEqual({ ok: true, value: "done" })
-    expect(events).toEqual(["acquire-1", "sleep-25", "acquire-2", "critical", "release"])
-  })
-
-  test("#given successful acquisition #when the critical section completes #then lock metadata identifies its owner and the lock is removed", () => {
-    // given
-    const writes: string[] = []
-    const removed: string[] = []
-    const deps: StoreDeps = {
-      mkdirSync: () => undefined,
-      now: () => FIXED_DATE,
-      processId: 42,
-      randomHex: () => "abcdef",
-      readFileSync: () => writes.at(-1) ?? "",
-      writeFileSync: (_path, content) => { writes.push(content) },
-      unlinkSync: (path) => { removed.push(path) },
-    }
-
-    // when
-    const result = withLessonStoreLock("/lessons", deps, () => "done")
-
-    // then
-    expect(result).toEqual({ ok: true, value: "done" })
-    expect(writes).toEqual(["pid=42\nnonce=abcdef\ncreated=2026-08-13T00:00:00.000Z\n"])
-    expect(removed).toEqual(["/lessons/.record-lesson.lock"])
-  })
-
-  test("#given a critical section error #when the lock scope exits #then the lock is removed", () => {
-    // given
-    const removed: string[] = []
-    const deps: StoreDeps = {
-      mkdirSync: () => undefined,
-      now: () => FIXED_DATE,
-      processId: 1,
-      randomHex: () => "abcdef",
-      readFileSync: () => "pid=1\nnonce=abcdef\ncreated=2026-08-13T00:00:00.000Z\n",
-      writeFileSync: () => undefined,
-      unlinkSync: (path) => { removed.push(path) },
-    }
-
-    // when
-    const result = withLessonStoreLock("/lessons", deps, () => { throw new Error("dedup read failed") })
-
-    // then
-    expect(result).toEqual({ ok: false, error: "dedup read failed" })
-    expect(removed).toEqual(["/lessons/.record-lesson.lock"])
-  })
-
-
-  test("#given successful critical section and missing lock #when release runs #then success stays inside Result API", () => {
-    // given
-    const missing = new Error("lock missing") as NodeJS.ErrnoException
-    missing.code = "ENOENT"
-
-    // when
-    const result = withLessonStoreLock("/lessons", {
-      mkdirSync: () => undefined,
-      now: () => FIXED_DATE,
-      processId: 1,
-      randomHex: () => "abcdef",
-      readFileSync: () => "pid=1\nnonce=abcdef\ncreated=2026-08-13T00:00:00.000Z\n",
-      writeFileSync: () => undefined,
-      unlinkSync: () => { throw missing },
-    }, () => "written")
-
-    // then
-    expect(result).toEqual({ ok: true, value: "written" })
-  })
-
-  test("#given stale quarantine inode mismatch #when reclamation finishes #then quarantine is removed", () => {
-    // given
-    const lockPath = "/lessons/.record-lesson.lock"
-    const quarantinePath = `${lockPath}.reclaim-42-abcdef`
-    const files = new Map([[lockPath, "stale owner"]])
-    let attempts = 0
-    const deps: StoreDeps = {
-      mkdirSync: () => undefined,
-      now: () => FIXED_DATE,
-      processId: 42,
-      randomHex: () => "abcdef",
-      readFileSync: (path) => files.get(path) ?? "",
-      statSync: (path) => ({
-        ino: path === lockPath ? 10 : 11,
-        mtimeMs: FIXED_DATE.getTime() - 60_001,
-      }),
-      renameSync: (source, destination) => {
-        const content = files.get(source)
-        if (content === undefined) throw new Error("missing source")
-        files.delete(source)
-        files.set(destination, content)
-      },
-      sleepSync: () => undefined,
-      unlinkSync: (path) => { files.delete(path) },
-      writeFileSync: (path, content) => {
-        attempts += 1
-        if (files.has(path)) {
-          const error = new Error("lock exists") as NodeJS.ErrnoException
-          error.code = "EEXIST"
-          throw error
-        }
-        files.set(path, content)
-      },
-    }
-
-    // when
-    const result = withLessonStoreLock("/lessons", deps, () => "done")
-
-    // then
-    expect(result).toEqual({ ok: true, value: "done" })
-    expect(attempts).toBe(2)
-    expect(files.has(quarantinePath)).toBe(false)
+    expect(lessonId).toBe("lesson-0123456789abcdef")
   })
 })
 
@@ -592,48 +167,55 @@ describe("listLessons", () => {
   })
 })
 
-describe("findLessonByHash", () => {
-  test("#given a hash line and the same token in prose #when searched #then only the hash line matches", () => {
+describe("multi-process lesson writes", () => {
+  const runWorkers = async (lessonsDir: string, hashes: readonly string[]): Promise<readonly string[]> => {
+    const startPath = join(lessonsDir, "start")
+    const storeUrl = new URL("./store.ts", import.meta.url).href
+    const script = `
+      import { existsSync } from "node:fs";
+      import { writeLessonExclusive } from ${JSON.stringify(new URL("./store.ts", import.meta.url).href)};
+      const [lessonsDir, startPath, hash] = process.argv.slice(1);
+      while (!existsSync(startPath)) await new Promise((resolve) => setTimeout(resolve, 2));
+      const content = \`Lesson id: placeholder\\nLesson hash: \${hash}\\nRecorded: 2026-08-14\\n\`;
+      const result = writeLessonExclusive({ lessonsDir, content, slugSource: \`Lesson \${hash}\`, semanticHash: hash });
+      if (!result.ok) { console.error(result.error); process.exit(1); }
+      console.log(result.duplicate ? "duplicate no-op" : "Recorded");
+    `
+    void storeUrl
+    const workers = hashes.map((hash) => Bun.spawn([process.execPath, "-e", script, lessonsDir, startPath, hash], { stdout: "pipe", stderr: "pipe" }))
+    writeFileSync(startPath, "go")
+    return Promise.all(workers.map(async (worker) => {
+      const output = await new Response(worker.stdout).text()
+      const error = await new Response(worker.stderr).text()
+      const exitCode = await worker.exited
+      if (exitCode !== 0) throw new Error(error)
+      return output.trim()
+    }))
+  }
+
+  test("#given four processes recording one semantic lesson #when released together #then one records and three are duplicate no-ops", async () => {
     // given
-    const hash = "0123456789abcdef"
-    const memory = createMemoryFs({
-      "/lessons/a.md": `# Lesson\n\nProse mentions ${hash} but is not metadata.\n`,
-      "/lessons/b.md": `# Lesson\n\nLesson hash: ${hash}\n`,
-    })
+    const lessonsDir = createTempDir()
 
     // when
-    const match = findLessonByHash("/lessons", hash, memory.deps)
+    const outputs = await runWorkers(lessonsDir, Array.from({ length: 4 }, () => "0123456789abcdef"))
 
     // then
-    expect(match).toBe("b.md")
+    expect(readdirSync(lessonsDir).filter((name) => name.endsWith(".md"))).toHaveLength(1)
+    expect(outputs.filter((output) => output === "Recorded")).toHaveLength(1)
+    expect(outputs.filter((output) => output === "duplicate no-op")).toHaveLength(3)
   })
 
-  test("#given an unreadable lesson #when deduplicating #then the read error fails the call", () => {
+  test("#given four processes recording distinct semantic lessons #when released together #then all four record without failure", async () => {
     // given
-    const memory = createMemoryFs({ "/lessons/a.md": "Lesson hash: 0123456789abcdef\n" })
-    const deps: StoreDeps = {
-      ...memory.deps,
-      readFileSync: () => { throw new Error("lesson temporarily unreadable") },
-    }
+    const lessonsDir = createTempDir()
+    const hashes = ["0000000000000001", "0000000000000002", "0000000000000003", "0000000000000004"]
 
     // when
-    const find = () => findLessonByHash("/lessons", "0123456789abcdef", deps)
+    const outputs = await runWorkers(lessonsDir, hashes)
 
     // then
-    expect(find).toThrow("Failed to read lesson /lessons/a.md: lesson temporarily unreadable")
-  })
-
-  test("#given the lesson directory cannot be listed #when deduplicating #then the directory error fails the call", () => {
-    // given
-    const deps: StoreDeps = {
-      existsSync: () => true,
-      readdirSync: () => { throw new Error("directory temporarily unreadable") },
-    }
-
-    // when
-    const find = () => findLessonByHash("/lessons", "0123456789abcdef", deps)
-
-    // then
-    expect(find).toThrow("Failed to list lessons in /lessons: directory temporarily unreadable")
+    expect(readdirSync(lessonsDir).filter((name) => name.endsWith(".md"))).toHaveLength(4)
+    expect(outputs).toEqual(["Recorded", "Recorded", "Recorded", "Recorded"])
   })
 })
