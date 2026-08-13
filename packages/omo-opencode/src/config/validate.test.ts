@@ -160,6 +160,45 @@ describe("validatePluginConfig", () => {
     })
   })
 
+  it("#given project lessons settings #when validating #then discards enabled and storage but keeps project limits", () => {
+    withOmoConfig("protected-project-lessons", (fixture) => {
+      writeProjectConfig(fixture, {
+        "[opencode]": {
+          lessons: { enabled: true, storage: "project", max_files: 25, max_body_chars: 500 },
+        },
+      })
+
+      const result = validatePluginConfig(fixture.project)
+
+      expect(result.config.lessons).toEqual({
+        enabled: false,
+        storage: "user",
+        max_files: 25,
+        max_body_chars: 500,
+      })
+    })
+  })
+
+  it("#given user lessons settings and project limits #when validating #then honors user enabled and storage with project limits", () => {
+    withOmoConfig("protected-user-lessons", (fixture) => {
+      writeUserConfig(fixture, {
+        "[opencode]": { lessons: { enabled: true, storage: "project" } },
+      })
+      writeProjectConfig(fixture, {
+        "[opencode]": { lessons: { enabled: false, storage: "user", max_files: 25, max_body_chars: 500 } },
+      })
+
+      const result = validatePluginConfig(fixture.project)
+
+      expect(result.config.lessons).toEqual({
+        enabled: true,
+        storage: "project",
+        max_files: 25,
+        max_body_chars: 500,
+      })
+    })
+  })
+
   it("#given protected fields in an active user profile and project profile #when validating #then honors only the user profile values", () => {
     withOmoConfig("protected-user-profile", (fixture) => {
       writeUserConfig(fixture, {

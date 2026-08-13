@@ -75,6 +75,14 @@ function protectUserFields(
 ): OhMyOpenCodeConfig {
   const userMcpEnvAllowlist = userConfig?.mcp_env_allowlist ?? []
   const userPlaywrightMcpArgs = userConfig?.browser_automation_engine?.playwright_mcp_args
+  const userLessons = userConfig.lessons
+  const lessons = config.lessons === undefined
+    ? undefined
+    : {
+      ...config.lessons,
+      enabled: userLessons?.enabled ?? false,
+      storage: userLessons?.storage ?? "user",
+    }
   const browserAutomationEngine = config.browser_automation_engine === undefined
     ? undefined
     : (() => {
@@ -85,6 +93,7 @@ function protectUserFields(
   return {
     ...config,
     mcp_env_allowlist: userMcpEnvAllowlist,
+    ...(lessons === undefined ? {} : { lessons }),
     ...(browserAutomationEngine === undefined
       ? {}
       : {

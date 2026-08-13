@@ -1,4 +1,4 @@
-import { existsSync as nodeExistsSync, readFileSync as nodeReadFileSync } from "node:fs"
+import { existsSync as nodeExistsSync, lstatSync as nodeLstatSync, readFileSync as nodeReadFileSync } from "node:fs"
 import { join } from "node:path"
 
 import { spawnSync } from "../../shared/bun-spawn-shim"
@@ -13,6 +13,7 @@ export type ParsedCitation =
 
 export type VerifyCitationsDeps = {
   readonly existsSync?: (p: string) => boolean
+  readonly lstatSync?: (p: string) => { readonly isFile: () => boolean; readonly size: number }
   readonly readFileSync?: (p: string) => string
   readonly runGit?: (args: readonly string[], cwd: string) => { readonly exitCode: number }
 }
@@ -29,6 +30,7 @@ const PATH_RE = /^[A-Za-z0-9._@+-]+(?:\/[A-Za-z0-9._@+-]+)*$/
 const LINE_SUFFIX_RE = /^(?<pathPart>.+?)(?::(?<startLine>\d+)(?:(?:-|:)(?<endLine>\d+))?)?$/
 const TEST_NAME_RE = /^[A-Za-z0-9 _.,:()#[\]{}+*/'"=-]+$/
 const WINDOWS_DRIVE_RE = /^[A-Za-z]:/
+const MAX_CITATION_FILE_BYTES = 4 * 1024 * 1024
 
 export const REASON_PATH_MISSING = "path does not exist"
 export const REASON_LINE_INVALID = "invalid or missing line"
@@ -121,6 +123,8 @@ function verifyOne(
       if (parsed.startLine === undefined) return null
       let content: string
       try {
+        const stats = deps.lstatSync(absolutePath)
+        if (!stats.isFile() || stats.size > MAX_CITATION_FILE_BYTES) return REASON_LINE_INVALID
         content = deps.readFileSync(absolutePath)
       } catch {
         return REASON_LINE_INVALID
@@ -150,6 +154,7 @@ export function verifyCitations(
 ): VerifyResult {
   const resolved: Required<VerifyCitationsDeps> = {
     existsSync: deps.existsSync ?? nodeExistsSync,
+    lstatSync: deps.lstatSync ?? nodeLstatSync,
     readFileSync: deps.readFileSync ?? ((path) => nodeReadFileSync(path, "utf8")),
     runGit: deps.runGit ?? defaultRunGit,
   }
