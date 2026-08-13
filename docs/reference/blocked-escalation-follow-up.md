@@ -43,7 +43,7 @@ The blocked-subagent escalation feature shipped `report_blocked` (a new always-o
 
 **Acceptance criteria:**
 - Add a row to the script table in `.agents/skills/opencode-qa/SKILL.md` for `blocked-escalation-probe.sh`.
-- Description in the Self-test column must state: `--self-test` mode asserts that the `report_blocked` notification injects the expected JSON structure (`reason` and `needs` fields) into the parked prompt. (Live-run behavior, where a background subagent blocks and parent receives the wake notification, belongs in the ROUTER table column, not here.)
+- Description in the Self-test column must state: `--self-test` mode asserts that `task` and `report_blocked` tool calls are emitted, the reminder matcher rejects a no-reminder stream and accepts a reminder marker, and the duplicate-reminder counter counts every occurrence. (Live-run behavior, where a background subagent blocks and parent receives the wake notification, belongs in the ROUTER table column, not here.)
 - Include the correct category column (B for hook/event proof, matching `sse-hook-probe.sh`).
 - Do NOT modify the script itself or any other part of the SKILL.md.
 
