@@ -54,7 +54,7 @@ async function executeRecordLesson(args: RecordLessonArgs, deps: RecordLessonDep
   const lessonsDirResult = resolveLessonsDir({ env: deps.env, config: deps.config, projectDir: deps.projectDir })
   if (!lessonsDirResult.ok) return lessonsDirResult.error
   const lessonsDir = lessonsDirResult.path
-  const globsResult = validateGlobs(normalizedArgs.globs)
+  const globsResult = validateGlobs(normalizedArgs.globs, deps.projectDir)
   if (!globsResult.ok) return globsResult.error
 
   if (normalizedArgs.citations.length < MIN_CITATIONS) return `Error: citations is required (${MIN_CITATIONS}-${MAX_CITATIONS} entries).`
@@ -98,7 +98,7 @@ Use this after identifying a concrete mistake and a reusable rule. Rejected call
       title: tool.schema.string().describe("Short title naming the reusable lesson"),
       what_went_wrong: tool.schema.string().describe("Concrete account of the mistake or failed approach"),
       rule_for_next_time: tool.schema.string().describe("Specific rule future agents should follow"),
-      globs: tool.schema.array(tool.schema.string()).min(1).max(8).describe("1-8 file globs describing where the lesson applies. Precise repo-root globs such as packages/<name>/src/**/*.ts are accepted. Rootless globs such as **/*.ts intentionally apply in every project with matching files. Literal match-everything patterns are rejected as a best-effort typo guard, not a security boundary."),
+      globs: tool.schema.array(tool.schema.string()).min(1).max(8).describe("1-8 file globs describing where the lesson applies. Globs are matched relative to the nearest project marker above each file, so use package-relative forms such as src/**/*.ts when a package has its own marker. Rootless globs such as **/*.ts intentionally apply in every project with matching files. Literal match-everything patterns are rejected as a best-effort typo guard, not a security boundary."),
       citations: tool.schema.array(tool.schema.string()).min(1).max(5).describe("1-5 verifiable citations: repo-relative path optionally with :line, :start-end, or :start:end; .omo/evidence/<dir>; git sha; or <path>::<test name>. Path lines must exist. Test names allow conservative letters, numbers, spaces, and common test punctuation only. Unverifiable citations are rejected outright."),
       description: tool.schema.string().optional().describe("Frontmatter description; defaults to title when omitted"),
     },

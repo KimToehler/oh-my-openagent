@@ -105,7 +105,6 @@ function verifyOne(
   parsed: ParsedCitation,
   repoRoot: string,
   deps: Required<VerifyCitationsDeps>,
-  verifyLines: boolean,
 ): string | null {
   switch (parsed.form) {
     case "unsafe":
@@ -119,8 +118,13 @@ function verifyOne(
     case "path": {
       const absolutePath = join(repoRoot, parsed.pathPart)
       if (!deps.existsSync(absolutePath)) return REASON_PATH_MISSING
-      if (parsed.startLine === undefined || !verifyLines) return null
-      const content = deps.readFileSync(absolutePath)
+      if (parsed.startLine === undefined) return null
+      let content: string
+      try {
+        content = deps.readFileSync(absolutePath)
+      } catch {
+        return REASON_LINE_INVALID
+      }
       const lineCount = content.length === 0 ? 0 : content.split(/\r?\n/).length - (content.endsWith("\n") ? 1 : 0)
       if (!Number.isSafeInteger(parsed.startLine) || parsed.startLine < 1 || parsed.startLine > lineCount) {
         return REASON_LINE_INVALID
@@ -155,7 +159,6 @@ export function verifyCitations(
       parseCitation(citation, { pathExists: (path) => resolved.existsSync(join(repoRoot, path)) }),
       repoRoot,
       resolved,
-      deps.readFileSync !== undefined,
     )
     if (reason !== null) {
       return { ok: false, failed: citation, reason }

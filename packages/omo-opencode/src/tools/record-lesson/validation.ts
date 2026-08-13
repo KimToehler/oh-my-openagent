@@ -1,4 +1,6 @@
+import { findProjectRoot } from "@oh-my-opencode/rules-engine"
 import { existsSync as nodeExistsSync, readdirSync as nodeReaddirSync } from "node:fs"
+import { join, relative } from "node:path"
 import picomatch from "picomatch"
 
 export type ValidationResult = { readonly ok: true } | { readonly ok: false; readonly error: string }
@@ -17,6 +19,7 @@ const UNIVERSAL_GLOB_PROBE_GROUPS = [
 ] as const
 // Keep aligned with packages/rules-engine/src/matcher.ts PICOMATCH_OPTIONS.
 const PICOMATCH_OPTIONS = { dot: true, bash: true } as const
+const GLOB_MAGIC_RE = /[*?{}[\]()!+@]/
 
 /**
  * Best-effort typo guard for literal match-everything patterns. This is not a scope
@@ -28,7 +31,7 @@ function isUniversalGlob(glob: string): boolean {
   return UNIVERSAL_GLOB_PROBE_GROUPS.some((probes) => probes.every((path) => matcher(path)))
 }
 
-export function validateGlobs(globs: readonly string[]): ValidationResult {
+export function validateGlobs(globs: readonly string[], projectDir?: string): ValidationResult {
   if (globs.length < MIN_GLOBS) {
     return {
       ok: false,
@@ -51,6 +54,25 @@ export function validateGlobs(globs: readonly string[]): ValidationResult {
       return {
         ok: false,
         error: `Error: universal glob rejected: ${trimmed}. Scope the lesson to the files it actually applies to.`,
+      }
+    }
+
+    const magicIndex = trimmed.search(GLOB_MAGIC_RE)
+    const literalPrefix = (magicIndex === -1 ? trimmed : trimmed.slice(0, magicIndex)).replace(/\/$/, "")
+    if (projectDir === undefined || literalPrefix.length === 0) continue
+
+    const prefixDir = join(projectDir, literalPrefix)
+    if (!nodeExistsSync(prefixDir)) continue
+
+    const prefixRoot = findProjectRoot(prefixDir)
+    if (prefixRoot === null) continue
+
+    const rootRelativePrefix = relative(prefixRoot, prefixDir).replaceAll("\\", "/")
+    if (literalPrefix !== rootRelativePrefix) {
+      const rewrite = `${rootRelativePrefix}${trimmed.slice(literalPrefix.length)}`
+      return {
+        ok: false,
+        error: `Error: glob is anchored above its nearest project marker: ${trimmed}. Use ${rewrite} instead.`,
       }
     }
   }

@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test"
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
+import { createRecordLessonTool } from "./tool"
 import { validateBodySize, validateFileCount, validateGlobs, type ValidateFileCountDeps } from "./validation"
 
 const LESSONS_DIR = "/home/user/.omo/rules/lessons"
@@ -94,18 +98,57 @@ describe("validateGlobs", () => {
     },
   )
 
-  test.each([
-    ["packages/omo-opencode/src/plugin/**/*.ts"],
-    ["apps/web/src/**/*.ts"],
-    ["libs/core/**/*.ts"],
-    ["crates/runtime/src/**/*.rs"],
-    ["services/api/**/*.go"],
-  ])("#given a precise repo-root glob %p #when validated #then it is accepted", (glob) => {
+  test("#given a monorepo package marker below the repo root #when a repo-root anchored glob is validated #then it suggests the package-relative form", () => {
     // given
-    const globs = [glob]
+    const projectDir = mkdtempSync(join(tmpdir(), "record-lesson-monorepo-"))
+    const prefixDir = join(projectDir, "packages/omo-opencode/src")
+    mkdirSync(prefixDir, { recursive: true })
+    writeFileSync(join(projectDir, "package.json"), "{}")
+    writeFileSync(join(projectDir, "packages/omo-opencode/package.json"), "{}")
 
     // when
-    const result = validateGlobs(globs)
+    const result = validateGlobs(["packages/omo-opencode/src/**/*.ts"], projectDir)
+
+    // then
+    expect(result).toEqual({
+      ok: false,
+      error: "Error: glob is anchored above its nearest project marker: packages/omo-opencode/src/**/*.ts. Use src/**/*.ts instead.",
+    })
+  })
+
+  test("#given the production tool call shape #when a monorepo-anchored glob is recorded #then projectDir reaches validation", async () => {
+    // given
+    const projectDir = mkdtempSync(join(tmpdir(), "record-lesson-production-"))
+    mkdirSync(join(projectDir, "packages/omo-opencode/src"), { recursive: true })
+    writeFileSync(join(projectDir, "package.json"), "{}")
+    writeFileSync(join(projectDir, "packages/omo-opencode/package.json"), "{}")
+    const recordLesson = createRecordLessonTool({
+      projectDir,
+      env: { OMO_LESSONS_DIR: join(projectDir, "lessons") },
+      getModelId: () => "test/model",
+    })
+
+    // when
+    const result = await recordLesson.execute({
+      title: "Reject dead glob",
+      what_went_wrong: "A repo-root glob silently missed package files.",
+      rule_for_next_time: "Use the matcher-relative glob.",
+      globs: ["packages/omo-opencode/src/**/*.ts"],
+      citations: ["package.json:1"],
+    }, {} as never)
+
+    // then
+    expect(result).toBe("Error: glob is anchored above its nearest project marker: packages/omo-opencode/src/**/*.ts. Use src/**/*.ts instead.")
+  })
+
+  test("#given a single-package repo marker #when the same repo-root anchored glob is validated #then it is accepted", () => {
+    // given
+    const projectDir = mkdtempSync(join(tmpdir(), "record-lesson-single-package-"))
+    mkdirSync(join(projectDir, "packages/omo-opencode/src"), { recursive: true })
+    writeFileSync(join(projectDir, "package.json"), "{}")
+
+    // when
+    const result = validateGlobs(["packages/omo-opencode/src/**/*.ts"], projectDir)
 
     // then
     expect(result).toEqual({ ok: true })
