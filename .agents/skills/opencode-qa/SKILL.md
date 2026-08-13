@@ -187,6 +187,9 @@ isolated sandbox and clean up on exit.
 | `scripts/server-smoke.sh` | B | `/global/health` healthy, `/doc` >=100 paths, no-auth -> 401 |
 | `scripts/sse-hook-probe.sh` | B | `/event` opens and delivers `server.connected` |
 | `scripts/tui-smoke.sh` | C | TUI renders under tmux, tears down, real DB untouched |
+| `scripts/blocked-escalation-probe.sh` | B | `task` and `report_blocked` tool calls emitted; reminder matcher rejects a no-reminder stream and accepts a reminder marker; duplicate reminders counted |
+| `scripts/serve-wake-split-probe.sh` | B | fake-LLM and opencode serve health checks; usage error validation; config merge contract; session scoping; topology fixtures; route provenance collection and process cleanup |
+| `scripts/lsp-e2e.sh` | B | LSP daemon HTTP/SSE integration: health checks, event stream retry logic, terminal tool error handling |
 
 ## Risks and caveats
 
