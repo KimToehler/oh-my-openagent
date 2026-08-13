@@ -831,6 +831,72 @@ interactive_bash(tmux_command="capture-pane -p -t dev-app")
 - Use for interactive apps that need persistent sessions
 - One-shot commands should use regular `Bash` tool with `&`
 
+### Lessons
+
+**Purpose**: Record verified mistakes as durable markdown rules that the existing rules-injector reads in future sessions.
+
+Until now, OMO's rules system was read-only: it discovered rule files and injected them into prompts, but nothing wrote them. The `record_lesson` tool closes that loop by letting an agent persist a reusable lesson after it has been verified against the codebase.
+
+**Usage**:
+
+```ts
+record_lesson({
+  title: "Do not call session.prompt outside the gate",
+  what_went_wrong: "A background completion woke the parent session twice and injected the same recovery prompt.",
+  rule_for_next_time: "Use dispatchInternalPrompt or the shared prompt-async gate for every internal prompt.",
+  globs: [
+    "packages/omo-opencode/src/shared/prompt-async-gate.ts",
+    "packages/omo-opencode/src/features/background-agent/*.ts",
+  ],
+  citations: [
+    "packages/omo-opencode/src/shared/prompt-async-gate.ts:42",
+    ".omo/evidence/20260813-wake-dup",
+    "7d664b96b",
+    "packages/omo-opencode/src/shared/prompt-async-route-audit.test.ts::rejects raw prompt outside gate",
+  ],
+  description: "Internal prompt deduplication rule",
+})
+```
+
+**Behavior**:
+
+- Lessons are stored as markdown files in `~/.omo/rules/lessons/` (user storage, default) or `.omo/rules/lessons/` (project storage). `OMO_LESSONS_DIR` overrides both.
+- Each lesson is one file named `<YYYYMMDD>-<slug>-<6hex>.md`. The slug is derived from the title and capped at 40 characters.
+- The tool refuses universal globs (`*`, `**`, `**/*`, `**/*.*`). Lessons use user-global storage by default and the rules matcher has no repo identity, so an unscoped lesson would fire in every project the user opens. Provide narrow globs instead.
+- Citations (1 to 5) are verified before any write. Accepted forms are repo-relative paths with an optional `:line` or `:start-end` range, `.omo/evidence/<dir>`, a full or abbreviated git commit sha, and `<path>::<test name>`. An unverifiable citation aborts the call and writes nothing.
+- Globs must be 1 to 8 entries. At least one glob is required.
+- The store is append-only: `record_lesson` never rewrites or deletes an existing lesson. At either cap the write is rejected and the agent is told to consolidate or delete existing lessons.
+- Duplicate detection is by content hash over the title, `what_went_wrong`, `rule_for_next_time`, and sorted globs. Recording the same lesson twice returns the existing lesson id without writing a second file.
+- Every lesson records the model it was learned against, the origin repo name, and the current commit sha.
+
+**Caveat**: a new lesson is visible in future sessions, not the session that wrote it. Session rule caches clear only on session end.
+
+**Tools** (registered only when `lessons.enabled` is true):
+
+- `record_lesson` - write a verified, scoped lesson for future sessions.
+
+**Configure**:
+
+```jsonc
+{
+  "lessons": {
+    "enabled": false,
+    "storage": "user",
+    "directory": null,
+    "max_files": 200,
+    "max_body_chars": 3000
+  }
+}
+```
+
+- `enabled` (default `false`) gates the `record_lesson` tool.
+- `storage` (default `"user"`) chooses between `~/.omo/rules/lessons/` and `.omo/rules/lessons/`.
+- `directory` overrides `storage` with an absolute path when set.
+- `max_files` (default `200`) caps the number of lesson files. The cap rejects writes rather than evicting.
+- `max_body_chars` (default `3000`) caps the character length of the rendered lesson body.
+
+The `OMO_LESSONS_DIR` environment variable wins over both `storage` and `directory`.
+
 ## Hooks
 
 Hooks intercept and modify behavior at key points in the agent lifecycle across the full session, message, tool, and parameter pipeline.
