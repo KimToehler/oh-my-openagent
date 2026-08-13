@@ -1,0 +1,162 @@
+import { describe, expect, test } from "bun:test"
+import { basename } from "node:path"
+
+import { createRecordLessonTool } from "./tool"
+import type { StoreDeps } from "./store"
+
+const FIXED_DATE = new Date("2026-08-13T00:00:00Z")
+const LESSONS_DIR = "/lessons"
+const VALID_ARGS = {
+  title: "Gate new tool families",
+  what_went_wrong: "A new tool family was registered unconditionally. ".repeat(10),
+  rule_for_next_time: "Gate every new tool family behind a config flag. ".repeat(8),
+  globs: ["packages/omo-opencode/src/plugin/**/*.ts", "packages/omo-opencode/src/tools/**/*.ts"],
+  citations: ["packages/omo-opencode/src/plugin/tool-registry-core-tools.ts:143"],
+}
+
+function createMemoryFs(initial: Record<string, string> = {}) {
+  const files = new Map(Object.entries(initial))
+  const writes: string[] = []
+  const deps: StoreDeps = {
+    now: () => FIXED_DATE,
+    randomHex: () => "111111",
+    existsSync: (path) => files.has(path) || [...files.keys()].some((candidate) => candidate.startsWith(`${path}/`)),
+    mkdirSync: () => undefined,
+    readdirSync: (dir) => [...files.keys()].filter((path) => path.startsWith(`${dir}/`)).map((path) => path.slice(dir.length + 1)),
+    readFileSync: (path) => {
+      const content = files.get(path)
+      if (content === undefined) throw new Error(`missing file: ${path}`)
+      return content
+    },
+    writeFileSync: (path, content) => {
+      writes.push(path)
+      if (files.has(path)) {
+        const error = new Error("file exists") as NodeJS.ErrnoException
+        error.code = "EEXIST"
+        throw error
+      }
+      files.set(path, content)
+    },
+  }
+  return { files, writes, deps }
+}
+
+function createTool(memory: ReturnType<typeof createMemoryFs>, overrides = {}) {
+  return createRecordLessonTool({
+    projectDir: "/repo",
+    env: { OMO_LESSONS_DIR: LESSONS_DIR },
+    getModelId: () => "anthropic/claude-opus-4-5",
+    getRepoName: () => "oh-my-openagent",
+    getCommitSha: () => "65dcd0bef",
+    now: () => FIXED_DATE,
+    storeDeps: memory.deps,
+    citationDeps: { existsSync: (path) => path.includes("tool-registry-core-tools.ts") },
+    ...overrides,
+  })
+}
+
+async function execute(tool: ReturnType<typeof createRecordLessonTool>, args = VALID_ARGS): Promise<string> {
+  return tool.execute(args, {} as never)
+}
+
+describe("createRecordLessonTool", () => {
+  test("#given valid lesson evidence #when recorded #then one scoped artifact is written and identified", async () => {
+    // given
+    const memory = createMemoryFs()
+
+    // when
+    const result = await execute(createTool(memory))
+
+    // then
+    expect(memory.files.size).toBe(1)
+    const [path, content] = [...memory.files.entries()][0]!
+    expect(result).toContain(basename(path, ".md"))
+    expect(result).toContain(path)
+    expect(content.match(/^---\n([\s\S]*?)\n---/m)?.[1]).toBe(`description: Gate new tool families\nglobs:\n  - "packages/omo-opencode/src/plugin/**/*.ts"\n  - "packages/omo-opencode/src/tools/**/*.ts"`)
+    expect(content).toContain("Learned against model: anthropic/claude-opus-4-5")
+    expect(content).toMatch(/Lesson hash: [0-9a-f]{16}/)
+  })
+
+  test("#given an unverifiable citation #when recording #then no filesystem residue is created", async () => {
+    // given
+    const memory = createMemoryFs({ "/lessons/existing.md": "existing" })
+    const before = memory.files.size
+
+    // when
+    const result = await execute(createTool(memory), { ...VALID_ARGS, citations: ["packages/does-not-exist.ts:12"] })
+
+    // then
+    expect(result).toStartWith("Error: unverifiable citation:")
+    expect(memory.files.size).toBe(before)
+    expect(memory.writes).toEqual([])
+  })
+
+  test("#given a full lesson store #when recording #then cap error is returned without writing", async () => {
+    // given
+    const memory = createMemoryFs(Object.fromEntries(Array.from({ length: 200 }, (_, index) => [`/lessons/${index}.md`, "x"])))
+
+    // when
+    const result = await execute(createTool(memory))
+
+    // then
+    expect(result).toBe("Error: lesson cap reached (200 files). Consolidate or delete existing lessons before recording a new one.")
+    expect(memory.writes).toEqual([])
+  })
+
+  test("#given a body above the configured limit #when recording #then body error is returned without writing", async () => {
+    // given
+    const memory = createMemoryFs()
+
+    // when
+    const result = await execute(createTool(memory), { ...VALID_ARGS, what_went_wrong: "x".repeat(3100) })
+
+    // then
+    expect(result).toMatch(/^Error: lesson body too long \(\d+ chars, max 3000\)\. Shorten it\.$/)
+    expect(memory.writes).toEqual([])
+  })
+
+  test("#given the first generated id collides #when recording #then filename and embedded lesson id remain identical", async () => {
+    // given
+    const existing = "/lessons/20260813-gate-new-tool-families-aaaaaa.md"
+    const memory = createMemoryFs({ [existing]: "PREEXISTING" })
+    const values = ["aaaaaa", "bbbbbb"]
+    let index = 0
+    memory.deps = { ...memory.deps, randomHex: () => values[index++] ?? "bbbbbb" }
+
+    // when
+    const result = await execute(createTool(memory))
+
+    // then
+    expect(result).toContain("bbbbbb")
+    expect(memory.files.get(existing)).toBe("PREEXISTING")
+    const [path, content] = [...memory.files.entries()].find(([path]) => path !== existing)!
+    expect(content).toContain(`Lesson id: ${basename(path, ".md")}`)
+  })
+
+  test("#given identical semantic content twice #when recorded twice #then second call is a duplicate no-op", async () => {
+    // given
+    const memory = createMemoryFs()
+    const tool = createTool(memory)
+
+    // when
+    await execute(tool)
+    const second = await execute(tool)
+
+    // then
+    expect(memory.files.size).toBe(1)
+    expect(second).toContain("duplicate no-op")
+    expect(second).toContain([...memory.files.keys()][0]!)
+  })
+
+  test("#given a bad citation and full store #when recording #then citation rejection wins before cap validation", async () => {
+    // given
+    const memory = createMemoryFs(Object.fromEntries(Array.from({ length: 200 }, (_, index) => [`/lessons/${index}.md`, "x"])))
+
+    // when
+    const result = await execute(createTool(memory), { ...VALID_ARGS, citations: ["packages/does-not-exist.ts:12"] })
+
+    // then
+    expect(result).toBe("Error: unverifiable citation: packages/does-not-exist.ts:12 (path does not exist)")
+    expect(memory.writes).toEqual([])
+  })
+})
