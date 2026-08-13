@@ -86,6 +86,17 @@ describe("parseCitation", () => {
     expect(parsed).toEqual({ form: "commit", raw, sha: "a4b34ebe8" })
   })
 
+  test("#given a lowercase hex filename #when parsed #then path existence takes precedence over sha syntax", () => {
+    // given
+    const raw = "deadbeef"
+
+    // when
+    const parsed = parseCitation(raw, { pathExists: (candidate) => candidate === raw })
+
+    // then
+    expect(parsed).toEqual({ form: "path", raw, pathPart: raw, startLine: undefined, endLine: undefined })
+  })
+
   test("#given a test id #when parsed #then the path half and the test name are split", () => {
     // given
     const raw = "packages/omo-opencode/src/tools/record-lesson/citations.test.ts::parseCitation"
@@ -100,6 +111,19 @@ describe("parseCitation", () => {
       pathPart: "packages/omo-opencode/src/tools/record-lesson/citations.test.ts",
       testName: "parseCitation",
     })
+  })
+
+  test.each([
+    ["src/x.test.ts::bad<name>"],
+    ["src/x.test.ts::bad>name"],
+    ["src/x.test.ts::bad\nname"],
+    ["src/x.test.ts::name; injected"],
+  ])("#given unsafe test name %p #when parsed #then the form is unknown", (raw) => {
+    // when
+    const parsed = parseCitation(raw)
+
+    // then
+    expect(parsed).toEqual({ form: "unknown", raw })
   })
 
   test("#given free prose #when parsed #then the form is unknown", () => {
@@ -138,7 +162,11 @@ describe("verifyCitations", () => {
     const citations = ["src/x.ts:10-20", ".omo/evidence/20260812-x/qa.md", "a4b34ebe8", "src/x.test.ts::does a thing"]
 
     // when
-    const result = verifyCitations(citations, REPO_ROOT, { existsSync: () => true, runGit: spy.runGit })
+    const result = verifyCitations(citations, REPO_ROOT, {
+      existsSync: () => true,
+      readFileSync: () => Array.from({ length: 20 }, (_, index) => `line ${index + 1}`).join("\n"),
+      runGit: spy.runGit,
+    })
 
     // then
     expect(result).toEqual({ ok: true })
@@ -155,22 +183,71 @@ describe("verifyCitations", () => {
     expect(result).toEqual({ ok: false, failed: "packages/does-not-exist.ts:12", reason: "path does not exist" })
   })
 
-  test("#given a path citation with a line suffix #when verified #then the suffix is stripped before the existence check", () => {
+  test("#given a path citation with an existing line #when verified #then file line count is checked", () => {
     // given
     const checked: string[] = []
 
     // when
-    const result = verifyCitations(["src/x.ts:143"], REPO_ROOT, {
+    const result = verifyCitations(["src/x.ts:3"], REPO_ROOT, {
       existsSync: (candidate) => {
         checked.push(candidate)
         return true
       },
+      readFileSync: () => "one\ntwo\nthree\n",
       runGit: createRunGitSpy(0).runGit,
     })
 
     // then
     expect(result).toEqual({ ok: true })
     expect(checked).toEqual(["/repo/src/x.ts"])
+  })
+
+  test.each([["src/x.ts:999999"], ["src/x.ts:0"], ["src/x.ts:4-5"]])(
+    "#given invalid or missing line citation %p #when verified #then it is rejected",
+    (citation) => {
+      // given
+      const deps = {
+        existsSync: () => true,
+        readFileSync: () => "one\ntwo\nthree\n",
+        runGit: createRunGitSpy(0).runGit,
+      }
+
+      // when
+      const result = verifyCitations([citation], REPO_ROOT, deps)
+
+      // then
+      expect(result).toEqual({ ok: false, failed: citation, reason: "invalid or missing line" })
+    },
+  )
+
+  test("#given exponential line syntax #when verified #then it is unrecognized rather than accepted as a path", () => {
+    // given
+    const citation = "src/x.ts:1e20"
+
+    // when
+    const result = verifyCitations([citation], REPO_ROOT, {
+      existsSync: () => true,
+      readFileSync: () => "one\ntwo\nthree\n",
+      runGit: createRunGitSpy(0).runGit,
+    })
+
+    // then
+    expect(result).toEqual({ ok: false, failed: citation, reason: "unrecognized citation form" })
+  })
+
+  test("#given common path start and end line form #when verified #then both existing lines are accepted", () => {
+    // given
+    const citation = "src/x.ts:2:3"
+
+    // when
+    const result = verifyCitations([citation], REPO_ROOT, {
+      existsSync: () => true,
+      readFileSync: () => "one\ntwo\nthree\n",
+      runGit: createRunGitSpy(0).runGit,
+    })
+
+    // then
+    expect(result).toEqual({ ok: true })
   })
 
   test("#given a test id citation #when verified #then only the path half is checked", () => {
@@ -196,7 +273,7 @@ describe("verifyCitations", () => {
     const spy = createRunGitSpy(1)
 
     // when
-    const result = verifyCitations(["deadbeefdeadbeef"], REPO_ROOT, { existsSync: () => true, runGit: spy.runGit })
+    const result = verifyCitations(["deadbeefdeadbeef"], REPO_ROOT, { existsSync: () => false, runGit: spy.runGit })
 
     // then
     expect(result).toEqual({ ok: false, failed: "deadbeefdeadbeef", reason: "commit not found" })
