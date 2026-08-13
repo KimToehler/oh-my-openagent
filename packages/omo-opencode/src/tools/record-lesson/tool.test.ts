@@ -118,21 +118,19 @@ describe("createRecordLessonTool", () => {
     expect(memory.writes).toEqual([])
   })
 
-  test("#given the first generated id collides #when recording #then filename and embedded lesson id remain identical", async () => {
+  test("#given hash path has a different embedded hash #when recording #then collision suffix preserves filename and embedded id equality", async () => {
     // given
-    const existing = "/lessons/20260813-gate-new-tool-families-aaaaaa.md"
-    const memory = createMemoryFs({ [existing]: "PREEXISTING" })
-    const values = ["aaaaaa", "bbbbbb"]
-    let index = 0
-    memory.deps = { ...memory.deps, randomHex: () => values[index++] ?? "bbbbbb" }
+    const semanticPath = "/lessons/gate-new-tool-families-240345d0385f8cb5.md"
+    const memory = createMemoryFs({ [semanticPath]: "Lesson hash: fedcba9876543210\nPREEXISTING" })
+    memory.deps = { ...memory.deps, randomHex: () => "bbbbbb" }
 
     // when
     const result = await execute(createTool(memory))
 
     // then
     expect(result).toContain("bbbbbb")
-    expect(memory.files.get(existing)).toBe("PREEXISTING")
-    const [path, content] = [...memory.files.entries()].find(([path]) => path !== existing)!
+    expect(memory.files.get(semanticPath)).toBe("Lesson hash: fedcba9876543210\nPREEXISTING")
+    const [path, content] = [...memory.files.entries()].find(([path]) => path !== semanticPath)!
     expect(content).toContain(`Lesson id: ${basename(path, ".md")}`)
   })
 
