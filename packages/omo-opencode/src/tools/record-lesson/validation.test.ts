@@ -18,7 +18,7 @@ function createMarkdownEntries(count: number): string[] {
 describe("validateGlobs", () => {
   test("#given a single scoped glob #when validated #then the result is ok", () => {
     // given
-    const globs = ["packages/omo-opencode/src/tools/**/*.ts"]
+    const globs = ["src/tools/**/*.ts"]
 
     // when
     const result = validateGlobs(globs)
@@ -29,7 +29,7 @@ describe("validateGlobs", () => {
 
   test("#given exactly eight scoped globs #when validated #then the result is ok", () => {
     // given
-    const globs = Array.from({ length: 8 }, (_, index) => `packages/pkg-${index}/src/**/*.ts`)
+    const globs = Array.from({ length: 8 }, (_, index) => `src/area-${index}/**/*.ts`)
 
     // when
     const result = validateGlobs(globs)
@@ -80,8 +80,37 @@ describe("validateGlobs", () => {
     },
   )
 
-  test.each([["src/**/*.ts"], ["packages/omo-opencode/src/plugin/**/*.ts"], ["**/*.test.ts"], ["docs/**"]])(
+  test.each([["src/**/*.ts"], ["**/*.test.ts"], ["docs/**"]])(
     "#given the scoped glob %p #when validated #then it is accepted",
+    (glob) => {
+      // given
+      const globs = [glob]
+
+      // when
+      const result = validateGlobs(globs)
+
+      // then
+      expect(result).toEqual({ ok: true })
+    },
+  )
+
+  test("#given a repo-root package glob #when validated #then it is rejected with stable alternatives", () => {
+    // given
+    const globs = ["packages/omo-opencode/src/plugin/**/*.ts"]
+
+    // when
+    const result = validateGlobs(globs)
+
+    // then
+    expect(result).toEqual({
+      ok: false,
+      error:
+        "Error: repo-root-anchored glob rejected: packages/omo-opencode/src/plugin/**/*.ts. Use a package-relative glob such as src/**/*.ts, or a rootless glob such as **/*.ts when the lesson applies across packages.",
+    })
+  })
+
+  test.each([["src/plugin/**/*.ts"], ["**/*.ts"]])(
+    "#given the root-stable glob %p #when validated #then it is accepted",
     (glob) => {
       // given
       const globs = [glob]
@@ -110,7 +139,7 @@ describe("validateGlobs", () => {
 
   test("#given a scoped glob that contains a double star #when validated #then it is accepted", () => {
     // given
-    const globs = ["packages/omo-opencode/src/plugin/**/*.ts"]
+    const globs = ["src/plugin/**/*.ts"]
 
     // when
     const result = validateGlobs(globs)
@@ -121,7 +150,7 @@ describe("validateGlobs", () => {
 
   test("#given a scoped glob ending in a bare double star #when validated #then it is accepted", () => {
     // given
-    const globs = ["packages/omo-opencode/src/plugin/**"]
+    const globs = ["src/plugin/**"]
 
     // when
     const result = validateGlobs(globs)

@@ -10,7 +10,7 @@ const VALID_ARGS = {
   title: "Gate new tool families",
   what_went_wrong: "A new tool family was registered unconditionally. ".repeat(10),
   rule_for_next_time: "Gate every new tool family behind a config flag. ".repeat(8),
-  globs: ["packages/omo-opencode/src/plugin/**/*.ts", "packages/omo-opencode/src/tools/**/*.ts"],
+  globs: ["src/plugin/**/*.ts", "src/tools/**/*.ts"],
   citations: ["packages/omo-opencode/src/plugin/tool-registry-core-tools.ts:143"],
 }
 
@@ -72,7 +72,7 @@ describe("createRecordLessonTool", () => {
     const [path, content] = [...memory.files.entries()][0]!
     expect(result).toContain(basename(path, ".md"))
     expect(result).toContain(path)
-    expect(content.match(/^---\n([\s\S]*?)\n---/m)?.[1]).toBe(`description: Gate new tool families\nglobs:\n  - "packages/omo-opencode/src/plugin/**/*.ts"\n  - "packages/omo-opencode/src/tools/**/*.ts"`)
+    expect(content.match(/^---\n([\s\S]*?)\n---/m)?.[1]).toBe(`description: Gate new tool families\nglobs:\n  - "src/plugin/**/*.ts"\n  - "src/tools/**/*.ts"`)
     expect(content).toContain("Learned against model: anthropic/claude-opus-4-5")
     expect(content).toMatch(/Lesson hash: [0-9a-f]{16}/)
   })

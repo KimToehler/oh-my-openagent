@@ -11,6 +11,7 @@ export type ValidateFileCountDeps = {
 const MIN_GLOBS = 1
 const MAX_GLOBS = 8
 const LESSON_EXTENSION = ".md"
+const REPO_ROOT_PACKAGE_PREFIX = "packages/"
 const UNIVERSAL_GLOB_PROBE_GROUPS = [
   ["a.txt", "x/y/z.bin", "LICENSE", ".env", "deep/nested/thing.q", "Makefile"],
   ["a.txt", "x/y/z.bin", ".env", "deep/nested/thing.q"],
@@ -54,6 +55,13 @@ export function validateGlobs(globs: readonly string[]): ValidationResult {
       return {
         ok: false,
         error: `Error: universal glob rejected: ${trimmed}. Scope the lesson to the files it actually applies to.`,
+      }
+    }
+
+    if (trimmed.startsWith(REPO_ROOT_PACKAGE_PREFIX)) {
+      return {
+        ok: false,
+        error: `Error: repo-root-anchored glob rejected: ${trimmed}. Use a package-relative glob such as src/**/*.ts, or a rootless glob such as **/*.ts when the lesson applies across packages.`,
       }
     }
   }

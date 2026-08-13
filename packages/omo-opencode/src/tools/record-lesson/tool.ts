@@ -120,7 +120,7 @@ Use this after identifying a concrete mistake and a reusable rule. Rejected call
       title: tool.schema.string().describe("Short title naming the reusable lesson"),
       what_went_wrong: tool.schema.string().describe("Concrete account of the mistake or failed approach"),
       rule_for_next_time: tool.schema.string().describe("Specific rule future agents should follow"),
-      globs: tool.schema.array(tool.schema.string()).min(1).max(8).describe("1-8 narrow file globs. A lesson without narrow globs would fire in every project, so scope it to the files it applies to."),
+      globs: tool.schema.array(tool.schema.string()).min(1).max(8).describe("1-8 narrow, root-stable file globs. Use package-relative globs such as src/**/*.ts, or rootless globs such as **/*.ts for cross-package lessons. Repo-root package prefixes such as packages/<name>/ are rejected because user lessons may be matched from a package root."),
       citations: tool.schema.array(tool.schema.string()).min(1).max(5).describe("1-5 verifiable citations: repo-relative path optionally with :line, .omo/evidence/<dir>, git sha, or <path>::<test name>. Unverifiable citations are rejected outright."),
       description: tool.schema.string().optional().describe("Frontmatter description; defaults to title when omitted"),
     },
