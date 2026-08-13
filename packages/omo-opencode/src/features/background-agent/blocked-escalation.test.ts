@@ -154,6 +154,33 @@ describe("BlockedEscalation", () => {
     expect(abortedSessions).toEqual(["orphan-child"])
   })
 
+  test("#given a park whose abort failed so the task kept its slot #when hard expiry fires #then the concurrency slot and descendant count are reclaimed", async () => {
+    // given
+    jest.useFakeTimers()
+    const manager = createManager({ promptAsync: async () => ({}), abort: async () => ({}) })
+    const task = createTask("leak-child")
+    task.status = "running"
+    task.completedAt = undefined
+    task.concurrencyKey = "explore"
+    task.rootSessionId = "root-session"
+    addTask(manager, task)
+    const concurrencyManager = Reflect.get(manager, "concurrencyManager")
+    await concurrencyManager.acquire("explore", task.id)
+    const rootDescendantCounts = Reflect.get(manager, "rootDescendantCounts")
+    rootDescendantCounts.set("root-session", 1)
+    await manager.notifyBlockedTask(task.id)
+
+    // when
+    jest.advanceTimersByTime(DEFAULT_BLOCKED_EXPIRY_MS)
+    await flushAsyncWork()
+
+    // then
+    const counts = Reflect.get(concurrencyManager, "counts")
+    expect(counts.get(concurrencyManager.getConcurrencyKey("explore")) ?? 0).toBe(0)
+    expect(rootDescendantCounts.has("root-session")).toBe(false)
+    expect(task.concurrencyKey).toBeUndefined()
+  })
+
   test("#given a blocked task #when accepted resume answers it #then both escalation timers are cancelled", async () => {
     // given
     jest.useFakeTimers()
@@ -207,6 +234,47 @@ describe("BlockedEscalation", () => {
     // then
     expect(queuedTask.error).toContain("expired unanswered")
     expect(skippedTask.error).toContain("expired unanswered")
+  })
+
+  // Guards the interaction between the queued-resume rollback and the expiry abort:
+  // restoreTaskAfterSkippedResume puts the task back to its pre-resume terminal
+  // status, so wasRunning is false at expiry and no abort fires. If that rollback
+  // ever stops restoring status, expiry would start aborting a child whose answer is
+  // still queued for delivery, destroying work the parent already committed to.
+  test("#given a resume the dispatcher queued #when expiry fires #then the rollback leaves the task terminal so no abort is issued", async () => {
+    // given
+    jest.useFakeTimers()
+    const abortedSessions: string[] = []
+    const queuedClient = {
+      session: {
+        promptAsync: async () => ({}),
+        abort: async ({ path }: { path: { id: string } }) => {
+          abortedSessions.push(path.id)
+          return {}
+        },
+      },
+    }
+    await dispatchInternalPrompt({
+      mode: "async",
+      client: queuedClient,
+      sessionID: "queued-abort",
+      source: "blocked-escalation-test",
+      settleMs: 0,
+      postDispatchHoldMs: 1_000,
+      input: { path: { id: "queued-abort" }, body: { parts: [] } },
+    })
+    const manager = createManager(queuedClient.session)
+    const task = createTask("queued-abort")
+    addTask(manager, task)
+    await manager.notifyBlockedTask(task.id)
+
+    // when
+    await resume(manager, task)
+    jest.advanceTimersByTime(DEFAULT_BLOCKED_EXPIRY_MS)
+    await flushAsyncWork()
+
+    // then
+    expect(abortedSessions).toEqual([])
   })
 
   test("#given first and reminder blocked wakes #when dedupe and final merging run #then reminder remains distinct and actionable in both orderings", () => {
