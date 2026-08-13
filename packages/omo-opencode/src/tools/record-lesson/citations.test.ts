@@ -164,6 +164,7 @@ describe("verifyCitations", () => {
     // when
     const result = verifyCitations(citations, REPO_ROOT, {
       existsSync: () => true,
+      lstatSync: () => ({ isFile: () => true, size: 1024 }),
       readFileSync: () => Array.from({ length: 20 }, (_, index) => `line ${index + 1}`).join("\n"),
       runGit: spy.runGit,
     })
@@ -204,6 +205,7 @@ describe("verifyCitations", () => {
         checked.push(candidate)
         return true
       },
+      lstatSync: () => ({ isFile: () => true, size: 1024 }),
       readFileSync: () => "one\ntwo\nthree\n",
       runGit: createRunGitSpy(0).runGit,
     })
@@ -213,13 +215,56 @@ describe("verifyCitations", () => {
     expect(checked).toEqual(["/repo/src/x.ts"])
   })
 
+  test("#given a FIFO path citation #when verified #then it is rejected before reading", () => {
+    // given
+    let readAttempted = false
+    const citation = "src/fifo:1"
+
+    // when
+    const result = verifyCitations([citation], REPO_ROOT, {
+      existsSync: () => true,
+      lstatSync: () => ({ isFile: () => false, size: 0 }),
+      readFileSync: () => {
+        readAttempted = true
+        return "blocked"
+      },
+      runGit: createRunGitSpy(0).runGit,
+    })
+
+    // then
+    expect(result).toEqual({ ok: false, failed: citation, reason: "invalid or missing line" })
+    expect(readAttempted).toBe(false)
+  })
+
+  test("#given an oversized regular file citation #when verified #then it is rejected before reading", () => {
+    // given
+    let readAttempted = false
+    const citation = "src/huge.ts:1"
+
+    // when
+    const result = verifyCitations([citation], REPO_ROOT, {
+      existsSync: () => true,
+      lstatSync: () => ({ isFile: () => true, size: 5 * 1024 * 1024 }),
+      readFileSync: () => {
+        readAttempted = true
+        return "too large"
+      },
+      runGit: createRunGitSpy(0).runGit,
+    })
+
+    // then
+    expect(result).toEqual({ ok: false, failed: citation, reason: "invalid or missing line" })
+    expect(readAttempted).toBe(false)
+  })
+
   test.each([["src/x.ts:999999"], ["src/x.ts:0"], ["src/x.ts:4-5"]])(
     "#given invalid or missing line citation %p #when verified #then it is rejected",
     (citation) => {
       // given
       const deps = {
         existsSync: () => true,
-        readFileSync: () => "one\ntwo\nthree\n",
+        lstatSync: () => ({ isFile: () => true, size: 1024 }),
+      readFileSync: () => "one\ntwo\nthree\n",
         runGit: createRunGitSpy(0).runGit,
       }
 
@@ -238,6 +283,7 @@ describe("verifyCitations", () => {
     // when
     const result = verifyCitations([citation], REPO_ROOT, {
       existsSync: () => true,
+      lstatSync: () => ({ isFile: () => true, size: 1024 }),
       readFileSync: () => {
         throw new Error("read failed")
       },
@@ -255,6 +301,7 @@ describe("verifyCitations", () => {
     // when
     const result = verifyCitations([citation], REPO_ROOT, {
       existsSync: () => true,
+      lstatSync: () => ({ isFile: () => true, size: 1024 }),
       readFileSync: () => "one\ntwo\nthree\n",
       runGit: createRunGitSpy(0).runGit,
     })
@@ -270,6 +317,7 @@ describe("verifyCitations", () => {
     // when
     const result = verifyCitations([citation], REPO_ROOT, {
       existsSync: () => true,
+      lstatSync: () => ({ isFile: () => true, size: 1024 }),
       readFileSync: () => "one\ntwo\nthree\n",
       runGit: createRunGitSpy(0).runGit,
     })

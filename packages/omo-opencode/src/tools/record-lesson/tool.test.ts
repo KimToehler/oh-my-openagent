@@ -55,6 +55,14 @@ function createTool(memory: ReturnType<typeof createMemoryFs>, overrides = {}) {
     storeDeps: memory.deps,
     citationDeps: {
       existsSync: (path) => path.includes("tool-registry-core-tools.ts"),
+      lstatSync: (path) => {
+        if (!path.includes("tool-registry-core-tools.ts")) {
+          const error = new Error(`ENOENT: no such file or directory, lstat '${path}'`) as NodeJS.ErrnoException
+          error.code = "ENOENT"
+          throw error
+        }
+        return { isFile: () => true, size: 2048 }
+      },
       readFileSync: (path) => {
         if (!path.includes("tool-registry-core-tools.ts")) throw new Error(`missing file: ${path}`)
         return Array.from({ length: Number(VALID_ARGS.citations[0].split(":").at(-1)) }, (_, index) => `line ${index + 1}`).join("\n")
