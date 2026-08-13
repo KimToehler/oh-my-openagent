@@ -1,13 +1,10 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
-import { randomBytes } from "node:crypto"
-import { writeFileSync as nodeWriteFileSync } from "node:fs"
-import { basename, join } from "node:path"
 
 import { verifyCitations } from "./citations"
 import { resolveRepoOrigin, type RepoOrigin } from "./origin"
 import { resolveLessonsDir } from "./paths"
 import { computeSemanticLessonHash, extractBody, renderLesson, type RenderLessonInput } from "./render"
-import { findLessonByHash, generateLessonId, withLessonStoreLock, writeLessonExclusive, type StoreDeps } from "./store"
+import { generateLessonId, writeLessonExclusive } from "./store"
 import type { RecordLessonArgs, RecordLessonDeps } from "./types"
 import { validateBodySize, validateFileCount, validateGlobs } from "./validation"
 
@@ -52,29 +49,6 @@ function createRenderInput(args: RecordLessonArgs, deps: RecordLessonDeps, lesso
   return { ...input, lessonHash: computeSemanticLessonHash(input) }
 }
 
-function idMatchingStoreDeps(base: StoreDeps | undefined, initialId: string): StoreDeps {
-  const originalRandomHex = base?.randomHex ?? (() => randomBytes(3).toString("hex"))
-  const initialSuffix = initialId.slice(initialId.lastIndexOf("-") + 1)
-  let first = true
-  return {
-    ...base,
-    randomHex: () => {
-      if (first) {
-        first = false
-        return initialSuffix
-      }
-      return originalRandomHex()
-    },
-    // Store owns collision retries. Rewriting only the id line keeps embedded identity
-    // matched to the exclusive filename selected by every retry.
-    writeFileSync: (path, content, options) => {
-      const finalId = basename(path, ".md")
-      const writeFileSync = base?.writeFileSync ?? nodeWriteFileSync
-      writeFileSync(path, content.replace(/^Lesson id: .*$/m, `Lesson id: ${finalId}`), options)
-    },
-  }
-}
-
 async function executeRecordLesson(args: RecordLessonArgs, deps: RecordLessonDeps): Promise<string> {
   const normalizedArgs: RecordLessonArgs = { ...args, globs: args.globs.map((glob) => glob.trim()) }
   const lessonsDirResult = resolveLessonsDir({ env: deps.env, config: deps.config, projectDir: deps.projectDir })
@@ -91,38 +65,35 @@ async function executeRecordLesson(args: RecordLessonArgs, deps: RecordLessonDep
     return `Error: unverifiable citation: ${citationsResult.failed} (${citationsResult.reason})`
   }
 
-  const initialId = generateLessonId(normalizedArgs.title, { ...deps.storeDeps, now: deps.now ?? deps.storeDeps?.now })
+  const hashInput = createRenderInput(normalizedArgs, deps, "pending")
+  const initialId = generateLessonId(normalizedArgs.title, hashInput.lessonHash, deps.storeDeps)
   const input = createRenderInput(normalizedArgs, deps, initialId)
   const rendered = renderLesson(input)
   const bodyResult = validateBodySize(extractBody(rendered), deps.config?.max_body_chars ?? DEFAULT_MAX_BODY_CHARS)
   if (!bodyResult.ok) return bodyResult.error
 
-  const storeDeps = idMatchingStoreDeps({ ...deps.storeDeps, now: deps.now ?? deps.storeDeps?.now }, initialId)
-  const locked = withLessonStoreLock(lessonsDir, storeDeps, () => {
-    const duplicate = findLessonByHash(lessonsDir, input.lessonHash, storeDeps)
-    if (duplicate !== undefined) return `Existing lesson ${join(lessonsDir, duplicate)}; duplicate no-op.`
+  // Cap checks can overshoot to 199+N under N concurrent distinct writes. Next call rejects the bounded overshoot.
+  // Textually different near-duplicates remain separate because semantic hashing intentionally preserves meaningful text.
+  const countResult = validateFileCount(lessonsDir, deps.config?.max_files ?? DEFAULT_MAX_FILES, deps.storeDeps)
+  if (!countResult.ok) return countResult.error
 
-    const countResult = validateFileCount(lessonsDir, deps.config?.max_files ?? DEFAULT_MAX_FILES, storeDeps)
-    if (!countResult.ok) return countResult.error
-
-    const writeResult = writeLessonExclusive({
-      lessonsDir,
-      content: rendered,
-      slugSource: normalizedArgs.title,
-      deps: storeDeps,
-    })
-    if (!writeResult.ok) return writeResult.error
-    return `Recorded lesson ${writeResult.lessonId}\nPath: ${writeResult.path}\nApplies to future sessions, not the current one.`
+  const writeResult = writeLessonExclusive({
+    lessonsDir,
+    content: rendered,
+    slugSource: normalizedArgs.title,
+    semanticHash: input.lessonHash,
+    deps: deps.storeDeps,
   })
-
-  return locked.ok ? locked.value : locked.error
+  if (!writeResult.ok) return writeResult.error
+  if (writeResult.duplicate) return `Existing lesson ${writeResult.path}; duplicate no-op.`
+  return `Recorded lesson ${writeResult.lessonId}\nPath: ${writeResult.path}\nApplies to future sessions, not the current one.`
 }
 
 export function createRecordLessonTool(deps: RecordLessonDeps): ToolDefinition {
   return tool({
     description: `Record a verified, scoped lesson for future sessions.
 
-Use this after identifying a concrete mistake and a reusable rule. Rejected calls never write partial lesson artifacts.`,
+Use this after identifying a concrete mistake and a reusable rule. Rejected calls never write partial lesson artifacts. Concurrent distinct writes can temporarily exceed max_files by their bounded in-flight count; the next call rejects the overshoot. Textually different near-duplicate lessons remain separate.`,
     args: {
       title: tool.schema.string().describe("Short title naming the reusable lesson"),
       what_went_wrong: tool.schema.string().describe("Concrete account of the mistake or failed approach"),
