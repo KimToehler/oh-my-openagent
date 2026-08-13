@@ -26,6 +26,9 @@ function createMemoryFs(initial: Record<string, string> = {}): {
       if (content === undefined) throw new Error(`missing file: ${path}`)
       return content
     },
+    lstatSync: () => ({ isSymbolicLink: () => false }),
+    realpathSync: (path) => path,
+    unlinkSync: (path) => { files.delete(path) },
     writeFileSync: (path, content, options) => {
       writeAttempts.push(path)
       if (options.flag === "wx" && files.has(path)) {
@@ -156,11 +159,88 @@ describe("writeLessonExclusive", () => {
       lessonsDir: "/lessons",
       content: "content",
       slugSource: "Store",
-      deps: { mkdirSync: () => undefined, writeFileSync: () => { throw error }, now: () => FIXED_DATE, randomHex: () => "111111" },
+      deps: {
+        mkdirSync: () => undefined,
+        lstatSync: () => ({ isSymbolicLink: () => false }),
+        realpathSync: (path) => path,
+        writeFileSync: () => { throw error },
+        now: () => FIXED_DATE,
+        randomHex: () => "111111",
+      },
     })
 
     // then
-    expect(result).toEqual({ ok: false, error: "Error: permission denied" })
+    expect(result).toEqual({ ok: false, error: "permission denied" })
+  })
+
+  test("#given a symlinked lessons directory #when written #then the write boundary rejects it", () => {
+    // given
+    const memory = createMemoryFs()
+
+    // when
+    const result = writeLessonExclusive({
+      lessonsDir: "/lessons",
+      content: "content",
+      slugSource: "Store",
+      deps: {
+        ...memory.deps,
+        lstatSync: () => ({ isSymbolicLink: () => true }),
+        now: () => FIXED_DATE,
+        randomHex: () => "111111",
+      },
+    })
+
+    // then
+    expect(result).toEqual({ ok: false, error: "Error: lessons directory must not be a symbolic link: /lessons" })
+    expect(memory.writeAttempts).toEqual([])
+  })
+
+  test("#given a resolved parent outside the lessons root #when written #then the escaping target is rejected", () => {
+    // given
+    const memory = createMemoryFs()
+    let realpathCalls = 0
+
+    // when
+    const result = writeLessonExclusive({
+      lessonsDir: "/safe/lessons",
+      content: "content",
+      slugSource: "Store",
+      deps: {
+        ...memory.deps,
+        lstatSync: () => ({ isSymbolicLink: () => false }),
+        realpathSync: () => realpathCalls++ === 0 ? "/safe/lessons" : "/safe/lessons-escape",
+        now: () => FIXED_DATE,
+        randomHex: () => "111111",
+      },
+    })
+
+    // then
+    expect(result).toEqual({ ok: false, error: "Error: lesson target escapes lessons directory: /safe/lessons-escape/20260813-store-111111.md" })
+    expect(memory.writeAttempts).toEqual([])
+  })
+
+  test("#given a concurrent write pushes the store over its cap #when written #then only the new file is removed", () => {
+    // given
+    const existingPath = "/lessons/existing.md"
+    const memory = createMemoryFs({ [existingPath]: "PREEXISTING" })
+
+    // when
+    const result = writeLessonExclusive({
+      lessonsDir: "/lessons",
+      content: "NEW CONTENT",
+      slugSource: "Store",
+      maxFiles: 1,
+      deps: {
+        ...memory.deps,
+        unlinkSync: (path) => { memory.files.delete(path) },
+        now: () => FIXED_DATE,
+        randomHex: () => "111111",
+      },
+    })
+
+    // then
+    expect(result).toEqual({ ok: false, error: "Error: lesson cap reached (1 files). Consolidate or delete existing lessons before recording a new one." })
+    expect(memory.files).toEqual(new Map([[existingPath, "PREEXISTING"]]))
   })
 })
 
@@ -202,5 +282,34 @@ describe("findLessonByHash", () => {
 
     // then
     expect(match).toBe("b.md")
+  })
+
+  test("#given an unreadable lesson #when deduplicating #then the read error fails the call", () => {
+    // given
+    const memory = createMemoryFs({ "/lessons/a.md": "Lesson hash: 0123456789abcdef\n" })
+    const deps: StoreDeps = {
+      ...memory.deps,
+      readFileSync: () => { throw new Error("lesson temporarily unreadable") },
+    }
+
+    // when
+    const find = () => findLessonByHash("/lessons", "0123456789abcdef", deps)
+
+    // then
+    expect(find).toThrow("Failed to read lesson /lessons/a.md: lesson temporarily unreadable")
+  })
+
+  test("#given the lesson directory cannot be listed #when deduplicating #then the directory error fails the call", () => {
+    // given
+    const deps: StoreDeps = {
+      existsSync: () => true,
+      readdirSync: () => { throw new Error("directory temporarily unreadable") },
+    }
+
+    // when
+    const find = () => findLessonByHash("/lessons", "0123456789abcdef", deps)
+
+    // then
+    expect(find).toThrow("Failed to list lessons in /lessons: directory temporarily unreadable")
   })
 })

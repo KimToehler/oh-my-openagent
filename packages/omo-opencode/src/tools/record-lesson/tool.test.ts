@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { basename } from "node:path"
+import { basename, join } from "node:path"
 
 import { createRecordLessonTool } from "./tool"
 import type { StoreDeps } from "./store"
@@ -28,6 +28,9 @@ function createMemoryFs(initial: Record<string, string> = {}) {
       if (content === undefined) throw new Error(`missing file: ${path}`)
       return content
     },
+    lstatSync: () => ({ isSymbolicLink: () => false }),
+    realpathSync: (path) => path,
+    unlinkSync: (path) => { files.delete(path) },
     writeFileSync: (path, content) => {
       writes.push(path)
       if (files.has(path)) {
@@ -167,6 +170,32 @@ describe("createRecordLessonTool", () => {
     expect(originLine).not.toContain("unknown")
     expect(originLine).not.toContain(basename(process.cwd()))
     expect(originLine).toMatch(/^oh-my-openagent @ [0-9a-f]{7,40}$/)
+  })
+
+  test("#given globs with surrounding whitespace #when recorded #then validation hashing and rendering use trimmed globs", async () => {
+    // given
+    const memory = createMemoryFs()
+
+    // when
+    await execute(createTool(memory), { ...VALID_ARGS, globs: ["  packages/omo-opencode/src/tools/**/*.ts  "] })
+
+    // then
+    const content = [...memory.files.values()][0]!
+    expect(content).toContain('  - "packages/omo-opencode/src/tools/**/*.ts"')
+    expect(content).not.toContain('  - "  packages/omo-opencode/src/tools/**/*.ts  "')
+  })
+
+  test("#given a duplicate on Windows-style storage #when recorded #then duplicate path uses platform join semantics", async () => {
+    // given
+    const memory = createMemoryFs()
+    const tool = createTool(memory)
+    await execute(tool)
+
+    // when
+    const result = await execute(tool)
+
+    // then
+    expect(result).toContain(`Existing lesson ${join(LESSONS_DIR, [...memory.files.keys()][0]!.slice(LESSONS_DIR.length + 1))}`)
   })
 
   test("#given a bad citation and full store #when recording #then citation rejection wins before cap validation", async () => {

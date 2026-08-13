@@ -1,7 +1,7 @@
 import { tool, type ToolDefinition } from "@opencode-ai/plugin/tool"
 import { randomBytes } from "node:crypto"
 import { writeFileSync as nodeWriteFileSync } from "node:fs"
-import { basename } from "node:path"
+import { basename, join } from "node:path"
 
 import { verifyCitations } from "./citations"
 import { resolveRepoOrigin, type RepoOrigin } from "./origin"
@@ -76,22 +76,23 @@ function idMatchingStoreDeps(base: StoreDeps | undefined, initialId: string): St
 }
 
 async function executeRecordLesson(args: RecordLessonArgs, deps: RecordLessonDeps): Promise<string> {
+  const normalizedArgs: RecordLessonArgs = { ...args, globs: args.globs.map((glob) => glob.trim()) }
   const lessonsDir = resolveLessonsDir({ env: deps.env, config: deps.config, projectDir: deps.projectDir })
-  const globsResult = validateGlobs(args.globs)
+  const globsResult = validateGlobs(normalizedArgs.globs)
   if (!globsResult.ok) return globsResult.error
 
-  if (args.citations.length < MIN_CITATIONS) return `Error: citations is required (${MIN_CITATIONS}-${MAX_CITATIONS} entries).`
-  if (args.citations.length > MAX_CITATIONS) return `Error: too many citations (max ${MAX_CITATIONS}).`
+  if (normalizedArgs.citations.length < MIN_CITATIONS) return `Error: citations is required (${MIN_CITATIONS}-${MAX_CITATIONS} entries).`
+  if (normalizedArgs.citations.length > MAX_CITATIONS) return `Error: too many citations (max ${MAX_CITATIONS}).`
 
-  const citationsResult = verifyCitations(args.citations, deps.projectDir, deps.citationDeps)
+  const citationsResult = verifyCitations(normalizedArgs.citations, deps.projectDir, deps.citationDeps)
   if (!citationsResult.ok) {
     return `Error: unverifiable citation: ${citationsResult.failed} (${citationsResult.reason})`
   }
 
-  const initialId = generateLessonId(args.title, { ...deps.storeDeps, now: deps.now ?? deps.storeDeps?.now })
-  const input = createRenderInput(args, deps, initialId)
+  const initialId = generateLessonId(normalizedArgs.title, { ...deps.storeDeps, now: deps.now ?? deps.storeDeps?.now })
+  const input = createRenderInput(normalizedArgs, deps, initialId)
   const duplicate = findLessonByHash(lessonsDir, input.lessonHash, deps.storeDeps)
-  if (duplicate !== undefined) return `Existing lesson ${lessonsDir}/${duplicate}; duplicate no-op.`
+  if (duplicate !== undefined) return `Existing lesson ${join(lessonsDir, duplicate)}; duplicate no-op.`
 
   const countResult = validateFileCount(lessonsDir, deps.config?.max_files ?? DEFAULT_MAX_FILES, deps.storeDeps)
   if (!countResult.ok) return countResult.error
@@ -103,7 +104,8 @@ async function executeRecordLesson(args: RecordLessonArgs, deps: RecordLessonDep
   const writeResult = writeLessonExclusive({
     lessonsDir,
     content: rendered,
-    slugSource: args.title,
+    slugSource: normalizedArgs.title,
+    maxFiles: deps.config?.max_files ?? DEFAULT_MAX_FILES,
     deps: idMatchingStoreDeps({ ...deps.storeDeps, now: deps.now ?? deps.storeDeps?.now }, initialId),
   })
   if (!writeResult.ok) return writeResult.error
