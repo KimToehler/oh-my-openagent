@@ -30,6 +30,7 @@ import {
   createLegacyPluginToastHook,
 } from "../../hooks"
 import { createGoalHook } from "../../hooks/goal"
+import { createLessonNudgeHook } from "../../hooks/lesson-nudge"
 import {
   detectExternalNotificationPlugin,
   getNotificationConflictWarning,
@@ -53,6 +54,7 @@ export type SessionHooks = {
   nonInteractiveEnv: ReturnType<typeof createNonInteractiveEnvHook> | null
   interactiveBashSession: ReturnType<typeof createInteractiveBashSessionHook> | null
   goal: ReturnType<typeof createGoalHook> | null
+  lessonNudge: ReturnType<typeof createLessonNudgeHook> | null
   editErrorRecovery: ReturnType<typeof createEditErrorRecoveryHook> | null
   delegateTaskRetry: ReturnType<typeof createDelegateTaskRetryHook> | null
   startWork: ReturnType<typeof createStartWorkHook> | null
@@ -175,6 +177,10 @@ export function createSessionHooks(args: {
         }))
     : null
 
+  const lessonNudge = isHookEnabled("lesson-nudge") && pluginConfig.lessons?.enabled && pluginConfig.lessons?.nudge !== false
+    ? safeHook("lesson-nudge", () => createLessonNudgeHook())
+    : null
+
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
     ? safeHook("edit-error-recovery", () => createEditErrorRecoveryHook(ctx))
     : null
@@ -248,6 +254,7 @@ export function createSessionHooks(args: {
     nonInteractiveEnv,
     interactiveBashSession,
     goal,
+    lessonNudge,
     editErrorRecovery,
     delegateTaskRetry,
     startWork,

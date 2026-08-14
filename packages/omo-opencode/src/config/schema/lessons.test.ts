@@ -2,13 +2,20 @@ import { describe, expect, test } from "bun:test"
 import { LessonsConfigSchema } from "./lessons"
 
 describe("LessonsConfigSchema", () => {
-  test("defaults enabled to false and storage to user", () => {
+  test("#given nudge is absent #when parsing #then defaults it to true", () => {
     const result = LessonsConfigSchema.parse({})
 
     expect(result.enabled).toBe(false)
     expect(result.storage).toBe("user")
     expect(result.max_files).toBe(200)
     expect(result.max_body_chars).toBe(3000)
+    expect(result.nudge).toBe(true)
+  })
+
+  test("#given nudge is false #when parsing #then preserves false", () => {
+    const result = LessonsConfigSchema.parse({ nudge: false })
+
+    expect(result.nudge).toBe(false)
   })
 
   test("parses explicit lessons config", () => {

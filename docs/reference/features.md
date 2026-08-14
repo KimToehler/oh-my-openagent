@@ -139,7 +139,7 @@ See the **[Team Mode Guide](../guide/team-mode.md)** for configuration, team spe
 
 - **Feature modules**: `packages/omo-opencode/src/features/` has 23 modules.
 - **Tool system**: `packages/omo-opencode/src/tools/` has 15 tool directories that produce **20 to 39 tools** depending on config gates.
-- **Hook system**: 5-tier composition is **54 base hooks**. With team mode it becomes **61** (extra tool guard + transforms + direct team session event handlers).
+- **Hook system**: 5-tier composition is **59 total slots** (53 active by default). With team mode it becomes **63** (direct team session event handlers plus the team-gated slots).
 - **MCP system**: 3 tiers: built-in remote MCPs (`websearch`, `context7`, `grep_app`), `.mcp.json` loader, and skill-embedded MCP from `SKILL.md` frontmatter.
 - **Managers**: plugin startup creates 4 managers: TmuxSessionManager, BackgroundManager, SkillMcpManager, ConfigHandler.
 - **Config pipeline**: 6 phases in order: provider, plugin-components, agents, tools, MCPs, commands.
@@ -872,6 +872,8 @@ record_lesson({
 
 **Caveat**: a new lesson is visible in future sessions, not the session that wrote it. Session rule caches clear only on session end.
 
+The `lesson-nudge` hook is registered when a session goes idle and is delivered on the next user message. This makes it effective in the TUI and under `opencode serve`, but it does not fire under `oh-my-opencode run`, which exits between turns and takes that in-memory state with it.
+
 **Tools** (registered only when `lessons.enabled` is true):
 
 - `record_lesson` - write a verified, scoped lesson for future sessions.
@@ -883,6 +885,7 @@ record_lesson({
   "lessons": {
     "enabled": false,
     "storage": "user",
+    "nudge": true,
     "max_files": 200,
     "max_body_chars": 3000
   }
@@ -891,6 +894,7 @@ record_lesson({
 
 - `enabled` (default `false`) gates the `record_lesson` tool.
 - `storage` (default `"user"`) chooses between `~/.omo/rules/lessons/` and `.omo/rules/lessons/`.
+- `nudge` (default `true`) enables a single early-session reminder to record corrections as they arise; has no effect under `oh-my-opencode run`.
 - `lessons.directory` is rejected because project config has no trusted provenance marker. Use `OMO_LESSONS_DIR` for an explicit user-controlled path override.
 - `max_files` (default `200`) caps the number of lesson files. The cap rejects writes rather than evicting.
 - `max_body_chars` (default `3000`) caps the character length of the rendered lesson body.
@@ -903,13 +907,13 @@ Hooks intercept and modify behavior at key points in the agent lifecycle across 
 
 Current composition counts:
 
-- Session: 24
-- Tool Guard: 16
-- Transform: 5
+- Session: 25
+- Tool Guard: 18
+- Transform: 7
 - Continuation: 7
 - Skill: 2
-- Total base: 54
-- With `team_mode.enabled`: +1 Tool Guard, +2 Transform, +4 direct team session event handlers in `packages/omo-opencode/src/plugin/event.ts` = 61
+- Total slots: 59
+- With `team_mode.enabled`: 63 (4 direct team session event handlers in `packages/omo-opencode/src/plugin/event.ts`)
 
 ### Hook Events
 

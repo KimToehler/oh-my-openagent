@@ -7847,13 +7847,18 @@
           "type": "number",
           "minimum": 100,
           "maximum": 10000
+        },
+        "nudge": {
+          "default": true,
+          "type": "boolean"
         }
       },
       "required": [
         "enabled",
         "storage",
         "max_files",
-        "max_body_chars"
+        "max_body_chars",
+        "nudge"
       ],
       "additionalProperties": false
     },
