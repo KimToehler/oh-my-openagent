@@ -31,6 +31,7 @@
 | Codex telemetry internals | [docs/reference/codex-telemetry.md](reference/codex-telemetry.md) |
 | Monitor tool reference | [docs/reference/monitor.md](reference/monitor.md) |
 | Web-terminal visual QA helper | [docs/reference/web-terminal-visual-qa.md](reference/web-terminal-visual-qa.md) |
+| Blocked-subagent escalation doc follow-ups | [docs/reference/blocked-escalation-follow-up.md](reference/blocked-escalation-follow-up.md) |
 | Sample configs | [docs/examples/](examples) (default, coding-focused, planning-focused) |
 | Privacy & ToS | [docs/legal/](legal) |
 | Manifesto | [docs/manifesto.md](manifesto.md) |
@@ -44,7 +45,7 @@ docs/
 ├── manifesto.md                              # The "why" — referenced from README
 ├── model-capabilities-maintenance.md         # How model-capabilities cache is refreshed
 ├── guide/                                    # User-facing tutorial-style guides (6 files)
-├── reference/                                # API / config / CLI reference (15 files)
+├── reference/                                # API / config / CLI reference (16 files)
 ├── examples/                                 # Sample JSONC configs (3 files)
 ├── legal/                                    # privacy-policy.md + terms-of-service.md
 ├── templates/

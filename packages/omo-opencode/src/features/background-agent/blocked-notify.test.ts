@@ -2,6 +2,7 @@ import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { afterEach, describe, expect, test } from "bun:test"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
+import { createReportBlockedTool } from "../../tools/report-blocked/tools"
 import { BackgroundManager } from "./manager"
 import type { BackgroundTask } from "./types"
 
@@ -135,7 +136,7 @@ describe("BackgroundManager blocked task notification", () => {
     expect(internals.parentWakeNotifier.getPendingParentWakes().get(task.parentSessionId)?.shouldReply).toBe(true)
   })
 
-  test("#given a blocked running task #when cancelTask parks it #then notification preparation covers the terminal-to-wake window", async () => {
+  test("#given a notifying cancel #when cancelTask flips the task terminal #then notification preparation covers the terminal-to-wake window", async () => {
     // given
     const manager = createManager()
     const task = createBlockedTask()
@@ -155,6 +156,50 @@ describe("BackgroundManager blocked task notification", () => {
     expect(cancelled).toBe(true)
     expect(observedActive).toBe(false)
     expect(observedPendingWake).toBe(true)
+  })
+
+  test("#given the real report_blocked tool over a real manager #when the child parks #then the wake is queued while the task is still active", async () => {
+    // given
+    const manager = createManager()
+    const task = createBlockedTask({ status: "running", completedAt: undefined, blockedAt: undefined, blockedReason: undefined })
+    addTask(manager, task)
+    const observedStatusAtWake: string[] = []
+    Reflect.set(manager, "enqueueNotificationForParent", async (_parentSessionID: string, operation: () => Promise<void>) => {
+      observedStatusAtWake.push(task.status)
+      await operation()
+    })
+    const reportBlocked = createReportBlockedTool(manager)
+
+    // when
+    const result = await reportBlocked.execute(
+      { reason: "Provider requests time out", needs: "Choose another provider" },
+      unsafeTestValue({ sessionID: task.sessionId, messageID: "msg", agent: "sisyphus-junior", abort: new AbortController().signal }),
+    )
+
+    // then
+    expect(result).toContain("parked")
+    expect(observedStatusAtWake).toEqual(["running"])
+    expect(task.status).toBe("cancelled")
+  })
+
+  test("#given the real report_blocked tool over a real manager #when the park skips notification #then no wake-preparation slot is left reserved", async () => {
+    // given
+    const manager = createManager()
+    const task = createBlockedTask({ status: "running", completedAt: undefined, blockedAt: undefined, blockedReason: undefined })
+    const internals = addTask(manager, task)
+    Reflect.set(manager, "enqueueNotificationForParent", async (_parentSessionID: string, operation: () => Promise<void>) => {
+      await operation()
+    })
+    const reportBlocked = createReportBlockedTool(manager)
+
+    // when
+    await reportBlocked.execute(
+      { reason: "Provider requests time out", needs: "Choose another provider" },
+      unsafeTestValue({ sessionID: task.sessionId, messageID: "msg", agent: "sisyphus-junior", abort: new AbortController().signal }),
+    )
+
+    // then
+    expect(internals.parentWakeNotifier.hasNotificationPreparation(task.parentSessionId)).toBe(false)
   })
 
   test("#given a blocked reason in task.error #when notifyBlockedTask runs #then notification rendering receives that error", async () => {

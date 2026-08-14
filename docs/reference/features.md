@@ -683,7 +683,8 @@ AST-aware search and rewrite now lives in the `ast-grep` skill. Load it with the
 | **call_omo_agent**    | Spawn explore/librarian agents. Supports `run_in_background`.                                                                                                                                                                           |
 | **task**              | Category-based task delegation. Supports built-in categories like `visual-engineering`, `ultrabrain`, `deep`, `artistry`, `quick`, `unspecified-low`, `unspecified-high`, and `writing`, or direct agent targeting via `subagent_type`. |
 | **background_output** | Retrieve background task results                                                                                                                                                                                                        |
-| **background_cancel** | Cancel running background tasks                                                                                                                                                                                                         |
+| **background_cancel** | Cancel running background tasks                                                                                                                                         |
+| **report_blocked**    | Lets a background subagent report that it cannot continue. Parks the calling task, then wakes the parent with the blocking reason and what it needs. The parent answers in plain text to resume the task.                              |
 
 ### Visual Analysis Tools
 
