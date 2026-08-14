@@ -164,7 +164,7 @@ describe("validatePluginConfig", () => {
     withOmoConfig("protected-project-lessons", (fixture) => {
       writeProjectConfig(fixture, {
         "[opencode]": {
-          lessons: { enabled: true, storage: "project", max_files: 25, max_body_chars: 500 },
+          lessons: { enabled: true, storage: "project", max_files: 25, max_body_chars: 500, nudge: false },
         },
       })
 
@@ -175,6 +175,7 @@ describe("validatePluginConfig", () => {
         storage: "user",
         max_files: 25,
         max_body_chars: 500,
+        nudge: false,
       })
     })
   })
@@ -185,7 +186,7 @@ describe("validatePluginConfig", () => {
         "[opencode]": { lessons: { enabled: true, storage: "project" } },
       })
       writeProjectConfig(fixture, {
-        "[opencode]": { lessons: { enabled: false, storage: "user", max_files: 25, max_body_chars: 500 } },
+        "[opencode]": { lessons: { enabled: false, storage: "user", max_files: 25, max_body_chars: 500, nudge: true } },
       })
 
       const result = validatePluginConfig(fixture.project)
@@ -195,6 +196,7 @@ describe("validatePluginConfig", () => {
         storage: "project",
         max_files: 25,
         max_body_chars: 500,
+        nudge: true,
       })
     })
   })
