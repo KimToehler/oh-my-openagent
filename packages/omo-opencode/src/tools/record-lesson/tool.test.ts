@@ -166,8 +166,13 @@ describe("createRecordLessonTool", () => {
   test("#given no origin deps #when recording from a worktree #then the origin line names the repo and a real sha", async () => {
     // given
     const memory = createMemoryFs()
+    // Point at a subdirectory whose basename differs from the repo name, so the
+    // assertion below proves the origin came from git rather than from the
+    // directory name. Running from the repo root would make those two identical
+    // and the check vacuous.
+    const nestedDir = join(process.cwd(), "packages", "omo-opencode")
     const tool = createTool(memory, {
-      projectDir: process.cwd(),
+      projectDir: nestedDir,
       getRepoName: undefined,
       getCommitSha: undefined,
     })
@@ -180,7 +185,8 @@ describe("createRecordLessonTool", () => {
     const originLine = content.match(/^Learned in: (?<origin>.*)$/m)?.groups?.origin
     expect(originLine).toBeDefined()
     expect(originLine).not.toContain("unknown")
-    expect(originLine).not.toContain(basename(process.cwd()))
+    expect(basename(nestedDir)).not.toBe("oh-my-openagent")
+    expect(originLine).not.toContain(basename(nestedDir))
     expect(originLine).toMatch(/^oh-my-openagent @ [0-9a-f]{7,40}$/)
   })
 
