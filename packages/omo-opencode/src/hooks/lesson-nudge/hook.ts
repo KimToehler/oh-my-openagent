@@ -15,6 +15,11 @@ type LessonNudgeLogger = (message: string, data?: Record<string, unknown>) => vo
 
 const registeredSessions = new Set<string>()
 
+/** @internal For testing only */
+export function _resetForTesting(): void {
+  registeredSessions.clear()
+}
+
 export function createLessonNudgeHook(
   collector: ContextCollector = contextCollector,
   logger: LessonNudgeLogger = log,

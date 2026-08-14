@@ -5,7 +5,8 @@ import {
   setMainSession,
   subagentSessions,
 } from "../../features/claude-code-session-state"
-import { createLessonNudgeHook } from "./hook"
+import { _resetForTesting as resetLessonNudgeForTesting, createLessonNudgeHook } from "./hook"
+import { buildLessonNudgeMessage } from "./message"
 
 const idleEvent = (sessionID: string) => ({
   event: { type: "session.idle", properties: { sessionID } },
@@ -17,6 +18,7 @@ const deletedEvent = (sessionID: string) => ({
 
 afterEach(() => {
   _resetForTesting()
+  resetLessonNudgeForTesting()
 })
 
 describe("createLessonNudgeHook", () => {
@@ -131,7 +133,7 @@ describe("createLessonNudgeHook", () => {
     expect(logger).toHaveBeenCalledTimes(1)
     expect(logger).toHaveBeenCalledWith("[lesson-nudge] registered nudge", {
       sessionID: "registering-session",
-      contentLength: 276,
+      contentLength: buildLessonNudgeMessage().length,
     })
   })
 })
