@@ -522,6 +522,17 @@ describe("HookNameSchema", () => {
     expect(result.success).toBe(true)
   })
 
+  test("accepts lesson-nudge hook name", () => {
+    //#given
+    const input = "lesson-nudge"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(true)
+  })
+
   test("rejects removed beast-mode-system hook name", () => {
     //#given
     const input = "beast-mode-system"
