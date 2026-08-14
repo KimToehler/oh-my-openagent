@@ -894,7 +894,7 @@ The `lesson-nudge` hook is registered when a session goes idle and is delivered 
 
 - `enabled` (default `false`) gates the `record_lesson` tool.
 - `storage` (default `"user"`) chooses between `~/.omo/rules/lessons/` and `.omo/rules/lessons/`.
-- `nudge` (default `true`) controls the idle reminder that suggests recorded lessons when a session is idle; has no effect under `oh-my-opencode run`.
+- `nudge` (default `true`) enables a single early-session reminder to record corrections as they arise; has no effect under `oh-my-opencode run`.
 - `lessons.directory` is rejected because project config has no trusted provenance marker. Use `OMO_LESSONS_DIR` for an explicit user-controlled path override.
 - `max_files` (default `200`) caps the number of lesson files. The cap rejects writes rather than evicting.
 - `max_body_chars` (default `3000`) caps the character length of the rendered lesson body.

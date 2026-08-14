@@ -1,3 +1,3 @@
 export function buildLessonNudgeMessage(): string {
-  return "Record every correction received this session with `record_lesson`, including precise file globs and an evidence citation that proves the fix. Lessons recorded now become visible only in future sessions, not the current session, so capture correction details before work ends."
+  return "When you receive a correction, record it with `record_lesson`: include precise file globs and an evidence citation. Recorded lessons become visible only in future sessions, not the current one, so capture them as they happen."
 }
