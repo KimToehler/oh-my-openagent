@@ -59,6 +59,84 @@ describe("createSessionHooks", () => {
     expect(result.modelFallback).not.toBeNull()
   })
 
+  it("creates lesson nudge hook when lessons are enabled and nudge is unset", () => {
+    // given
+    const pluginConfig = unsafeTestValue<OhMyOpenCodeConfig>({
+      lessons: { enabled: true },
+    })
+
+    // when
+    const result = createSessionHooks({
+      ctx: mockContext,
+      pluginConfig,
+      modelCacheState: mockModelCacheState,
+      backgroundManager: mockBackgroundManager,
+      isHookEnabled: (hookName) => hookName === "lesson-nudge",
+      safeHookEnabled: true,
+    })
+
+    // then
+    expect(result.lessonNudge).not.toBeNull()
+  })
+
+  it("skips lesson nudge hook when lessons config is absent", () => {
+    // given
+    const pluginConfig = unsafeTestValue<OhMyOpenCodeConfig>({})
+
+    // when
+    const result = createSessionHooks({
+      ctx: mockContext,
+      pluginConfig,
+      modelCacheState: mockModelCacheState,
+      backgroundManager: mockBackgroundManager,
+      isHookEnabled: (hookName) => hookName === "lesson-nudge",
+      safeHookEnabled: true,
+    })
+
+    // then
+    expect(result.lessonNudge).toBeNull()
+  })
+
+  it("skips lesson nudge hook when lessons are disabled", () => {
+    // given
+    const pluginConfig = unsafeTestValue<OhMyOpenCodeConfig>({
+      lessons: { enabled: false },
+    })
+
+    // when
+    const result = createSessionHooks({
+      ctx: mockContext,
+      pluginConfig,
+      modelCacheState: mockModelCacheState,
+      backgroundManager: mockBackgroundManager,
+      isHookEnabled: (hookName) => hookName === "lesson-nudge",
+      safeHookEnabled: true,
+    })
+
+    // then
+    expect(result.lessonNudge).toBeNull()
+  })
+
+  it("skips lesson nudge hook when nudge is disabled", () => {
+    // given
+    const pluginConfig = unsafeTestValue<OhMyOpenCodeConfig>({
+      lessons: { enabled: true, nudge: false },
+    })
+
+    // when
+    const result = createSessionHooks({
+      ctx: mockContext,
+      pluginConfig,
+      modelCacheState: mockModelCacheState,
+      backgroundManager: mockBackgroundManager,
+      isHookEnabled: (hookName) => hookName === "lesson-nudge",
+      safeHookEnabled: true,
+    })
+
+    // then
+    expect(result.lessonNudge).toBeNull()
+  })
+
   it("does not create removed context window monitor hook", () => {
     // given
     const pluginConfig = {} as OhMyOpenCodeConfig
