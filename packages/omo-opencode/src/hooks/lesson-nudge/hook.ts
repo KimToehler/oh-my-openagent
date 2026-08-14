@@ -13,6 +13,8 @@ type LessonNudgeEvent = {
 
 type LessonNudgeLogger = (message: string, data?: Record<string, unknown>) => void
 
+// Nudge requires persistent in-memory state across session.idle events within one process.
+// opencode run exits after each turn, losing this state, so nudge cannot work under run.
 const registeredSessions = new Set<string>()
 
 /** @internal For testing only */
