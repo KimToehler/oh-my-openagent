@@ -1,0 +1,17 @@
+== NOTE: opencode run --format json emits ONE JSON OBJECT PER LINE. jq must slurp (-s) to count across the stream. ==
+== plan's step-6 jq expression (known-broken: the tool name lives at .part.tool) ==
+1
+== correct jq: .part.tool == record_lesson  (tool_use count) ==
+1
+== distinct callID count ==
+1
+== parts with state.status == completed ==
+1
+== grep -c record_lesson ==
+1
+== tool input args ==
+{"title":"new tool families must be config gated","what_went_wrong":"A new tool family was registered unconditionally in the tool registry, so every session paid for it even when the feature was unwanted.","rule_for_next_time":"Register every new tool family behind an explicit config flag that defaults to off, and assert both the on and the off case in the registry test.","globs":["src/plugin/**/*.ts"],"citations":["packages/omo-opencode/src/plugin/tool-registry-core-tools.ts:143"],"description":"new tool families must be config gated"}
+== tool output ==
+Recorded lesson new-tool-families-must-be-config-gated-3ae9436b1413a7d1
+Path: /private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.7ffxvlTfLA/qahome/.omo/rules/lessons/new-tool-families-must-be-config-gated-3ae9436b1413a7d1.md
+Applies to future sessions, not the current one.

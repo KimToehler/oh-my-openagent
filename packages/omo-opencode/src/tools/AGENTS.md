@@ -1,4 +1,4 @@
-# src/tools/ — 12–31 Native Tools Across 13 Tool Directories (+ shared utilities)
+# src/tools/ — 12–32 Native Tools Across 14 Tool Directories (+ shared utilities)
 
 **Generated:** 2026-05-15
 
@@ -20,7 +20,7 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 
 > LSP tools are provided by the built-in `lsp` MCP (Tier-1 stdio), backed by `packages/lsp-tools-mcp/`. AST-aware code search and rewrite is available through the `ast-grep` skill using `sg`.
 
-### Conditional (up to +19 native tools)
+### Conditional (up to +20 native tools)
 
 | Tool(s) | Gate | Source |
 |---------|------|--------|
@@ -28,6 +28,7 @@ Tools registered via [`createToolRegistry()`](../plugin/tool-registry.ts) in `sr
 | `interactive_bash` | `isInteractiveBashEnabled(config)` (tmux config) | `interactive-bash/` |
 | `task_create`, `task_get`, `task_list`, `task_update` | `experimental.task_system` | `task/` |
 | `edit` (hashline-edit) | `hashline_edit: true` | `hashline-edit/` |
+| `record_lesson` | `lessons.enabled: true` | `record-lesson/` |
 | 12 `team_*` tools | `team_mode.enabled: true` | `../features/team-mode/tools/` |
 
 ### 12 team_* Tools (when team_mode enabled)

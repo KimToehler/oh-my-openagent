@@ -1,0 +1,2 @@
+8bc0e8fc28bdc405b5ddbcd4a953fdc29d8e4ca15ed81151bd7ff0683809d529  /Users/tim/.omo/rules/worktrees.md
+ab774f3d7a415236a3f54123eede58d408392ff96a9e9c92972ac2605f051e91  /Users/tim/.omo/rules/worktree-parallel-safety.md

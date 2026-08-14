@@ -1,0 +1,9 @@
+{ "[opencode]": {
+    "lessons": {
+      "enabled": true
+    }
+  },
+  "_migrations": [
+    "2026-08-reasoning-unification"
+  ]
+}

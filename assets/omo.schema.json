@@ -9020,6 +9020,42 @@
           ],
           "additionalProperties": false
         },
+        "lessons": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": false,
+              "type": "boolean"
+            },
+            "storage": {
+              "default": "user",
+              "type": "string",
+              "enum": [
+                "user",
+                "project"
+              ]
+            },
+            "max_files": {
+              "default": 200,
+              "type": "number",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "max_body_chars": {
+              "default": 3000,
+              "type": "number",
+              "minimum": 100,
+              "maximum": 10000
+            }
+          },
+          "required": [
+            "enabled",
+            "storage",
+            "max_files",
+            "max_body_chars"
+          ],
+          "additionalProperties": false
+        },
         "ralph_loop": {
           "type": "object",
           "propertyNames": {
@@ -21042,6 +21078,42 @@
                   "enabled",
                   "auto_start",
                   "default_max_iterations"
+                ],
+                "additionalProperties": false
+              },
+              "lessons": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "default": false,
+                    "type": "boolean"
+                  },
+                  "storage": {
+                    "default": "user",
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "project"
+                    ]
+                  },
+                  "max_files": {
+                    "default": 200,
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 1000
+                  },
+                  "max_body_chars": {
+                    "default": 3000,
+                    "type": "number",
+                    "minimum": 100,
+                    "maximum": 10000
+                  }
+                },
+                "required": [
+                  "enabled",
+                  "storage",
+                  "max_files",
+                  "max_body_chars"
                 ],
                 "additionalProperties": false
               },

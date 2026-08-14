@@ -1,0 +1,30 @@
+== STEP 9: real-home isolation ==
+-- real user rules listing AFTER --
+total 16
+drwxr-xr-x   4 tim  staff   128 23 Juli 16:47 .
+drwx------@ 18 tim  staff   576 13 Aug. 17:54 ..
+-rw-r--r--   1 tim  staff  1796 23 Juli 16:47 worktree-parallel-safety.md
+-rw-r--r--   1 tim  staff  1798 23 Juli 11:50 worktrees.md
+
+-- diff of listing BEFORE vs AFTER --
+LISTING IDENTICAL  PASS
+
+-- content hashes BEFORE vs AFTER --
+BYTE-IDENTICAL  PASS
+-- hashed file count --
+2
+
+-- real $HOME/.omo/rules/lessons must NOT exist --
+absent  PASS
+
+-- real opencode DB session count BEFORE --
+1962
+-- real opencode DB session count AFTER --
+1962
+
+-- sandbox DB session count BEFORE --
+no db yet
+-- sandbox DB session count AFTER --
+6
+-- sandbox DB path --
+-rw-r--r--  1 tim  staff  589824 14 Aug. 01:53 /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.7ffxvlTfLA/data/opencode/opencode.db

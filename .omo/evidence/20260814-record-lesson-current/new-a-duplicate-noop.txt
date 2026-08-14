@@ -1,0 +1,20 @@
+== NEW CHECK A: same lesson recorded twice live ==
+-- second call tool_use count --
+1
+-- second call input args --
+{"title":"new tool families must be config gated","what_went_wrong":"A new tool family was registered unconditionally in the tool registry, so every session paid for it even when the feature was unwanted.","rule_for_next_time":"Register every new tool family behind an explicit config flag that defaults to off, and assert both the on and the off case in the registry test.","globs":["src/plugin/**/*.ts"],"citations":["packages/omo-opencode/src/plugin/tool-registry-core-tools.ts:143"],"description":"new tool families must be config gated"}
+-- second call tool OUTPUT --
+Existing lesson /private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.7ffxvlTfLA/qahome/.omo/rules/lessons/new-tool-families-must-be-config-gated-3ae9436b1413a7d1.md; duplicate no-op.
+
+-- lessons dir after second call --
+.
+..
+new-tool-families-must-be-config-gated-3ae9436b1413a7d1.md
+-- .md count after second call --
+1
+-- total entries after second call --
+1
+-- file hash BEFORE second call --
+78f821e24a48a3155181874fe309b269b01409718ca2055d98d147cd5fc410f3  /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.7ffxvlTfLA/qahome/.omo/rules/lessons/new-tool-families-must-be-config-gated-3ae9436b1413a7d1.md
+-- file hash AFTER second call --
+78f821e24a48a3155181874fe309b269b01409718ca2055d98d147cd5fc410f3  /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.7ffxvlTfLA/qahome/.omo/rules/lessons/new-tool-families-must-be-config-gated-3ae9436b1413a7d1.md
