@@ -97,6 +97,8 @@ describe("createLessonNudgeHook", () => {
     expect(registerSpy).toHaveBeenCalledWith("options-session", expect.objectContaining({
       id: "lesson-nudge",
       source: "custom",
+      content: buildLessonNudgeMessage(),
+      priority: "normal",
     }))
   })
 

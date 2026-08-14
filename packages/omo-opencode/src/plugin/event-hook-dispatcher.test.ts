@@ -1,6 +1,4 @@
 import { describe, expect, it, mock } from "bun:test"
-import { readFileSync } from "node:fs"
-import { join } from "node:path"
 import type { CreatedHooks } from "../create-hooks"
 import type { OhMyOpenCodeConfig } from "../config"
 import type { BackgroundManager } from "../features/background-agent"
@@ -51,7 +49,7 @@ describe("createEventHookDispatcher", () => {
         const dispatched = dispatch(sessionIdleInput("ses_lesson_nudge_null"))
 
         // then
-        expect(dispatched).resolves.toBeUndefined()
+        await expect(dispatched).resolves.toBeUndefined()
       })
     })
   })
@@ -80,8 +78,8 @@ const NON_EVENT_TIER_SESSION_HOOKS = new Set([
 
 describe("session hook dispatch coverage", () => {
   describe("#given every member returned by createSessionHooks", () => {
-    describe("#when the event dispatcher source is inspected", () => {
-      it("#then each member is dispatched or explicitly allowlisted to another tier", () => {
+    describe("#when one event is dispatched", () => {
+      it("#then each event-tier member receives it or is explicitly allowlisted to another tier", async () => {
         // given
         const sessionHooks = createSessionHooks({
           ctx: unsafeTestValue<PluginContext>({ directory: "/tmp", client: {} }),
@@ -91,16 +89,38 @@ describe("session hook dispatch coverage", () => {
           isHookEnabled: () => false,
           safeHookEnabled: true,
         })
-        const dispatcherSource = readFileSync(join(import.meta.dir, "event-hook-dispatcher.ts"), "utf8")
-
-        // when
-        const undispatched = Object.keys(sessionHooks).filter(
-          (member) =>
-            !NON_EVENT_TIER_SESSION_HOOKS.has(member) && !dispatcherSource.includes(`hooks.${member}`),
+        const handlers: Record<string, ReturnType<typeof mock>> = {}
+        const hookStubs: Record<string, unknown> = {}
+        const bareHandlers = new Set(["sessionNotification", "lessonNudge"])
+        const handlerMembers = new Set(["todoContinuationEnforcer", "atlasHook"])
+        const eventTierMembers = Object.keys(sessionHooks).filter(
+          (member) => !NON_EVENT_TIER_SESSION_HOOKS.has(member),
         )
 
+        for (const member of eventTierMembers) {
+          const handler = mock(() => {})
+          handlers[member] = handler
+          hookStubs[member] = bareHandlers.has(member)
+            ? handler
+            : handlerMembers.has(member)
+              ? { handler }
+              : { event: handler }
+        }
+
+        const dispatch = createEventHookDispatcher(
+          unsafeTestValue<CreatedHooks>(hookStubs),
+          createEventHookRunner(),
+        )
+        const input = sessionIdleInput("ses_dispatch_coverage")
+
+        // when
+        await dispatch(input)
+
         // then
-        expect(undispatched).toEqual([])
+        for (const member of eventTierMembers) {
+          expect(handlers[member]).toHaveBeenCalledTimes(1)
+          expect(handlers[member]).toHaveBeenCalledWith(unsafeTestValue<never>(input))
+        }
       })
     })
   })
