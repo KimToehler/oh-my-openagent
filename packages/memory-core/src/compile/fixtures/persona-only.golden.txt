@@ -1,0 +1,13 @@
+<reminder/>
+
+<self>
+<projection>$MEMORY_DIR/system/persona.md</projection>
+Committed persona.
+</self>
+
+<memory_metadata>
+- AGENT_ID: persona-agent
+- CONVERSATION_ID: persona-conversation
+- System prompt last recompiled: 2026-05-04 12:00:00 AM UTC+0000
+- 2 previous messages between you and the user are stored in recall memory
+</memory_metadata>

@@ -8,6 +8,30 @@
     ".": {
       "types": "./src/index.ts",
       "import": "./src/index.ts"
+    },
+    "./agents-builtin": {
+      "types": "./src/agents/builtin/index.ts",
+      "import": "./src/agents/builtin/index.ts"
+    },
+    "./category-builtins": {
+      "types": "./src/category/builtins.ts",
+      "import": "./src/category/builtins.ts"
+    },
+    "./category-resolver": {
+      "types": "./src/category/resolver.ts",
+      "import": "./src/category/resolver.ts"
+    },
+    "./renderer-text": {
+      "types": "./src/renderer-text.ts",
+      "import": "./src/renderer-text.ts"
+    },
+    "./rpc-spawn": {
+      "types": "./src/runners/rpc/spawn.ts",
+      "import": "./src/runners/rpc/spawn.ts"
+    },
+    "./task-renderers": {
+      "types": "./src/tools/task/renderers.ts",
+      "import": "./src/tools/task/renderers.ts"
     }
   },
   "types": "./src/index.ts",
@@ -23,8 +47,8 @@
     "typebox": "1.1.38"
   },
   "peerDependencies": {
-    "@code-yeongyu/senpi": "2026.7.26",
-    "@earendil-works/pi-tui": "0.80.3",
+    "@code-yeongyu/senpi": "2026.8.14",
+    "@earendil-works/pi-tui": "0.84.1",
     "typebox": "*"
   },
   "peerDependenciesMeta": {
@@ -39,8 +63,8 @@
     }
   },
   "devDependencies": {
-    "@code-yeongyu/senpi": "2026.7.26",
-    "@earendil-works/pi-tui": "0.80.3",
+    "@code-yeongyu/senpi": "2026.8.14",
+    "@earendil-works/pi-tui": "0.84.1",
     "typebox": "1.1.38"
   },
   "sideEffects": false

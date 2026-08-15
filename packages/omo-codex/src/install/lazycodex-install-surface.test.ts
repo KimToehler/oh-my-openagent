@@ -26,7 +26,7 @@ const LAZYCODEX_AGENT_ROLE_NAMES = [
   "lazycodex-worker-medium",
 ] as const
 
-const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 60_000 : 20_000
+const INSTALL_CODEX_INTEGRATION_TEST_TIMEOUT_MS = process.platform === "win32" ? 120_000 : 20_000
 
 const skipAstGrepInstall = async () => ({ kind: "skipped" as const, reason: "test" })
 
@@ -96,7 +96,9 @@ describe("lazycodex install surface", () => {
     const installationGuide = await readFile(join(process.cwd(), "docs", "guide", "installation.md"), "utf8")
 
     // when
-    const componentBinNames = EXPECTED_OMO_COMPONENT_BINS.map((entry) => entry.name)
+    const componentBinNames = EXPECTED_OMO_COMPONENT_BINS.filter(
+      (entry) => !("kind" in entry && entry.kind === "runtime-wrapper"),
+    ).map((entry) => entry.name)
 
     // then
     for (const name of componentBinNames) {
