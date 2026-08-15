@@ -1,24 +1,26 @@
-import { beforeEach, describe, expect, it } from "bun:test"
+import type { PluginInput } from "@opencode-ai/plugin"
+import { beforeEach, describe, expect, it, mock } from "bun:test"
 
-import type { ContextCollector } from "../../features/context-injector/collector"
-
-import { _resetWarnedForTesting, createUnpolledShellJobHook } from "./hook"
+import {
+  _resetNudgeStateForTesting,
+  createUnpolledShellJobHook,
+  NUDGE_COOLDOWN_MS,
+} from "./hook"
 import { _resetForTesting, recordToolCall } from "./tracker"
 
 const SESSION = "ses_main"
 
-type Registered = { sessionID: string; id: string; content: string }
+const promptMock = mock(async (_args: unknown) => ({ status: "ok" }) as { status: string })
+const settleMock = mock(async () => true)
 
-function fakeCollector(): { collector: ContextCollector; registered: Registered[] } {
-  const registered: Registered[] = []
-  const collector = {
-    register(sessionID: string, options: { id: string; content: string }) {
-      registered.push({ sessionID, id: options.id, content: options.content })
-    },
-  } as unknown as ContextCollector
-  return { collector, registered }
+/** Injected rather than mock.module'd: bun's module mocks are process-global and leak. */
+const deps = {
+  dispatchPrompt: ((args: unknown) => promptMock(args)) as never,
+  isDispatchAccepted: ((result: { status: string }) => result.status === "ok") as never,
+  shouldPrompt: (() => settleMock()) as never,
 }
 
+const ctx = { client: {}, directory: "/tmp" } as unknown as PluginInput
 const idle = { event: { type: "session.idle", properties: { sessionID: SESSION } } }
 
 function startJob(jobId: string, command = "./gradlew test") {
@@ -30,36 +32,52 @@ function startJob(jobId: string, command = "./gradlew test") {
   })
 }
 
+/** The text the hook would send, for asserting on message content. */
+function dispatchedText(call: number = 0): string {
+  const args = promptMock.mock.calls[call]?.[0] as
+    | { input?: { body?: { parts?: { text?: string }[] } } }
+    | undefined
+  return args?.input?.body?.parts?.[0]?.text ?? ""
+}
+
 describe("unpolled shell job hook", () => {
   beforeEach(() => {
     _resetForTesting()
-    _resetWarnedForTesting()
+    _resetNudgeStateForTesting()
+    promptMock.mockClear()
+    settleMock.mockClear()
+    promptMock.mockImplementation(async () => ({ status: "ok" }))
+    settleMock.mockImplementation(async () => true)
   })
 
-  it("warns at idle when a detached shell job was never polled", async () => {
-    const { collector, registered } = fakeCollector()
+  it("prompts the session when a detached shell job was never polled", async () => {
     startJob("shell_09e11136fc3e37b6", "./gradlew test --tests Foo")
 
-    await createUnpolledShellJobHook(collector, () => {})(idle)
+    await createUnpolledShellJobHook(ctx, deps)(idle)
 
-    expect(registered).toHaveLength(1)
-    expect(registered[0]?.sessionID).toBe(SESSION)
-    expect(registered[0]?.id).toBe("unpolled-shell-job")
-    expect(registered[0]?.content).toContain("shell_09e11136fc3e37b6")
-    expect(registered[0]?.content).toContain("./gradlew test --tests Foo")
-    expect(registered[0]?.content).toContain("does not notify")
+    expect(promptMock).toHaveBeenCalledTimes(1)
+    expect(dispatchedText()).toContain("shell_09e11136fc3e37b6")
+    expect(dispatchedText()).toContain("./gradlew test --tests Foo")
+    expect(dispatchedText()).toContain("does not notify")
+  })
+
+  it("dispatches asynchronously so the prompt starts a new turn", async () => {
+    startJob("shell_09e11136fc3e37b6")
+
+    await createUnpolledShellJobHook(ctx, deps)(idle)
+
+    const args = promptMock.mock.calls[0]?.[0] as { mode?: string; sessionID?: string }
+    expect(args?.mode).toBe("async")
+    expect(args?.sessionID).toBe(SESSION)
   })
 
   it("stays silent when no shell job is outstanding", async () => {
-    const { collector, registered } = fakeCollector()
+    await createUnpolledShellJobHook(ctx, deps)(idle)
 
-    await createUnpolledShellJobHook(collector, () => {})(idle)
-
-    expect(registered).toHaveLength(0)
+    expect(promptMock).not.toHaveBeenCalled()
   })
 
   it("stays silent once the job has been polled to completion", async () => {
-    const { collector, registered } = fakeCollector()
     startJob("shell_24ed9238e5ae5551")
     recordToolCall({
       sessionID: SESSION,
@@ -68,13 +86,12 @@ describe("unpolled shell job hook", () => {
       output: "status: completed",
     })
 
-    await createUnpolledShellJobHook(collector, () => {})(idle)
+    await createUnpolledShellJobHook(ctx, deps)(idle)
 
-    expect(registered).toHaveLength(0)
+    expect(promptMock).not.toHaveBeenCalled()
   })
 
-  it("still warns when a poll reported the job as running", async () => {
-    const { collector, registered } = fakeCollector()
+  it("still prompts when a poll reported the job as running", async () => {
     startJob("shell_3d5ba29a2ac4b779")
     recordToolCall({
       sessionID: SESSION,
@@ -83,67 +100,84 @@ describe("unpolled shell job hook", () => {
       output: "status: running",
     })
 
-    await createUnpolledShellJobHook(collector, () => {})(idle)
+    await createUnpolledShellJobHook(ctx, deps)(idle)
 
-    expect(registered).toHaveLength(1)
-    expect(registered[0]?.content).toContain("shell_3d5ba29a2ac4b779")
+    expect(promptMock).toHaveBeenCalledTimes(1)
+    expect(dispatchedText()).toContain("shell_3d5ba29a2ac4b779")
   })
 
   it("lists every outstanding job when several are open", async () => {
-    const { collector, registered } = fakeCollector()
     startJob("shell_4e6059704ea3df52", "npm test")
     startJob("shell_4eb92e6d6e916b0d", "./gradlew build")
 
-    await createUnpolledShellJobHook(collector, () => {})(idle)
+    await createUnpolledShellJobHook(ctx, deps)(idle)
 
-    expect(registered).toHaveLength(1)
-    expect(registered[0]?.content).toContain("shell_4e6059704ea3df52")
-    expect(registered[0]?.content).toContain("shell_4eb92e6d6e916b0d")
+    expect(dispatchedText()).toContain("shell_4e6059704ea3df52")
+    expect(dispatchedText()).toContain("shell_4eb92e6d6e916b0d")
+  })
+
+  it("does not prompt when the session became active again", async () => {
+    settleMock.mockImplementation(async () => false)
+    startJob("shell_50d30ebf447fefcb")
+
+    await createUnpolledShellJobHook(ctx, deps)(idle)
+
+    expect(promptMock).not.toHaveBeenCalled()
   })
 
   it("ignores events that are not session.idle", async () => {
-    const { collector, registered } = fakeCollector()
     startJob("shell_50d30ebf447fefcb")
 
-    await createUnpolledShellJobHook(collector, () => {})({
+    await createUnpolledShellJobHook(ctx, deps)({
       event: { type: "session.updated", properties: { sessionID: SESSION } },
     })
 
-    expect(registered).toHaveLength(0)
+    expect(promptMock).not.toHaveBeenCalled()
   })
 
   it("drops tracked jobs when the session is deleted", async () => {
-    const { collector, registered } = fakeCollector()
     startJob("shell_5b2c897b2d02c2bf")
 
-    const hook = createUnpolledShellJobHook(collector, () => {})
+    const hook = createUnpolledShellJobHook(ctx, deps)
     await hook({ event: { type: "session.deleted", properties: { sessionID: SESSION } } })
     await hook(idle)
 
-    expect(registered).toHaveLength(0)
+    expect(promptMock).not.toHaveBeenCalled()
   })
 
-  it("warns only once per job so repeated idles do not spam", async () => {
-    const { collector, registered } = fakeCollector()
+  it("does not re-prompt within the cooldown window", async () => {
     startJob("shell_631191c09fa8d271")
+    let clock = 1_000_000
+    const hook = createUnpolledShellJobHook(ctx, { ...deps, now: () => clock })
 
-    const hook = createUnpolledShellJobHook(collector, () => {})
     await hook(idle)
+    clock += NUDGE_COOLDOWN_MS - 1
     await hook(idle)
 
-    expect(registered).toHaveLength(1)
+    expect(promptMock).toHaveBeenCalledTimes(1)
   })
 
-  it("warns again when a new job appears after an earlier warning", async () => {
-    const { collector, registered } = fakeCollector()
+  it("keeps prompting after the cooldown while the job is still outstanding", async () => {
     startJob("shell_631191c09fa8d271")
+    let clock = 1_000_000
+    const hook = createUnpolledShellJobHook(ctx, { ...deps, now: () => clock })
 
-    const hook = createUnpolledShellJobHook(collector, () => {})
     await hook(idle)
+    clock += NUDGE_COOLDOWN_MS + 1
+    await hook(idle)
+
+    expect(promptMock).toHaveBeenCalledTimes(2)
+    expect(dispatchedText(1)).toContain("shell_631191c09fa8d271")
+  })
+
+  it("does not record a cooldown when the dispatch was rejected, so the next idle retries", async () => {
+    promptMock.mockImplementation(async () => ({ status: "failed" }))
     startJob("shell_0e430bdc6c9ad516")
+    const hook = createUnpolledShellJobHook(ctx, { ...deps, now: () => 1_000_000 })
+
+    await hook(idle)
     await hook(idle)
 
-    expect(registered).toHaveLength(2)
-    expect(registered[1]?.content).toContain("shell_0e430bdc6c9ad516")
+    expect(promptMock).toHaveBeenCalledTimes(2)
   })
 })

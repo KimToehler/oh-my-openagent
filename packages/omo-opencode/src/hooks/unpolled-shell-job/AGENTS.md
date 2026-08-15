@@ -29,26 +29,51 @@ and was still violated three times in one session. Facts stated as reference get
   `ctx_shell` (matching lean-ctx's MCP tool however the host prefixes it).
   - A call with `run_in_background: true` whose output contains a `shell_<hex>` id
     registers that job for the session.
-  - A call with `background_action: "status"` clears the job **only if** the output
-    reports a terminal state (`completed`, `failed`, `cancelled`, `timed out`, ...).
-    A poll reporting `running` deliberately leaves it outstanding.
+  - A call with `background_action: "status"` clears the job **only if the parsed status
+    field** reports a terminal value. The status is extracted from the field, never
+    matched against the free-form body: a running gradle/npm job's log tail routinely
+    contains `FAILED` / `completed`, and scanning the whole output for those words retired
+    the job on its first poll — silently disarming the guard for exactly the long, noisy
+    builds it exists for. An unparseable status is treated as **still running** (fail-safe).
   - A call with `background_action: "cancel"` always clears it.
-- `hook.ts` runs on `session.idle`. If any job is outstanding it registers a high-priority
-  `contextCollector` entry naming each job id and its command. It warns **once per job**,
-  so repeated idles do not spam, but a newly started job warns again.
-- `session.deleted` drops all state for the session.
+  - A `status` poll naming an unknown job adopts it, so a reworded start message degrades
+    to still-guarded rather than untracked. Retired ids are remembered and refused, so a
+    late "job not found" reply cannot resurrect a reaped job into an endless warning.
+  - Entries are pruned by TTL (2h) and capped per session, because `session.deleted` is
+    **not** guaranteed — `client.session.abort()` does not reliably emit it, and aborted
+    subagents are the heaviest users of detached shells.
+- `hook.ts` runs on `session.idle` and dispatches an **internal continuation prompt**
+  (`dispatchInternalPrompt`, `mode: "async"`), the same mechanism `goal` and
+  `atlas/idle-completion-nudge` use.
 
-Recording happens unconditionally in `plugin/tool-execute-after.ts`, *before* the
-configurable hook chain. The idle hook is gated by the `unpolled-shell-job` hook name, but
-the tracking it depends on must not be — a disabled recorder would silently produce an
-always-empty warning.
+  It deliberately does **not** use `contextCollector`: collector entries are drained by
+  `experimental.chat.messages.transform` and injected into the next *real user* message
+  (`features/context-injector/injector.ts`), which means they arrive only after a human
+  types again — i.e. after the very stall this hook exists to prevent — and are skipped
+  entirely for subagent sessions, whose prompts carry the internal-initiator marker.
+  Subagents are the worst case (stale-cancelled at 15 min with work uncommitted), so a
+  collector-based guard is silent exactly where it is needed most.
+
+  A cooldown (`NUDGE_COOLDOWN_MS`) throttles repeat prompts, but the hook keeps firing
+  while a job is outstanding — a guard against stalling must escalate, not go quiet after
+  one attempt. A rejected dispatch does not start the cooldown, so the next idle retries.
+- `session.deleted` drops all state — cleared centrally in
+  `plugin/event-session-lifecycle.ts`, not inside the hook, because recording is
+  unconditional. Clearing only in the (configurable) hook meant that disabling the hook
+  removed the tracker's only reaper.
 
 ## Testing
 
-`bun test packages/omo-opencode/src/hooks/unpolled-shell-job/` — 18 tests across
-`tracker.test.ts` (registration, clearing, per-session isolation) and `hook.test.ts`
-(warn/silent decisions, dedupe, event filtering).
+`bun test packages/omo-opencode/src/hooks/unpolled-shell-job/` — 33 tests across
+`tracker.test.ts` (registration, status parsing, adoption, retirement, TTL/cap,
+per-session isolation) and `hook.test.ts` (dispatch shape, cooldown, settle gate,
+event filtering).
 
-The fixtures use real `shell_*` ids and real output shapes taken from a live transcript
-(`~/.claude/transcripts/`), where a single session recorded 42 detached starts and 314
-polls.
+Wiring is pinned by two tests outside this directory:
+`plugin/tool-execute-after.test.ts` asserts a detached `ctx_shell` call reaches the
+tracker with the right argument shape (verified to fail when the call is removed), and
+`plugin/event-hook-dispatcher.test.ts` enumerates every session hook and asserts each is
+dispatched on `session.idle`.
+
+Fixtures use realistic `shell_*` ids and poll bodies, including the gradle/jest/bun log
+tails that previously caused a running job to be retired.

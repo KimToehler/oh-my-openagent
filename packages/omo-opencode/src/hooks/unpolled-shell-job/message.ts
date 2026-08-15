@@ -13,11 +13,11 @@ export function buildUnpolledShellJobMessage(jobs: readonly OutstandingJob[]): s
     `\`task(run_in_background=true)\`, no \`<system-reminder>\` will ever arrive for it. If you`,
     `end the turn expecting one, the work stalls until a human intervenes.`,
     ``,
-    `Poll it now, in this turn:`,
-    `\`ctx_shell(background_action="status", job_id="${jobs[0]?.jobId ?? "shell_..."}")\``,
+    `Poll each one now, in this turn:`,
+    ...jobs.map((job) => `\`ctx_shell(background_action="status", job_id="${job.jobId}")\``),
     ``,
-    `If you no longer need the result, cancel it explicitly with`,
-    `\`background_action="cancel"\`. Either way, do not yield while it is outstanding.`,
+    `If you no longer need a result, cancel it explicitly with`,
+    `\`background_action="cancel"\`. Either way, do not yield while one is outstanding.`,
     `</unpolled-background-shell-jobs>`,
   ].join("\n")
 }

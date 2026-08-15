@@ -122,12 +122,20 @@ export function createToolExecuteAfterHandler(args: {
     // Detached ctx_shell jobs never notify on completion, so track them here and warn at
     // idle if the turn would end with one outstanding. Recorded unconditionally: the
     // idle-time hook is configurable, but it is useless without this data.
-    recordShellToolCall({
-      sessionID: input.sessionID,
-      tool: input.tool,
-      ...(input.args === undefined ? {} : { args: input.args as Record<string, unknown> }),
-      ...(typeof output.output === "string" ? { output: output.output } : {}),
-    })
+    try {
+      recordShellToolCall({
+        sessionID: input.sessionID,
+        tool: input.tool,
+        ...(input.args === undefined ? {} : { args: input.args as Record<string, unknown> }),
+        ...(typeof output.output === "string" ? { output: output.output } : {}),
+      })
+    } catch (error) {
+      log("[tool-execute-after] Failed to record detached shell job", {
+        tool: input.tool,
+        sessionID: input.sessionID,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    }
 
     const runToolExecuteAfterHooks = async (): Promise<void> => {
       await hooks.toolOutputTruncator?.["tool.execute.after"]?.(hookInput, output)

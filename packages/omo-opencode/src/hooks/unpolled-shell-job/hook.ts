@@ -1,9 +1,23 @@
-import { contextCollector, type ContextCollector } from "../../features/context-injector/collector"
+import type { PluginInput } from "@opencode-ai/plugin"
+
 import { log } from "../../shared"
 import { resolveSessionEventID } from "../../shared/event-session-id"
+import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
+import { shouldPromptAfterSessionIdle } from "../shared/session-idle-settle"
 
 import { buildUnpolledShellJobMessage } from "./message"
 import { forgetSession, getOutstandingJobs } from "./tracker"
+
+const HOOK_NAME = "unpolled-shell-job"
+
+/**
+ * Minimum gap between two continuation prompts for the same session.
+ *
+ * The guard must keep firing while a job is outstanding — going permanently quiet after
+ * one attempt guarantees the stall it exists to prevent — but re-prompting on every idle
+ * would spin. A cooldown keeps it insistent without spamming.
+ */
+export const NUDGE_COOLDOWN_MS = 60_000
 
 type UnpolledShellJobEvent = {
   readonly event: {
@@ -12,27 +26,45 @@ type UnpolledShellJobEvent = {
   }
 }
 
-type Logger = (message: string, data?: Record<string, unknown>) => void
+type UnpolledShellJobOptions = {
+  readonly idleSettleMs?: number
+  readonly now?: () => number
+  /** Injected in tests; `mock.module` would leak globally across bun's test process. */
+  readonly dispatchPrompt?: typeof dispatchInternalPrompt
+  readonly isDispatchAccepted?: typeof isInternalPromptDispatchAccepted
+  readonly shouldPrompt?: typeof shouldPromptAfterSessionIdle
+}
 
-/** Job ids already warned about, per session, so repeated idles do not spam. */
-const warnedJobs = new Map<string, Set<string>>()
+const lastNudgedAt = new Map<string, number>()
+const inFlight = new Set<string>()
 
 /** @internal For testing only */
-export function _resetWarnedForTesting(): void {
-  warnedJobs.clear()
+export function _resetNudgeStateForTesting(): void {
+  lastNudgedAt.clear()
+  inFlight.clear()
+}
+
+export function forgetNudgeState(sessionID: string): void {
+  lastNudgedAt.delete(sessionID)
+  inFlight.delete(sessionID)
 }
 
 export function createUnpolledShellJobHook(
-  collector: ContextCollector = contextCollector,
-  logger: Logger = log,
+  ctx: PluginInput,
+  options: UnpolledShellJobOptions = {},
 ): (input: UnpolledShellJobEvent) => Promise<void> {
+  const now = options.now ?? (() => Date.now())
+  const dispatchPrompt = options.dispatchPrompt ?? dispatchInternalPrompt
+  const isDispatchAccepted = options.isDispatchAccepted ?? isInternalPromptDispatchAccepted
+  const shouldPrompt = options.shouldPrompt ?? shouldPromptAfterSessionIdle
+
   return async ({ event }) => {
     const sessionID = resolveSessionEventID(event.properties)
     if (sessionID === undefined) return
 
     if (event.type === "session.deleted") {
       forgetSession(sessionID)
-      warnedJobs.delete(sessionID)
+      forgetNudgeState(sessionID)
       return
     }
     if (event.type !== "session.idle") return
@@ -40,23 +72,46 @@ export function createUnpolledShellJobHook(
     const outstanding = getOutstandingJobs(sessionID)
     if (outstanding.length === 0) return
 
-    const alreadyWarned = warnedJobs.get(sessionID) ?? new Set<string>()
-    const unwarned = outstanding.filter((job) => !alreadyWarned.has(job.jobId))
-    if (unwarned.length === 0) return
+    if (inFlight.has(sessionID)) return
+    const previous = lastNudgedAt.get(sessionID)
+    if (previous !== undefined && now() - previous < NUDGE_COOLDOWN_MS) return
 
-    collector.register(sessionID, {
-      id: "unpolled-shell-job",
-      source: "custom",
-      content: buildUnpolledShellJobMessage(outstanding),
-      priority: "high",
-    })
+    inFlight.add(sessionID)
+    try {
+      // The session may have resumed between the idle event and this dispatch.
+      if (!(await shouldPrompt(ctx.client, sessionID, options.idleSettleMs))) {
+        log(`[${HOOK_NAME}] Skipped; session is active again`, { sessionID })
+        return
+      }
 
-    for (const job of outstanding) alreadyWarned.add(job.jobId)
-    warnedJobs.set(sessionID, alreadyWarned)
+      const promptResult = await dispatchPrompt({
+        mode: "async",
+        client: ctx.client,
+        sessionID,
+        source: `${HOOK_NAME}:idle-poll-reminder`,
+        ...(options.idleSettleMs === undefined ? {} : { settleMs: options.idleSettleMs }),
+        queueBehavior: "defer",
+        input: {
+          path: { id: sessionID },
+          body: { parts: [{ type: "text", text: buildUnpolledShellJobMessage(outstanding) }] },
+        },
+      })
 
-    logger("[unpolled-shell-job] warned about outstanding detached jobs", {
-      sessionID,
-      jobIds: outstanding.map((job) => job.jobId),
-    })
+      if (!isDispatchAccepted(promptResult)) {
+        log(`[${HOOK_NAME}] Continuation dispatch not accepted`, {
+          sessionID,
+          status: promptResult.status,
+        })
+        return
+      }
+
+      lastNudgedAt.set(sessionID, now())
+      log(`[${HOOK_NAME}] Prompted session to poll its detached shell jobs`, {
+        sessionID,
+        jobIds: outstanding.map((job) => job.jobId),
+      })
+    } finally {
+      inFlight.delete(sessionID)
+    }
   }
 }

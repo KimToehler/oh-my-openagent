@@ -1,11 +1,60 @@
 import { beforeEach, describe, expect, it } from "bun:test"
 
 import { clearPendingStore, storeToolMetadata } from "../features/tool-metadata-store"
+import {
+  _resetForTesting as resetShellJobTracker,
+  getOutstandingJobs,
+} from "../hooks/unpolled-shell-job/tracker"
 import { createToolExecuteAfterHandler } from "./tool-execute-after"
 
 describe("createToolExecuteAfterHandler", () => {
   beforeEach(() => {
     clearPendingStore()
+    resetShellJobTracker()
+  })
+
+  it("#given a detached ctx_shell call #when tool.execute.after runs #then the job is tracked", async () => {
+    const handler = createToolExecuteAfterHandler({
+      ctx: { directory: "/repo" } as never,
+      hooks: {} as never,
+    })
+
+    await handler(
+      {
+        tool: "lean-ctx_ctx_shell",
+        sessionID: "ses_shell",
+        callID: "call_shell",
+        args: { command: "./gradlew test", run_in_background: true },
+      },
+      { title: "result", output: "Started background job shell_1234abcd5678ef90", metadata: {} }
+    )
+
+    expect(getOutstandingJobs("ses_shell").map((job) => job.jobId)).toEqual([
+      "shell_1234abcd5678ef90",
+    ])
+    expect(getOutstandingJobs("ses_shell")[0]?.command).toBe("./gradlew test")
+  })
+
+  it("#given the tracker would throw #when tool.execute.after runs #then the hook chain still runs", async () => {
+    let chainRan = false
+    const handler = createToolExecuteAfterHandler({
+      ctx: { directory: "/repo" } as never,
+      hooks: {
+        claudeCodeHooks: {
+          "tool.execute.after": async () => {
+            chainRan = true
+          },
+        },
+      } as never,
+    })
+
+    // A non-string tool name is the shape the surrounding file documents as best-effort.
+    await handler(
+      { tool: undefined as never, sessionID: "ses_shell", callID: "call_shell" },
+      { title: "result", output: "output", metadata: {} }
+    )
+
+    expect(chainRan).toBe(true)
   })
 
   it("#given truncator changes output #when tool.execute.after runs #then claudeCodeHooks receives truncated output", async () => {

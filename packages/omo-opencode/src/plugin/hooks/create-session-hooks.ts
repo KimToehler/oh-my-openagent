@@ -184,7 +184,7 @@ export function createSessionHooks(args: {
     : null
 
   const unpolledShellJob = isHookEnabled("unpolled-shell-job")
-    ? safeHook("unpolled-shell-job", () => createUnpolledShellJobHook())
+    ? safeHook("unpolled-shell-job", () => createUnpolledShellJobHook(ctx))
     : null
 
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
