@@ -42,6 +42,23 @@ and was still violated three times in one session. Facts stated as reference get
   - Entries are pruned by TTL (2h) and capped per session, because `session.deleted` is
     **not** guaranteed — `client.session.abort()` does not reliably emit it, and aborted
     subagents are the heaviest users of detached shells.
+- `message.ts` builds the warning. It offers three resolutions (bounded wait / cancel /
+  confirm-already-finished) rather than only "poll each one".
+
+  The wait path prescribes a **bounded loop that breaks on completion**, because the
+  earlier phrasing — a list of `background_action="status"` calls — reliably produced a
+  spiral of a dozen-plus single status calls across as many turns, flooding context to
+  learn what one loop would have reported. The message says explicitly that the
+  "never sleep-poll" rule targets a *blind* `sleep 300` (which wastes the whole wait even
+  when the job lands in 5s), not a loop that exits as soon as the work finishes;
+  without that carve-out an agent reads the two rules as contradictory and falls back to
+  spamming `status`.
+
+  It also closes with the point that most jobs should never have been detached:
+  `ctx_shell` runs in the foreground up to ~110s, and delegable work belongs in
+  `task(run_in_background=true)`, which notifies. Telling an agent how to clean up a
+  detached job without telling it not to detach next time treats the symptom.
+
 - `hook.ts` runs on `session.idle` and dispatches an **internal continuation prompt**
   (`dispatchInternalPrompt`, `mode: "async"`), the same mechanism `goal` and
   `atlas/idle-completion-nudge` use.
