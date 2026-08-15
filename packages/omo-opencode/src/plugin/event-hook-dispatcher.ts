@@ -62,6 +62,7 @@ export function createEventHookDispatcher(hooks: CreatedHooks, runEventHookSafel
     await runEventHookSafely("interactiveBashSession", hooks.interactiveBashSession?.event, input);
     await runEventHookSafely("goal", hooks.goal?.event, input);
     await runEventHookSafely("lessonNudge", hooks.lessonNudge, input);
+    await runEventHookSafely("unpolledShellJob", hooks.unpolledShellJob, input);
     await runEventHookSafely("stopContinuationGuard", hooks.stopContinuationGuard?.event, input);
     await runEventHookSafely("compactionContextInjector", hooks.compactionContextInjector?.event, input);
     await runEventHookSafely("compactionTodoPreserver", hooks.compactionTodoPreserver?.event, input);

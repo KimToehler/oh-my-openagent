@@ -29,6 +29,7 @@ export const HookNameSchema = z.enum([
   "goal",
   "category-skill-reminder",
   "lesson-nudge",
+  "unpolled-shell-job",
 
   "compaction-context-injector",
   "compaction-todo-preserver",

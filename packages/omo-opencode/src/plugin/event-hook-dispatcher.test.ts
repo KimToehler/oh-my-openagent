@@ -91,7 +91,7 @@ describe("session hook dispatch coverage", () => {
         })
         const handlers: Record<string, ReturnType<typeof mock>> = {}
         const hookStubs: Record<string, unknown> = {}
-        const bareHandlers = new Set(["sessionNotification", "lessonNudge"])
+        const bareHandlers = new Set(["sessionNotification", "lessonNudge", "unpolledShellJob"])
         const handlerMembers = new Set(["todoContinuationEnforcer", "atlasHook"])
         const eventTierMembers = Object.keys(sessionHooks).filter(
           (member) => !NON_EVENT_TIER_SESSION_HOOKS.has(member),
