@@ -12,7 +12,7 @@
 
 | Tier | Composer | Base | With team-mode | Where |
 |------|----------|------|----------------|-------|
-| **Session** | `create-session-hooks.ts` | 25 | 25 | OpenCode session lifecycle + chat.params + chat.message |
+| **Session** | `create-session-hooks.ts` | 26 | 26 | OpenCode session lifecycle + chat.params + chat.message |
 | **Tool Guard** | `create-tool-guard-hooks.ts` | 18 | 18 | Pre/post tool execution (+1: `team-tool-gating`, already included) |
 | **Transform** | `create-transform-hooks.ts` | 7 | 7 | `experimental.chat.messages.transform` (includes `team-mode-status-injector`, `team-mailbox-injector`, `monitor-status-injector` when enabled) |
 | **Continuation** | `create-continuation-hooks.ts` | 7 | 7 | Boulder/atlas/compaction/notification |
@@ -23,7 +23,7 @@ Total exposed hooks: **59 base, 63 with team-mode + monitor** (counts the 4 team
 
 Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated in [`src/config/schema/hooks.ts`](../config/schema/hooks.ts) `HookNameSchema`. Team-session-event sub-hooks are not individually listed in the schema -- they activate together with `team_mode.enabled`.
 
-### Tier 1: Session Hooks (25)
+### Tier 1: Session Hooks (26)
 
 | Hook | Event | Purpose |
 |------|-------|---------|
@@ -39,6 +39,7 @@ Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated
 | `interactiveBashSession` | tool.execute | Tmux session lifecycle for interactive_bash tool |
 | `goal` | event | Persistent per-session objective; idle continuation + usage accounting. Replaces `ralphLoop` (see [`goal/AGENTS.md`](goal/AGENTS.md)) |
 | `lessonNudge` | event | Suggest recorded lessons when session goes idle (TUI/serve only; does not fire under `opencode run`) |
+| `unpolledShellJob` | event | Warn at idle when the turn would end with a detached `ctx_shell` job never polled to completion (see [`unpolled-shell-job/AGENTS.md`](unpolled-shell-job/AGENTS.md)) |
 | `editErrorRecovery` | tool.execute.after | Retry failed file edits |
 | `delegateTaskRetry` | tool.execute.after | Retry failed task delegations |
 | `startWork` | chat.message | `/start-work` command handler |

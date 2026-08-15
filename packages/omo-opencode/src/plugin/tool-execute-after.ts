@@ -1,6 +1,7 @@
 import { recoverToolMetadata } from "../features/tool-metadata-store"
 import { buildCodegraphInitGuidanceForToolResult } from "@oh-my-opencode/utils"
 import type { CreatedHooks } from "../create-hooks"
+import { recordToolCall as recordShellToolCall } from "../hooks/unpolled-shell-job/tracker"
 import { log as defaultLog } from "../shared/logger"
 import type { PluginContext } from "./types"
 
@@ -115,6 +116,24 @@ export function createToolExecuteAfterHandler(args: {
         tool: input.tool,
         sessionID: input.sessionID,
         callID: input.callID ?? input.callId ?? input.call_id,
+      })
+    }
+
+    // Detached ctx_shell jobs never notify on completion, so track them here and warn at
+    // idle if the turn would end with one outstanding. Recorded unconditionally: the
+    // idle-time hook is configurable, but it is useless without this data.
+    try {
+      recordShellToolCall({
+        sessionID: input.sessionID,
+        tool: input.tool,
+        ...(input.args === undefined ? {} : { args: input.args as Record<string, unknown> }),
+        ...(typeof output.output === "string" ? { output: output.output } : {}),
+      })
+    } catch (error) {
+      log("[tool-execute-after] Failed to record detached shell job", {
+        tool: input.tool,
+        sessionID: input.sessionID,
+        error: error instanceof Error ? error.message : String(error),
       })
     }
 

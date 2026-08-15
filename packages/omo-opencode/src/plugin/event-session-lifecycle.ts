@@ -14,6 +14,8 @@ import {
 import { resetMessageCursor } from "../shared";
 import { clearSessionModel, setSessionModel } from "../shared/session-model-state";
 import { clearSessionPromptParams } from "../shared/session-prompt-params-state";
+import { forgetNudgeState as forgetShellJobNudgeState } from "../hooks/unpolled-shell-job/hook";
+import { forgetSession as forgetShellJobSession } from "../hooks/unpolled-shell-job/tracker";
 import { deleteSessionTools } from "../shared/session-tools-store";
 import { dispatchOpenClawEvent } from "../openclaw/runtime-dispatch";
 import { resolveMessageEventSessionID, resolveSessionEventID } from "../shared/event-session-id";
@@ -110,6 +112,11 @@ export async function handleSessionDeletedEvent(args: {
   await dispatchOpenClawSessionEvent({ ...args, rawEvent: "session.deleted", sessionID });
   if (wasSyncSubagentSession) subagentSessions.delete(sessionID);
   deleteSessionTools(sessionID);
+  // Recorded unconditionally in tool-execute-after, so it must also be cleared
+  // unconditionally — clearing only inside the (configurable) hook meant disabling the
+  // hook turned the tracker into an unbounded map with no reaper at all.
+  forgetShellJobSession(sessionID);
+  forgetShellJobNudgeState(sessionID);
   await args.managers.skillMcpManager.disconnectSession(sessionID);
   if (args.tmuxIntegrationEnabled) await args.managers.tmuxSessionManager.onSessionDeleted({ sessionID });
 }

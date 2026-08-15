@@ -31,6 +31,7 @@ import {
 } from "../../hooks"
 import { createGoalHook } from "../../hooks/goal"
 import { createLessonNudgeHook } from "../../hooks/lesson-nudge"
+import { createUnpolledShellJobHook } from "../../hooks/unpolled-shell-job"
 import {
   detectExternalNotificationPlugin,
   getNotificationConflictWarning,
@@ -55,6 +56,7 @@ export type SessionHooks = {
   interactiveBashSession: ReturnType<typeof createInteractiveBashSessionHook> | null
   goal: ReturnType<typeof createGoalHook> | null
   lessonNudge: ReturnType<typeof createLessonNudgeHook> | null
+  unpolledShellJob: ReturnType<typeof createUnpolledShellJobHook> | null
   editErrorRecovery: ReturnType<typeof createEditErrorRecoveryHook> | null
   delegateTaskRetry: ReturnType<typeof createDelegateTaskRetryHook> | null
   startWork: ReturnType<typeof createStartWorkHook> | null
@@ -181,6 +183,10 @@ export function createSessionHooks(args: {
     ? safeHook("lesson-nudge", () => createLessonNudgeHook())
     : null
 
+  const unpolledShellJob = isHookEnabled("unpolled-shell-job")
+    ? safeHook("unpolled-shell-job", () => createUnpolledShellJobHook(ctx))
+    : null
+
   const editErrorRecovery = isHookEnabled("edit-error-recovery")
     ? safeHook("edit-error-recovery", () => createEditErrorRecoveryHook(ctx))
     : null
@@ -255,6 +261,7 @@ export function createSessionHooks(args: {
     interactiveBashSession,
     goal,
     lessonNudge,
+    unpolledShellJob,
     editErrorRecovery,
     delegateTaskRetry,
     startWork,
