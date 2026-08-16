@@ -1,4 +1,4 @@
-# src/features/background-agent/ — Core Orchestration Engine
+# src/features/background-agent/ - Core Orchestration Engine
 
 **Generated:** 2026-05-20
 
@@ -16,9 +16,9 @@ LaunchInput → pending → [ConcurrencyManager queue] → running → polling �
 
 | File | Purpose |
 |------|---------|
-| `manager.ts` | `BackgroundManager` — main class: launch, cancel, getTask, listTasks |
+| `manager.ts` | `BackgroundManager` - main class: launch, cancel, getTask, listTasks |
 | `spawner.ts` | Task spawning: create session → inject prompt → start polling |
-| `concurrency.ts` | `ConcurrencyManager` — FIFO queue per concurrency key, slot acquisition/release |
+| `concurrency.ts` | `ConcurrencyManager` - FIFO queue per concurrency key, slot acquisition/release |
 | `task-poller.ts` | 3s interval polling, completion via idle events + stability detection (10s unchanged) |
 | `types.ts` | `BackgroundTask`, `LaunchInput`, `ResumeInput`, `BackgroundTaskStatus` |
 | `parent-wake-notifier.ts` | 587 LOC. Dependency-injected client + enqueue callback. Notifies parent session when a background task wants attention. |
@@ -49,10 +49,20 @@ LaunchInput → pending → [ConcurrencyManager queue] → running → polling �
 ## COMPLETION DETECTION
 
 Two signals combined:
-1. **Session idle event** — OpenCode reports session became idle
-2. **Stability detection** — message count unchanged for 10s (3+ stable polls at 3s interval)
+1. **Session idle event**: OpenCode reports session became idle
+2. **Stability detection**: message count unchanged for 10s (3+ stable polls at 3s interval)
 
 Both must agree before marking a task complete. Prevents premature completion on brief pauses.
+
+### Todo-completion gate is bounded, not indefinite
+
+The poll loop also waits on a task's own todo list before completing it (`manager.ts` around lines 3365-3368): while `checkSessionTodos` reports incomplete todos, the task stays `running`. That wait is bounded by a grace window, config key `background_task.todoGateGraceMs` (`config/schema/background-task.ts`, default 600000 ms / 10 minutes, `.min(60000)`), constrained by a `superRefine` guard that requires `todoGateGraceMs` to stay below `taskTtlMs`. When a task has been continuously idle with valid session output but non-terminal todos for longer than the grace window, it completes through the normal `tryCompleteTask` path instead of waiting indefinitely, and the completion notification is annotated with the count of unfinished todos (`unfinishedTodoCount` on `BackgroundTask`, `types.ts`).
+
+Todo terminalization is not guaranteed by any producer: nothing obliges a subagent to mark its own todos terminal before going idle, since that depends on the subagent's own judgement rather than a contract the harness can enforce. That is the reason the gate is bounded by time instead of by a stricter producer contract.
+
+Two known limits on the bound:
+- **Status unavailable**: when the session status map (`allStatuses`) comes back `undefined` for a poll cycle, the loop continues before reaching the todo gate (`manager.ts:3335`, `if (allStatuses === undefined) { continue }`). On that cycle the gate's stamp is never set, so the bound cannot start counting for the task, while age-based task pruning keeps running on its own independent schedule.
+- **Plugin-restart orphan**: the poll loop and all in-memory task state live in the running plugin process. If the runtime restarts, that state is gone, the task never reaches a terminal status, and no bound (this one or any other) can fire for it. This is a separate, unaddressed failure mode from the todo gate.
 
 ## CONCURRENCY MODEL
 

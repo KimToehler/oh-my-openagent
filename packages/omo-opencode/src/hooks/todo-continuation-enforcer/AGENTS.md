@@ -83,6 +83,8 @@ interface SessionState {
 
 ## RELATIONSHIP TO ATLAS
 
-`todoContinuationEnforcer` handles **main Sisyphus sessions** only.
-`atlasHook` handles **boulder/ralph/subagent sessions** with a different decision gate.
-Both fire on `session.idle` but check session type first.
+`todoContinuationEnforcer` is not scoped to main sessions only. `handleSessionIdle` fires on `session.idle` for any session whose resolved agent is not in `DEFAULT_SKIP_AGENTS` (`prometheus`, `compaction`, `plan`; the check is `resolvedAgentName && skipAgents.some(...)` at `idle-event.ts:203-207`). Subagent and background-task sessions go through this same gate: `todo-continuation-enforcer.test.ts:410` pins a case named "should inject for background task session (subagent)", and `:393` pins "should inject for any session with incomplete todos" against an arbitrary session id.
+
+`atlasHook` is a separate mechanism that only acts on sessions registered in an active boulder plan. `handleAtlasSessionIdle` (`hooks/atlas/idle-event.ts:38-46`) calls `resolveActiveBoulderSession` and returns early when the session is not tracked there. It does not gate on "boulder/ralph/subagent" as a session type in general, only on boulder-plan membership.
+
+Both hooks fire on `session.idle`, but neither excludes a session for being a subagent as such: the enforcer excludes by agent name (three agents only), atlas excludes by boulder-plan membership. A given subagent session can be handled by both, one, or neither, depending on its agent name and whether it is boulder-tracked.
