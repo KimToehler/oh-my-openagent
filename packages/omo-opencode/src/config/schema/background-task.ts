@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { TERMINAL_TASK_TTL_MS } from "../../features/background-agent/constants"
+import { TASK_TTL_MS, TERMINAL_TASK_TTL_MS } from "../../features/background-agent/constants"
 
 const CircuitBreakerConfigSchema = z.object({
   enabled: z.boolean().optional(),
@@ -28,6 +28,8 @@ export const BackgroundTaskConfigSchema = z.object({
   blockedRewakeMs: z.number().describe("Delay before sending one reminder for an unanswered blocked task in milliseconds (default: 600000 = 10 minutes, minimum: 60000 = 1 minute).").min(60000).optional(),
   /** Time before an unanswered blocked task expires in milliseconds (default: 1200000 = 20 minutes, minimum: 60000 = 1 minute). Must remain below the terminal task TTL. */
   blockedExpiryMs: z.number().describe("Time before an unanswered blocked task expires in milliseconds (default: 1200000 = 20 minutes, minimum: 60000 = 1 minute). Must remain below the terminal task TTL.").min(60000).optional(),
+  /** Grace period in milliseconds a background task may stay continuously idle with valid output but incomplete todos before completing anyway (default: 600000 = 10 minutes, minimum: 60000 = 1 minute). Must remain below taskTtlMs. */
+  todoGateGraceMs: z.number().describe("Grace period in milliseconds a background task may stay continuously idle with valid output but incomplete todos before completing anyway (default: 600000 = 10 minutes, minimum: 60000 = 1 minute). Must remain below taskTtlMs.").min(60000).optional(),
   syncPollTimeoutMs: z.number().min(60000).optional(),
   syncWallClockTimeoutMs: z
     .number()
@@ -53,6 +55,14 @@ export const BackgroundTaskConfigSchema = z.object({
       code: "custom",
       path: ["blockedExpiryMs"],
       message: "blockedExpiryMs must be less than the terminal task TTL",
+    })
+  }
+
+  if (config.todoGateGraceMs !== undefined && config.todoGateGraceMs >= (config.taskTtlMs ?? TASK_TTL_MS)) {
+    context.addIssue({
+      code: "custom",
+      path: ["todoGateGraceMs"],
+      message: "todoGateGraceMs must be less than taskTtlMs",
     })
   }
 })

@@ -9313,6 +9313,11 @@
           "minimum": 60000,
           "description": "Time before an unanswered blocked task expires in milliseconds (default: 1200000 = 20 minutes, minimum: 60000 = 1 minute). Must remain below the terminal task TTL."
         },
+        "todoGateGraceMs": {
+          "type": "number",
+          "minimum": 60000,
+          "description": "Grace period in milliseconds a background task may stay continuously idle with valid output but incomplete todos before completing anyway (default: 600000 = 10 minutes, minimum: 60000 = 1 minute). Must remain below taskTtlMs."
+        },
         "syncPollTimeoutMs": {
           "type": "number",
           "minimum": 60000
