@@ -90,9 +90,12 @@ export function pruneStaleTasksAndNotifications(args: {
     if (age <= effectiveTtl) continue
 
     const ttlMinutes = Math.round(effectiveTtl / 60000)
+    const inactivitySeconds = Math.round(age / 1000)
     const errorMessage = task.status === "pending"
       ? `Task timed out while queued (${ttlMinutes} minutes)`
-      : `Task timed out after ${ttlMinutes} minutes of inactivity`
+      : (task.progress?.toolCalls ?? 0) > 0
+        ? `Task stuck with output present after ${inactivitySeconds}s of inactivity (${ttlMinutes} minute TTL)`
+        : `Task genuinely inactive after ${inactivitySeconds}s (${ttlMinutes} minute TTL)`
 
     onTaskPruned(taskId, task, errorMessage)
   }

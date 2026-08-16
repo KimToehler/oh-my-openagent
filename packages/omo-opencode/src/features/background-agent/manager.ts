@@ -281,6 +281,7 @@ export class BackgroundManager {
   private parentWakeTextDeltaBuffers: Map<string, string> = new Map()
   private observedOutputSessions: Set<string> = new Set()
   private observedIncompleteTodosBySession: Map<string, number> = new Map()
+  private todoGateLogLastEmittedAt: Map<string, number> = new Map()
   private rootDescendantCounts: Map<string, number>
   private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
@@ -454,6 +455,7 @@ export class BackgroundManager {
     this.archiveCompletedTask(task)
     archiveBackgroundTask(task)
     this.blockedNotificationTaskIds.delete(task.id)
+    this.todoGateLogLastEmittedAt.delete(task.id)
     this.tasks.delete(task.id)
     this.removeTaskFromParentIndex(task.id, task.parentSessionId)
   }
@@ -2870,6 +2872,7 @@ The task was re-queued on a fallback model after a retryable failure.
         this.parentWakeNotifier.releaseNotificationPreparation(notificationParentSessionID)
         this.updateBackgroundTaskMarker(notificationParentSessionID)
       }
+      this.todoGateLogLastEmittedAt.delete(task.id)
       this.completingTaskIds.delete(task.id)
     }
   }
@@ -3150,7 +3153,13 @@ The task was re-queued on a fallback model after a retryable failure.
       sessionStatuses: allStatuses,
       onTaskPruned: (taskId, task, errorMessage) => {
         const wasPending = task.status === "pending"
-        log("[background-agent] Pruning stale task:", { taskId, status: task.status, age: Math.round(((wasPending ? task.queuedAt?.getTime() : task.startedAt?.getTime()) ? (Date.now() - (wasPending ? task.queuedAt!.getTime() : task.startedAt!.getTime())) : 0) / 1000) + "s" })
+        const ttlTimestamp = wasPending
+          ? task.queuedAt
+          : task.progress?.lastUpdate ?? task.startedAt
+        const ageSeconds = ttlTimestamp
+          ? Math.round((Date.now() - ttlTimestamp.getTime()) / 1000)
+          : 0
+        log("[background-agent] Pruning stale task:", { taskId, status: task.status, age: `${ageSeconds}s` })
         task.status = "error"
         task.error = errorMessage
         task.completedAt = new Date()
@@ -3383,7 +3392,11 @@ The task was re-queued on a fallback model after a retryable failure.
             const lastActivityAt = task.progress?.lastUpdate ?? task.startedAt ?? new Date(now)
             const activityGraceExpired = now - lastActivityAt.getTime() >= todoGateGraceMs
             if (!todoGateExpired || !activityGraceExpired) {
-              log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
+              const lastLoggedAt = this.todoGateLogLastEmittedAt.get(task.id)
+              if (lastLoggedAt === undefined || now - lastLoggedAt >= 60_000) {
+                this.logger("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
+                this.todoGateLogLastEmittedAt.set(task.id, now)
+              }
               continue
             }
 
