@@ -1425,6 +1425,8 @@ The fallback retry session is now created and can be inspected directly.
     existingTask.status = "running"
     existingTask.completedAt = undefined
     existingTask.error = undefined
+    existingTask.todoGateFirstObservedAt = undefined
+    existingTask.unfinishedTodoCount = undefined
     this.updateTaskParent(existingTask, input.parentSessionId)
     existingTask.parentMessageId = input.parentMessageId
     existingTask.parentModel = input.parentModel

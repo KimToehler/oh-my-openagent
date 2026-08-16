@@ -189,6 +189,8 @@ export async function resumeTask(
   task.status = "running"
   task.completedAt = undefined
   task.error = undefined
+  task.todoGateFirstObservedAt = undefined
+  task.unfinishedTodoCount = undefined
   task.parentSessionId = input.parentSessionId
   task.parentMessageId = input.parentMessageId
   task.parentModel = input.parentModel
