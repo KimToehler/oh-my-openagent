@@ -59,6 +59,7 @@ import { ConcurrencyManager } from "./concurrency"
 import {
   DEFAULT_BLOCKED_EXPIRY_MS,
   DEFAULT_BLOCKED_REWAKE_MS,
+  DEFAULT_TODO_GATE_GRACE_MS,
   POLLING_INTERVAL_MS,
   type QueueItem,
   TASK_CLEANUP_DELAY_MS,
@@ -279,7 +280,7 @@ export class BackgroundManager {
   private readonly parentWakeNotifier: ParentWakeNotifier
   private parentWakeTextDeltaBuffers: Map<string, string> = new Map()
   private observedOutputSessions: Set<string> = new Set()
-  private observedIncompleteTodosBySession: Map<string, boolean> = new Map()
+  private observedIncompleteTodosBySession: Map<string, number> = new Map()
   private rootDescendantCounts: Map<string, number>
   private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
@@ -1609,10 +1610,12 @@ Task ${existingTask.id} resumed with parent answer.
     return existingTask
   }
 
-  private async checkSessionTodos(sessionID: string): Promise<boolean> {
-    const observedIncompleteTodos = this.observedIncompleteTodosBySession.get(sessionID)
-    if (observedIncompleteTodos === false) {
-      return false
+  private async checkSessionTodos(
+    sessionID: string,
+  ): Promise<{ hasIncompleteTodos: boolean; incompleteTodoCount: number }> {
+    const observedIncompleteTodoCount = this.observedIncompleteTodosBySession.get(sessionID)
+    if (observedIncompleteTodoCount === 0) {
+      return { hasIncompleteTodos: false, incompleteTodoCount: 0 }
     }
 
     try {
@@ -1621,22 +1624,24 @@ Task ${existingTask.id} resumed with parent answer.
       })
       const todos = normalizeSDKResponse(response, [] as Todo[], { preferResponseOnMissingData: true })
       if (!todos || todos.length === 0) {
-        this.observedIncompleteTodosBySession.set(sessionID, false)
-        return false
+        this.observedIncompleteTodosBySession.set(sessionID, 0)
+        return { hasIncompleteTodos: false, incompleteTodoCount: 0 }
       }
 
-      const incomplete = todos.filter(
+      const incompleteTodoCount = todos.filter(
         (t) => t.status !== "completed" && t.status !== "cancelled"
-      )
-      const hasIncompleteTodos = incomplete.length > 0
-      this.observedIncompleteTodosBySession.set(sessionID, hasIncompleteTodos)
-      return hasIncompleteTodos
+      ).length
+      this.observedIncompleteTodosBySession.set(sessionID, incompleteTodoCount)
+      return {
+        hasIncompleteTodos: incompleteTodoCount > 0,
+        incompleteTodoCount,
+      }
     } catch (error) {
       log("[background-agent] Failed to check session todos:", {
         sessionID,
         error,
       })
-      return false
+      return { hasIncompleteTodos: false, incompleteTodoCount: 0 }
     }
   }
 
@@ -1809,7 +1814,8 @@ Task ${existingTask.id} resumed with parent answer.
       if (hasParentWakeOutput) {
         this.clearDispatchedParentWake(sessionID)
       }
-      if (!isUserPart && !isInternalWakePart && !holdDispatchedWakeForTextDelta) {
+      const isRealTaskActivity = !isUserPart && !isInternalWakePart && !holdDispatchedWakeForTextDelta
+      if (isRealTaskActivity) {
         this.parentWakeNotifier.recordParentSessionActivity(sessionID)
       }
 
@@ -1836,6 +1842,9 @@ Task ${existingTask.id} resumed with parent answer.
         }
       }
       task.progress.lastUpdate = partInfo?.activityTime ?? new Date()
+      if (isRealTaskActivity) {
+        task.todoGateFirstObservedAt = undefined
+      }
 
       if (partInfo?.type === "tool" || partInfo?.tool) {
         const countedToolPartIDs = task.progress.countedToolPartIDs ?? new Set<string>()
@@ -1907,12 +1916,12 @@ Task ${existingTask.id} resumed with parent answer.
       const todos = Array.isArray(props?.todos) ? props.todos : undefined
       if (!sessionID || !todos) return
 
-      const hasIncompleteTodos = todos.some((todo) => {
+      const incompleteTodoCount = todos.filter((todo) => {
         if (!todo || typeof todo !== "object") return false
         const status = (todo as { status?: unknown }).status
         return status !== "completed" && status !== "cancelled"
-      })
-      this.observedIncompleteTodosBySession.set(sessionID, hasIncompleteTodos)
+      }).length
+      this.observedIncompleteTodosBySession.set(sessionID, incompleteTodoCount)
       return
     }
 
@@ -1932,7 +1941,7 @@ Task ${existingTask.id} resumed with parent answer.
         },
         idleDeferralTimers: this.idleDeferralTimers,
         validateSessionHasOutput: (id) => this.validateSessionHasOutput(id),
-        checkSessionTodos: (id) => this.checkSessionTodos(id),
+        checkSessionTodos: async (id) => (await this.checkSessionTodos(id)).hasIncompleteTodos,
         tryCompleteTask: (task, source) => this.tryCompleteTask(task, source),
         emitIdleEvent: (sessionID) => this.handleEvent({ type: "session.idle", properties: { sessionID } }),
       })
@@ -2891,6 +2900,7 @@ The task was re-queued on a fallback model after a retryable failure.
       error: task.error,
       attempts: cloneAttempts(task),
       sessionId: task.sessionId,
+      unfinishedTodoCount: task.unfinishedTodoCount,
     })
 
     // Update pending tracking and check if all tasks complete
@@ -3362,9 +3372,34 @@ The task was re-queued on a fallback model after a retryable failure.
           // Re-check status after async operation
           if (task.status !== "running") continue
 
-          const hasIncompleteTodos = await this.checkSessionTodos(sessionID)
-          if (hasIncompleteTodos) {
-            log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
+          const todoState = await this.checkSessionTodos(sessionID)
+          if (todoState.hasIncompleteTodos) {
+            task.todoGateFirstObservedAt ??= new Date()
+            const now = Date.now()
+            const todoGateGraceMs = this.config?.todoGateGraceMs ?? DEFAULT_TODO_GATE_GRACE_MS
+            const todoGateExpired = now - task.todoGateFirstObservedAt.getTime() >= todoGateGraceMs
+            const lastActivityAt = task.progress?.lastUpdate ?? task.startedAt ?? new Date(now)
+            const activityGraceExpired = now - lastActivityAt.getTime() >= todoGateGraceMs
+            if (!todoGateExpired || !activityGraceExpired) {
+              log("[background-agent] Task has incomplete todos via polling, waiting:", task.id)
+              continue
+            }
+
+            if (
+              task.status !== "running"
+              || (sessionStatus && isActiveSessionStatus(sessionStatus.type))
+              || !await this.validateSessionHasOutput(sessionID)
+            ) {
+              continue
+            }
+
+            const latestActivityAt = task.progress?.lastUpdate ?? task.startedAt ?? new Date()
+            if (Date.now() - latestActivityAt.getTime() < todoGateGraceMs) {
+              continue
+            }
+
+            task.unfinishedTodoCount = todoState.incompleteTodoCount
+            await this.tryCompleteTask(task, "todo-gate grace expired")
             continue
           }
 

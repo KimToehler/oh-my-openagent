@@ -3,6 +3,7 @@
 import { describe, test, expect, mock } from "bun:test"
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { BackgroundTaskConfig } from "../../config/schema"
 import { BackgroundManager } from "./manager"
 import { MIN_SESSION_GONE_POLLS } from "./session-existence"
 import type { BackgroundTask } from "./types"
@@ -92,7 +93,10 @@ function injectTask(manager: BackgroundManager, task: BackgroundTask): void {
   manager["tasks"].set(task.id, task)
 }
 
-function createManagerWithClient(clientOverrides: Record<string, unknown> = {}): BackgroundManager {
+function createManagerWithClient(
+  clientOverrides: Record<string, unknown> = {},
+  config?: BackgroundTaskConfig,
+): BackgroundManager {
   const client = {
     session: {
       status: async () => ({ data: {} }),
@@ -114,7 +118,7 @@ function createManagerWithClient(clientOverrides: Record<string, unknown> = {}):
     },
   }
   return new BackgroundManager(
-    { pluginContext: createPluginContext(client), config: undefined, enableParentSessionNotifications: false },
+    { pluginContext: createPluginContext(client), config, enableParentSessionNotifications: false },
   )
 }
 
@@ -385,6 +389,254 @@ describe("BackgroundManager pollRunningTasks", () => {
       //#then
       expect(task.status).toBe("completed")
       expect(todoCallCount).toBe(1)
+    })
+  })
+
+  describe("#given idle output with incomplete todos", () => {
+    const fixedNow = new Date("2026-08-17T12:00:00.000Z").getTime()
+    const graceMs = 60_000
+
+    function createTodoGateTask(sessionId: string): BackgroundTask {
+      const task = createRunningTask(sessionId)
+      task.startedAt = new Date(fixedNow - graceMs * 3)
+      task.progress = { toolCalls: 1, lastUpdate: new Date(fixedNow - graceMs * 2) }
+      task.todoGateFirstObservedAt = new Date(fixedNow - graceMs * 2)
+      return task
+    }
+
+    function incompleteTodos(count = 3): { data: Array<{ content: string; status: string; priority: string }> } {
+      return {
+        data: Array.from({ length: count }, (_, index) => ({
+          content: `unfinished ${index + 1}`,
+          status: "in_progress",
+          priority: "high",
+        })),
+      }
+    }
+
+    test("#when both grace conditions expire #then completes with unfinished count", async () => {
+      //#given
+      const originalDateNow = Date.now
+      Date.now = () => fixedNow
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-expired": { type: "idle" } } }),
+        todo: async () => incompleteTodos(),
+      }, { todoGateGraceMs: graceMs })
+      const task = createTodoGateTask("ses-expired")
+      injectTask(manager, task)
+
+      try {
+        //#when
+        await manager["pollRunningTasks"]()
+
+        //#then
+        expect(task.status).toBe("completed")
+        expect(task.unfinishedTodoCount).toBe(3)
+      } finally {
+        Date.now = originalDateNow
+        await manager.shutdown()
+      }
+    })
+
+    test("#when session remains active #then keeps task running", async () => {
+      //#given
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-active-gate": { type: "busy" } } }),
+        todo: async () => incompleteTodos(),
+      }, { todoGateGraceMs: graceMs })
+      const task = createTodoGateTask("ses-active-gate")
+      injectTask(manager, task)
+
+      //#when
+      await manager["pollRunningTasks"]()
+
+      //#then
+      expect(task.status).toBe("running")
+      await manager.shutdown()
+    })
+
+    test("#when valid output is absent #then keeps task running", async () => {
+      //#given
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-no-output": { type: "idle" } } }),
+        messages: async () => ({ data: [] }),
+        todo: async () => incompleteTodos(),
+      }, { todoGateGraceMs: graceMs })
+      const task = createTodoGateTask("ses-no-output")
+      injectTask(manager, task)
+
+      //#when
+      await manager["pollRunningTasks"]()
+
+      //#then
+      expect(task.status).toBe("running")
+      expect(task.unfinishedTodoCount).toBeUndefined()
+      await manager.shutdown()
+    })
+
+    test("#when first observation is inside grace window #then stamps and waits", async () => {
+      //#given
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-fresh-gate": { type: "idle" } } }),
+        todo: async () => incompleteTodos(1),
+      }, { todoGateGraceMs: graceMs })
+      const task = createTodoGateTask("ses-fresh-gate")
+      task.todoGateFirstObservedAt = undefined
+      injectTask(manager, task)
+
+      //#when
+      await manager["pollRunningTasks"]()
+
+      //#then
+      expect(task.status).toBe("running")
+      expect(task.todoGateFirstObservedAt).toBeDefined()
+      await manager.shutdown()
+    })
+
+    test("#when user and internal-wake parts arrive #then preserves the stamp", async () => {
+      //#given
+      const manager = createManagerWithClient()
+      const task = createTodoGateTask("ses-synthetic-parts")
+      const originalStamp = task.todoGateFirstObservedAt
+      injectTask(manager, task)
+
+      //#when
+      manager.handleEvent({
+        type: "message.part.updated",
+        properties: {
+          sessionID: task.sessionId,
+          part: { sessionID: task.sessionId, role: "user", type: "text", text: "continue" },
+        },
+      })
+      manager.handleEvent({
+        type: "message.part.updated",
+        properties: {
+          sessionID: task.sessionId,
+          part: {
+            sessionID: task.sessionId,
+            role: "user",
+            type: "text",
+            text: "<system-reminder>wake</system-reminder><!-- OMO_INTERNAL_INITIATOR -->",
+          },
+        },
+      })
+
+      //#then
+      expect(task.todoGateFirstObservedAt).toEqual(originalStamp)
+      await manager.shutdown()
+    })
+
+    test("#when assistant and tool parts arrive #then clears the stamp", async () => {
+      //#given
+      const manager = createManagerWithClient()
+      const assistantTask = createTodoGateTask("ses-assistant-part")
+      const toolTask = createTodoGateTask("ses-tool-part")
+      injectTask(manager, assistantTask)
+      injectTask(manager, toolTask)
+
+      //#when
+      manager.handleEvent({
+        type: "message.part.updated",
+        properties: {
+          sessionID: assistantTask.sessionId,
+          part: { sessionID: assistantTask.sessionId, role: "assistant", type: "text", text: "work" },
+        },
+      })
+      manager.handleEvent({
+        type: "message.part.updated",
+        properties: {
+          sessionID: toolTask.sessionId,
+          part: { sessionID: toolTask.sessionId, role: "assistant", type: "tool", tool: "bash" },
+        },
+      })
+
+      //#then
+      expect(assistantTask.todoGateFirstObservedAt).toBeUndefined()
+      expect(toolTask.todoGateFirstObservedAt).toBeUndefined()
+      await manager.shutdown()
+    })
+
+    test("#when only observed-stamp grace expires #then recent progress keeps task running", async () => {
+      //#given
+      const originalDateNow = Date.now
+      Date.now = () => fixedNow
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-recent-progress": { type: "idle" } } }),
+        todo: async () => incompleteTodos(2),
+      }, { todoGateGraceMs: graceMs })
+      const task = createTodoGateTask("ses-recent-progress")
+      task.progress = { toolCalls: 2, lastUpdate: new Date(fixedNow - graceMs / 2) }
+      injectTask(manager, task)
+
+      try {
+        //#when
+        await manager["pollRunningTasks"]()
+
+        //#then
+        expect(task.status).toBe("running")
+        expect(task.unfinishedTodoCount).toBeUndefined()
+      } finally {
+        Date.now = originalDateNow
+        await manager.shutdown()
+      }
+    })
+
+    test("#when progress refreshes during output validation #then final activity re-read keeps task running", async () => {
+      //#given
+      const originalDateNow = Date.now
+      Date.now = () => fixedNow
+      let task: BackgroundTask
+      const manager = createManagerWithClient({
+        status: async () => ({ data: { "ses-interleaved-progress": { type: "idle" } } }),
+        messages: async () => {
+          task.progress = { toolCalls: 2, lastUpdate: new Date(fixedNow) }
+          return {
+            data: [{
+              info: { role: "assistant", finish: "end_turn", id: "msg-output" },
+              parts: [{ type: "text", text: "done" }],
+            }],
+          }
+        },
+        todo: async () => incompleteTodos(2),
+      }, { todoGateGraceMs: graceMs })
+      task = createTodoGateTask("ses-interleaved-progress")
+      injectTask(manager, task)
+
+      try {
+        //#when
+        await manager["pollRunningTasks"]()
+
+        //#then
+        expect(task.status).toBe("running")
+        expect(task.progress?.lastUpdate.getTime()).toBe(fixedNow)
+      } finally {
+        Date.now = originalDateNow
+        await manager.shutdown()
+      }
+    })
+
+    test("#when incomplete todos are checked twice #then cached result retains the count", async () => {
+      //#given
+      let todoCallCount = 0
+      const manager = createManagerWithClient({
+        todo: async () => {
+          todoCallCount += 1
+          return incompleteTodos(4)
+        },
+      })
+      const checkSessionTodos = Reflect.get(manager, "checkSessionTodos") as (
+        sessionId: string,
+      ) => Promise<{ hasIncompleteTodos: boolean; incompleteTodoCount: number }>
+
+      //#when
+      const first = await checkSessionTodos.call(manager, "ses-cached-count")
+      const second = await checkSessionTodos.call(manager, "ses-cached-count")
+
+      //#then
+      expect(first).toEqual({ hasIncompleteTodos: true, incompleteTodoCount: 4 })
+      expect(second).toEqual({ hasIncompleteTodos: true, incompleteTodoCount: 4 })
+      expect(todoCallCount).toBe(2)
+      await manager.shutdown()
     })
   })
 
