@@ -65,6 +65,32 @@ Evidence for the whole effort lives under `.omo/evidence/20260817-todo-gate-dead
 
 **Acceptance criteria:** either detach spawned children from the call's process group, or fail loudly when a command tries to background, or document the reaping semantics in the tool description. Today the description says nothing about it.
 
+### 3a. The QA path is healthy. Do not re-litigate this.
+
+Two separate subagent runs concluded the QA environment was unusable. Both were wrong, and this section is the disproof, recorded so nobody spends a third run rediscovering it. Every row below was executed directly.
+
+| Probe | Result |
+| --- | --- |
+| `opencode --version` | 1.18.15 |
+| bare `opencode run` in an XDG sandbox | reaches a real provider and fails only on credentials, which is exactly what the mock model exists to avoid |
+| `.agents/skills/opencode-qa/scripts/mock-model-selftest.mjs` | SELF-TEST PASS, 20 assertions |
+| `opencode run` against the mock provider | `RUN_EXIT=0`, real streamed JSON, 4 requests served by the mock |
+| the same, plus `plugin: ["file://<worktree>/dist/index.js"]` | `RUN_EXIT=0`, real streamed JSON, plugin log written |
+
+The mock model works, the plugin loads from a `file://` bundle, and a sandboxed `opencode run` completes end to end. The blocker was item 3 above, not the harness.
+
+A related non-issue, also raised and dismissed: the only modified file in the pinned QA worktrees was `packages/omo-senpi/plugin/extensions/omo-task.js`, a senpi extension that is not part of the opencode bundle under test and was byte-identical in both the stock and patched worktrees, so it could not bias a BEFORE/AFTER comparison.
+
+### 3b. Verified-good QA recipe, proven end to end
+
+1. Start the mock model from a shell tool, detached, and wait for `MOCK_LISTENING <port>`.
+2. Write `$XDG_CONFIG_HOME/opencode/opencode.json` with both the `plugin` array pointing at the built `dist/index.js` and a `mock` provider on `http://127.0.0.1:<port>/v1`.
+3. Put omo settings in `$HOME/.omo/omo.jsonc` under the literal `[opencode]` key, with square brackets. A bare `opencode` key is rejected by `additionalProperties: false` and silently discards the whole file.
+4. Drive with `opencode run '<prompt>' --model mock/mock-model --format json`.
+5. Delegate with `category`, not `subagent_type`.
+6. Anything long-lived goes through `nohup ... & disown` from a shell tool, polled by a bounded loop in later calls. Never from `ctx_execute` (item 3).
+7. Before trusting any BEFORE/AFTER comparison, prove the two bundles differ: grep each built bundle for a string unique to the change.
+
 ### 4. Plugin log escapes XDG sandbox isolation (tooling, correctness risk for all QA)
 
 **Gap:** The logger writes to `os.tmpdir()/oh-my-opencode.log`, which `XDG_DATA_HOME` / `XDG_CONFIG_HOME` / `XDG_STATE_HOME` / `XDG_CACHE_HOME` do not redirect. A sandboxed QA run and a live parent session therefore share one file.
@@ -83,8 +109,8 @@ Evidence for the whole effort lives under `.omo/evidence/20260817-todo-gate-dead
 
 ## Smaller Notes, No Action Required
 
-- **`ctx_shell` write-guard false positive:** a relative redirect after `cd` into a `mktemp -d` under `$TMPDIR` is blocked even though that prefix is allowed, because the guard cannot resolve the target against the effective working directory. Workaround: use absolute `/tmp/...` paths in redirects.
-- **Subagents can announce blockage without calling `report_blocked`:** one lane wrote the word BLOCKED in its message text and never invoked the tool, so it parked as `running` for 43 minutes with no notification. Status alone does not reveal this; duration climbs while the last-tool field never advances. A heuristic that detects a blockage-announcing final message with no matching `report_blocked` call would be cheap and valuable.
+- **`ctx_shell` write-guard false positive (tooling papercut):** a relative redirect after `cd` into a `mktemp -d` under `$TMPDIR` is blocked even though that prefix is explicitly allowed, because the guard cannot resolve a relative target against the command's effective working directory. It forces every redirect in a QA script to be spelled as an absolute `/tmp/...` path. Fix would be to resolve the redirect target against the effective cwd before deciding, or to allow relative targets when the command contains a `cd` into an allowed prefix. Workaround until then: absolute paths in redirects.
+- **A subagent can announce blockage without calling `report_blocked`, and then hang indefinitely (harness behavior):** one lane wrote the word BLOCKED in its final message text and never invoked the tool, so it parked as `running` for 43 minutes with no notification, no evidence file, and no live process. Status alone does not reveal this: wall-clock duration keeps climbing while the last-tool field never advances, so liveness has to be inferred by comparing the last activity timestamp against the clock and checking `ps` for the processes the lane claims to be running. A cheap heuristic would close it: detect a final assistant message that announces blockage with no matching `report_blocked` call, and either convert it or warn the parent. Contrast with the following lane, which did call the tool correctly and was unblocked in under two minutes.
 - **`todoGateLogLastEmittedAt` residue on the stale-interrupt path:** `checkAndInterruptStaleTasks` does not pass `onTaskInterrupted`, so an interrupted task's entry survives cancellation until the terminal reap calls `removeTask`. Proven bounded by live-task count and always reclaimed, so not the unbounded leak the guard targets. A one-line `onTaskInterrupted` wiring would close it symmetrically.
 - **`unfinishedTodoCount` written one statement before `tryCompleteTask`:** if a concurrent completer holds `completingTaskIds`, the bail leaves a stale count on a still-running task. Benign today: the field has one reader, inside completion, and renders only for `status === "completed"`, and every resume route clears it. Moving the assignment after a successful completion would make it structurally impossible rather than merely unobservable.
 - **Team member tasks now terminalize through the bound.** The plan's success criterion 4 asked that they behave exactly as before; strictly they do not, because `pollRunningTasks` has no `teamRunId` skip. This is the correct outcome and the plan's own reasoning requires it: the pruner and the idle handler both skip team tasks, so the poll gate is their only terminalizer. Before the change a team member with open todos stranded in `running` forever and non-force `team_delete` was permanently blocked. Do not "fix" this back by adding a guard.
