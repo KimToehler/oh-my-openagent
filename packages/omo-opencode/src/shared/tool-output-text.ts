@@ -19,6 +19,11 @@ type ToolOutputTextSource = {
   readonly content?: unknown
 }
 
+type ToolOutputTextTarget = {
+  output?: unknown
+  content?: unknown
+}
+
 function isTextBlock(block: unknown): block is { type: "text"; text: string } {
   if (typeof block !== "object" || block === null) return false
   const candidate = block as { type?: unknown; text?: unknown }
@@ -38,4 +43,45 @@ export function resolveToolOutputText(output: ToolOutputTextSource | undefined):
     .join("\n")
 
   return text.length === 0 ? undefined : text
+}
+
+/**
+ * Writes replacement text back into a `tool.execute.after` payload.
+ *
+ * The write path is asymmetric for the same reason the read path is. For native tools
+ * OpenCode passes `{...toolResult, attachments}` and returns that very object, so
+ * assigning `.output` propagates. For MCP tools the RAW result is passed and the returned
+ * object is rebuilt as `{output: <joined content[] text>, content: m.content}` AFTER every
+ * plugin hook has run, so assigning `.output` is discarded and only a `content[]` edit
+ * survives.
+ *
+ * Mirrors `resolveToolOutputText`: native `.output` wins when both shapes are present, and
+ * the MCP branch collapses into the FIRST text block (the rest are emptied) because the
+ * text is rejoined with newlines downstream.
+ *
+ * Returns whether a writable target was found.
+ */
+export function applyToolOutputText(
+  output: ToolOutputTextTarget | undefined,
+  text: string
+): boolean {
+  if (output === undefined) return false
+
+  if (typeof output.output === "string") {
+    output.output = text
+    return true
+  }
+
+  if (!Array.isArray(output.content)) return false
+
+  const textBlockIndexes = output.content.flatMap((block, index) => (isTextBlock(block) ? [index] : []))
+  const firstTextBlockIndex = textBlockIndexes[0]
+  if (firstTextBlockIndex === undefined) return false
+
+  for (const index of textBlockIndexes) {
+    const block = output.content[index] as { type: "text"; text: string }
+    block.text = index === firstTextBlockIndex ? text : ""
+  }
+
+  return true
 }

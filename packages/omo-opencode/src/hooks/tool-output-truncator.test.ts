@@ -179,6 +179,98 @@ describe("createToolOutputTruncatorHook", () => {
       })
     })
 
+    describe("#given an MCP tool whose text lives in content[]", () => {
+      const createMcpOutput = (outputText: string) => ({
+        title: "",
+        metadata: {},
+        content: [{ type: "text", text: outputText }],
+      })
+
+      describe("#when a listed MCP tool is processed", () => {
+        it("#then should truncate lsp_diagnostics and write back into content[]", async () => {
+          // given
+          const truncateMock = mock(async (_sessionID: string, _output: string, options?: { targetMaxTokens?: number }) => ({
+            result: "truncated",
+            truncated: true,
+            targetMaxTokens: options?.targetMaxTokens,
+          }))
+          truncateSpy.mockReturnValue({
+            truncate: truncateMock,
+            getUsage: mock(async () => null),
+            truncateSync: mock(() => ({ result: "", truncated: false })),
+          })
+          hook = createToolOutputTruncatorHook({} as never)
+
+          const input = createInput("lsp_diagnostics")
+          const output = createMcpOutput("huge diagnostics payload")
+
+          // when
+          await hook["tool.execute.after"](input, output as never)
+
+          // then
+          expect(truncateMock).toHaveBeenCalledWith(
+            "test-session",
+            "huge diagnostics payload",
+            { targetMaxTokens: 50_000 }
+          )
+          expect(output.content).toEqual([{ type: "text", text: "truncated" }])
+        })
+      })
+
+      describe("#when truncate_all_tool_outputs is enabled", () => {
+        it("#then should truncate unlisted MCP tools too", async () => {
+          // given
+          const truncateMock = mock(async () => ({
+            result: "truncated",
+            truncated: true,
+          }))
+          truncateSpy.mockReturnValue({
+            truncate: truncateMock,
+            getUsage: mock(async () => null),
+            truncateSync: mock(() => ({ result: "", truncated: false })),
+          })
+          hook = createToolOutputTruncatorHook({} as never, {
+            experimental: { truncate_all_tool_outputs: true },
+          })
+
+          const input = createInput("context7_query-docs")
+          const output = createMcpOutput("huge docs payload")
+
+          // when
+          await hook["tool.execute.after"](input, output as never)
+
+          // then
+          expect(truncateMock).toHaveBeenCalled()
+          expect(output.content).toEqual([{ type: "text", text: "truncated" }])
+        })
+      })
+
+      describe("#when the truncator reports no truncation", () => {
+        it("#then should leave content[] untouched", async () => {
+          // given
+          const truncateMock = mock(async (_sessionID: string, output: string) => ({
+            result: output,
+            truncated: false,
+          }))
+          truncateSpy.mockReturnValue({
+            truncate: truncateMock,
+            getUsage: mock(async () => null),
+            truncateSync: mock(() => ({ result: "", truncated: false })),
+          })
+          hook = createToolOutputTruncatorHook({} as never)
+
+          const input = createInput("lsp_diagnostics")
+          const output = createMcpOutput("small payload")
+
+          // when
+          await hook["tool.execute.after"](input, output as never)
+
+          // then
+          expect(output.content).toEqual([{ type: "text", text: "small payload" }])
+        })
+      })
+    })
+
     describe("#given truncate_all_tool_outputs enabled", () => {
       describe("#when any tool output is processed", () => {
         it("#then should truncate non-listed tools too", async () => {
