@@ -470,3 +470,44 @@ citations.**
 **Fix status:** needs-decision — a `harness-findings-review` skill (triage → verify →
 re-score severity → route the top findings into work) would make the read side routine
 instead of accidental.
+
+## 2026-08-18 — Subagents summarize mutation-test output instead of pasting it, making evidence unfalsifiable at review time
+
+**Severity:** costly
+**Area:** subagents
+**Observed in:** `~/git/onara`, 23-todo wave, 7 lanes affected (tasks 15–21)
+
+**What happened:** lanes were instructed to capture RED-before-GREEN and mutation proofs
+into an evidence file. Seven of them wrote the *conclusion* rather than the *output*:
+
+```text
+A. Executed. Mutated `GENERATED_DRILL_ENRICHMENT_SCOPE` to set `backfillCatalogTags = true`.
+Named test `execute enqueues generated drills with translation and image scope excluding
+catalog tags` failed: `generated-drill scope must exclude authored catalog tags ==>
+expected: <false> but was: <true>`.
+```
+
+That reads as a real result but contains no command line, no `rc=`, no `FAILED` line, no
+XML counts. A later audit lane (F1) could not distinguish it from invention and issued a
+REJECT for "reconstructed prose" across seven todos.
+
+**Evidence:** re-executing two of the claimed mutations reproduced them *exactly* — same
+named test, same assertion string (`DisciplineGenerationTaskTest` 13 tests/1 failure;
+`TrainingControllerTest` 91 tests/1 failure). The lanes had been honest; the format simply
+made honesty unverifiable without re-running the work.
+
+**Root cause (theory):** the instruction said "capture evidence", which a summarizing agent
+satisfies with a faithful paraphrase — its default output mode. Nothing in the prompt made
+*verbatim* the requirement, and a paraphrase of a real run is indistinguishable from a
+paraphrase of an imagined one.
+
+**Cost:** one full audit lane's REJECT plus two re-run mutation cycles (~2 min gradle each)
+to establish that nothing was actually wrong.
+
+**Workaround:** demand the artifact, not the claim — "paste the command line, the `rc=`
+sentinel, the `FAILED` line, and the `tests=/failures=` XML counts; a sentence describing a
+failure is not evidence". Cheap and mechanical to check: an evidence file with zero
+occurrences of `BUILD ` or `rc=` is prose.
+
+**Fix status:** unfixed — worth hoisting into whatever shared guidance tells subagents to
+record verification, since the failure is systemic across lanes rather than per-lane.
