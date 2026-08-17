@@ -492,6 +492,7 @@ Control parallel agent execution and concurrency limits.
 | `taskTtlMs`                 | `1800000` | Absolute non-terminal task TTL (min: 300000)                          |
 | `sessionGoneTimeoutMs`      | `60000`   | Timeout when a task session disappears (min: 10000)                   |
 | `taskCleanupDelayMs`        | `600000`  | Delay before terminal tasks are removed (min: 60000)                  |
+| `todoGateGraceMs`           | `600000`  | How long a task may stay continuously idle with valid output but incomplete todos before completing anyway (min: 60000). Must stay below `taskTtlMs`; lowering `taskTtlMs` below this default is rejected. |
 | `syncPollTimeoutMs`         | -         | Synchronous polling timeout in milliseconds (min: 60000)             |
 | `maxToolCalls`              | `200`     | Maximum tool calls per subagent task (min: 10)                        |
 | `circuitBreaker`            | -         | Circuit-breaker object: `enabled`, `maxToolCalls`, `consecutiveThreshold` |
