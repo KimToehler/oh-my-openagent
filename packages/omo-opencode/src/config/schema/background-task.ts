@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { TASK_TTL_MS, TERMINAL_TASK_TTL_MS } from "../../features/background-agent/constants"
+import { DEFAULT_TODO_GATE_GRACE_MS, TASK_TTL_MS, TERMINAL_TASK_TTL_MS } from "../../features/background-agent/constants"
 
 const CircuitBreakerConfigSchema = z.object({
   enabled: z.boolean().optional(),
@@ -58,11 +58,15 @@ export const BackgroundTaskConfigSchema = z.object({
     })
   }
 
-  if (config.todoGateGraceMs !== undefined && config.todoGateGraceMs >= (config.taskTtlMs ?? TASK_TTL_MS)) {
+  const effectiveTodoGateGraceMs = config.todoGateGraceMs ?? DEFAULT_TODO_GATE_GRACE_MS
+  const effectiveTaskTtlMs = config.taskTtlMs ?? TASK_TTL_MS
+  if (effectiveTodoGateGraceMs >= effectiveTaskTtlMs) {
     context.addIssue({
       code: "custom",
-      path: ["todoGateGraceMs"],
-      message: "todoGateGraceMs must be less than taskTtlMs",
+      path: config.todoGateGraceMs === undefined ? ["taskTtlMs"] : ["todoGateGraceMs"],
+      message: config.todoGateGraceMs === undefined
+        ? `taskTtlMs must be greater than the todoGateGraceMs default (${DEFAULT_TODO_GATE_GRACE_MS}); set todoGateGraceMs explicitly to a lower value`
+        : "todoGateGraceMs must be less than taskTtlMs",
     })
   }
 })

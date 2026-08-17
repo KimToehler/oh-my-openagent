@@ -129,6 +129,58 @@ describe("BackgroundTaskConfigSchema", () => {
         }
       })
     })
+
+    describe("#given taskTtlMs (300000) with todoGateGraceMs unset", () => {
+      test("#when safeParsed #then reports default grace ordering failure on taskTtlMs", () => {
+        const result = BackgroundTaskConfigSchema.safeParse({ taskTtlMs: 300000 })
+
+        expect(result.success).toBe(false)
+        if (!result.success) {
+          expect(result.error.issues).toContainEqual(expect.objectContaining({
+            path: ["taskTtlMs"],
+            message: "taskTtlMs must be greater than the todoGateGraceMs default (600000); set todoGateGraceMs explicitly to a lower value",
+          }))
+        }
+      })
+    })
+
+    describe("#given taskTtlMs (500000) with todoGateGraceMs unset", () => {
+      test("#when safeParsed #then reports default grace ordering failure on taskTtlMs", () => {
+        const result = BackgroundTaskConfigSchema.safeParse({ taskTtlMs: 500000 })
+
+        expect(result.success).toBe(false)
+        if (!result.success) {
+          expect(result.error.issues).toContainEqual(expect.objectContaining({
+            path: ["taskTtlMs"],
+            message: "taskTtlMs must be greater than the todoGateGraceMs default (600000); set todoGateGraceMs explicitly to a lower value",
+          }))
+        }
+      })
+    })
+
+    describe("#given taskTtlMs (300000) and todoGateGraceMs (60000)", () => {
+      test("#when safeParsed #then accepts lowered valid pair", () => {
+        const result = BackgroundTaskConfigSchema.safeParse({ taskTtlMs: 300000, todoGateGraceMs: 60000 })
+
+        expect(result.success).toBe(true)
+      })
+    })
+
+    describe("#given taskTtlMs (700000) with todoGateGraceMs unset", () => {
+      test("#when safeParsed #then accepts default grace below TTL", () => {
+        const result = BackgroundTaskConfigSchema.safeParse({ taskTtlMs: 700000 })
+
+        expect(result.success).toBe(true)
+      })
+    })
+
+    describe("#given no todo gate values", () => {
+      test("#when safeParsed #then accepts default grace and TTL", () => {
+        const result = BackgroundTaskConfigSchema.safeParse({})
+
+        expect(result.success).toBe(true)
+      })
+    })
   })
 
   describe("syncWallClockTimeoutMs", () => {
