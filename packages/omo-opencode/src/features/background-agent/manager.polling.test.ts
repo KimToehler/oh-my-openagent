@@ -581,23 +581,23 @@ describe("BackgroundManager pollRunningTasks", () => {
       }
     })
 
-    test("#when progress refreshes during output validation #then final activity re-read keeps task running", async () => {
+    test("#when progress refreshes after both grace checks #then final activity re-read keeps task running", async () => {
       //#given
       const originalDateNow = Date.now
       Date.now = () => fixedNow
       let task: BackgroundTask
       const manager = createManagerWithClient({
         status: async () => ({ data: { "ses-interleaved-progress": { type: "idle" } } }),
-        messages: async () => {
-          task.progress = { toolCalls: 2, lastUpdate: new Date(fixedNow) }
-          return {
-            data: [{
-              info: { role: "assistant", finish: "end_turn", id: "msg-output" },
-              parts: [{ type: "text", text: "done" }],
-            }],
-          }
+        todo: async () => {
+          queueMicrotask(() => {
+            queueMicrotask(() => {
+              queueMicrotask(() => {
+                task.progress = { toolCalls: 2, lastUpdate: new Date(fixedNow) }
+              })
+            })
+          })
+          return incompleteTodos(2)
         },
-        todo: async () => incompleteTodos(2),
       }, { todoGateGraceMs: graceMs })
       task = createTodoGateTask("ses-interleaved-progress")
       injectTask(manager, task)
