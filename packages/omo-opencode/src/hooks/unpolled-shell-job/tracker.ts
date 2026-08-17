@@ -34,6 +34,12 @@ const TERMINAL_STATUSES = new Set([
   "notfound",
 ])
 
+/**
+ * Status values that prove the job is still alive, and so is worth adopting when we never
+ * saw its start message.
+ */
+const RUNNING_STATUSES = new Set(["running", "started", "active", "inprogress", "pending"])
+
 /** lean-ctx reports `[background:shell_... running]` or a `status: running` line. */
 const STATUS_FIELD_PATTERN = /(?:^|\[background:\s*\S+\s+|\bstatus:\s*)([a-z][a-z _-]*?)(?:\]|$|\n)/im
 
@@ -103,6 +109,12 @@ function isTerminalStatus(output: string | undefined): boolean {
   return TERMINAL_STATUSES.has(status.trim().replace(/[ _-]/g, "").toLowerCase())
 }
 
+function isRunningStatus(output: string | undefined): boolean {
+  const status = STATUS_FIELD_PATTERN.exec(output ?? "")?.[1]
+  if (status === undefined) return false
+  return RUNNING_STATUSES.has(status.trim().replace(/[ _-]/g, "").toLowerCase())
+}
+
 function clearJob(sessionID: string, jobId: string): void {
   const retired = retiredBySession.get(sessionID) ?? new Set<string>()
   retired.add(jobId)
@@ -160,9 +172,13 @@ export function recordToolCall({ sessionID, tool, args, output }: ObservedToolCa
     }
     // A poll naming a job we never registered means the start message did not match
     // JOB_ID_PATTERN (e.g. lean-ctx reworded it). Adopt it so the job is still guarded
-    // rather than silently untracked — but never re-adopt one we already retired, or a
-    // "job not found" reply for a reaped id would resurrect it and warn forever.
+    // rather than silently untracked, but ONLY on positive evidence that it is still
+    // running: adopting whenever the status merely failed to parse turns a payload we
+    // cannot read into a permanent phantom that every cleanup poll re-creates.
+    // Never re-adopt one we already retired, or a "job not found" reply for a reaped id
+    // would resurrect it and warn forever.
     if (backgroundAction !== "status") return
+    if (!isRunningStatus(output)) return
     if (retiredBySession.get(sessionID)?.has(polledJobId) === true) return
     trackJob(sessionID, polledJobId, "(started before it was tracked)")
     return

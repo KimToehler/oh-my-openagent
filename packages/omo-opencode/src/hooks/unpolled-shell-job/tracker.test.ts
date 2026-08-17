@@ -155,6 +155,17 @@ describe("unpolled shell job tracker", () => {
     expect(getOutstandingJobs(SESSION).map((job) => job.jobId)).toEqual(["shell_77aabbccddeeff00"])
   })
 
+  it("does not adopt a job from a poll whose status could not be parsed", () => {
+    recordToolCall({
+      sessionID: SESSION,
+      tool: "lean-ctx_ctx_shell",
+      args: { background_action: "status", job_id: "shell_99aabbccddeeff00" },
+      output: undefined,
+    })
+
+    expect(getOutstandingJobs(SESSION)).toEqual([])
+  })
+
   it("does not resurrect a job that a terminal poll just cleared", () => {
     recordToolCall(detachedStart("shell_88aabbccddeeff00"))
     recordToolCall({

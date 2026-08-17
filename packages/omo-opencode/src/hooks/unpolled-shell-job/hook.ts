@@ -3,6 +3,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
+import type { InternalPromptDispatchResult } from "../../shared/prompt-async-gate/types"
 import { shouldPromptAfterSessionIdle } from "../shared/session-idle-settle"
 
 import { buildUnpolledShellJobMessage } from "./message"
@@ -33,6 +34,17 @@ type UnpolledShellJobOptions = {
   readonly dispatchPrompt?: typeof dispatchInternalPrompt
   readonly isDispatchAccepted?: typeof isInternalPromptDispatchAccepted
   readonly shouldPrompt?: typeof shouldPromptAfterSessionIdle
+}
+
+/**
+ * `isInternalPromptDispatchAccepted` counts `"queued"` as accepted, but the
+ * `"already-delivered"` coalesce shape means the prompt was DISCARDED inside the semantic
+ * dedupe hold. This warning is byte-identical on every fire while the same job set is
+ * outstanding, so it is the exact prompt that shape suppresses. Arming the cooldown on it
+ * would silence the guard for a message the session never received.
+ */
+function isDiscardedByCoalesce(result: InternalPromptDispatchResult): boolean {
+  return result.status === "queued" && result.coalesceKind === "already-delivered"
 }
 
 const lastNudgedAt = new Map<string, number>()
@@ -97,7 +109,7 @@ export function createUnpolledShellJobHook(
         },
       })
 
-      if (!isDispatchAccepted(promptResult)) {
+      if (!isDispatchAccepted(promptResult) || isDiscardedByCoalesce(promptResult)) {
         log(`[${HOOK_NAME}] Continuation dispatch not accepted`, {
           sessionID,
           status: promptResult.status,

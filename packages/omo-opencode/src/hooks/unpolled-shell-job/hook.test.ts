@@ -106,6 +106,25 @@ describe("unpolled shell job hook", () => {
     expect(dispatchedText()).toContain("shell_3d5ba29a2ac4b779")
   })
 
+  it("retries on the next idle when the prompt was discarded by semantic dedupe", async () => {
+    startJob("shell_5f1c0d2b3a4e5f60")
+    const hook = createUnpolledShellJobHook(ctx, {
+      ...deps,
+      isDispatchAccepted: (() => true) as never,
+    })
+    promptMock.mockImplementation(async () => ({
+      status: "queued",
+      queuedBy: "unpolled-shell-job:idle-poll-reminder",
+      position: 0,
+      coalesceKind: "already-delivered",
+    }))
+
+    await hook(idle)
+    await hook(idle)
+
+    expect(promptMock).toHaveBeenCalledTimes(2)
+  })
+
   it("lists every outstanding job when several are open", async () => {
     startJob("shell_4e6059704ea3df52", "npm test")
     startJob("shell_4eb92e6d6e916b0d", "./gradlew build")
