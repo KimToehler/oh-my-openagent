@@ -44,6 +44,12 @@ Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tr
 
 `resolveOmoConfigPaths` returns the user layer first, then project layers farthest-first (`paths.ts:98`). `loadOmoConfig` folds each layer onto the accumulator in order, so the last-merged layer wins: **nearest project `.omo/omo.jsonc` beats a farther ancestor, and any loaded project layer beats the user layer**. Missing or unparseable layers become `diagnostics` and are skipped; the accumulator starts from `DEFAULT_RAW_CONFIG` (task defaults parsed from the schema). The merged document then resolves through `resolveOmoConfigView` (shared base -> `[harness]` -> `profiles.<P>` -> `profiles.<P>.[harness]`, control keys stripped) before the final `OmoConfigSchema` parse applies defaults once. If the merged result fails final validation the loader returns the all-default config plus a `validation` diagnostic rather than throwing.
 
+### Harness blocks & profile activation
+
+- Harness blocks: `[opencode]` holds freeform plugin config, while `[senpi]` and `[codex]` hold typed shared keys (see `OMO_CONFIG_HARNESS_IDS` in `src/schema/harness.ts`).
+- Profile activation precedence (`resolveOmoProfileName`): `OMO_PROFILE` > `OCX_PROFILE` (set via `ocx oc -p <name>`) > `OPENCODE_CONFIG_DIR` tail `profiles/<name>` > none. No default profiles ship; a profile only exists if a layer defines it under `profiles.<name>`.
+- `models` catalog resolution (`resolveModelReferences`): a `model` string matching a catalog key resolves to that entry's model id and fills any unset tuning fields; explicit site-level tuning always wins over the catalog entry; `[harness]` blocks can override individual catalog entries per harness.
+
 ### Filename resolution (`paths.ts`)
 
 - User dir: `~/.omo` on every platform; prefers `omo.jsonc`, falls back to `omo.json` (`paths.ts:29`). There is no `$XDG_CONFIG_HOME` / `%APPDATA%` / `~/.config/omo` branch, and `legacy-user-config-purge.test.ts` fails the suite if one returns.
@@ -53,6 +59,10 @@ Harness-neutral primitives for the `omo.json` config surface: a Zod v4 schema tr
 ### Merge safety (`merge.ts`)
 
 Recursively deep-merges plain objects; scalars and arrays replace. `__proto__`, `prototype`, and `constructor` keys are dropped via `isUnsafeObjectKey` on both the merge key and every nested value (`merge.ts:9`, `merge.ts:22`).
+
+### User-layer-only settings
+
+`mcp_env_allowlist` and `browser_automation_engine.playwright_mcp_args` resolve from the user layer only, including the user's own `profiles.<P>` block. Project layers (`<dir>/.omo/omo.jsonc`) cannot extend or override either setting; this is enforced during view resolution, not left to convention.
 
 ### Writer guarantees (`writer.ts`)
 
@@ -71,6 +81,10 @@ bun test packages/omo-config-core
 ```
 
 Co-located `*.test.ts` cover the schema (`src/schema/config-schema.test.ts`), the loader precedence and diagnostics (`src/loader/loader.test.ts`), the deep-merge and pollution guard (`src/loader/merge.test.ts`), and the writer plus its symlink/atomicity security path (`src/writer/writer.test.ts`, `src/writer/writer-security.test.ts`). Parent: [`packages/AGENTS.md`](../AGENTS.md).
+
+### Migration triggers & IDs
+
+Two migration ids ship today: `2026-07-opencode-config-unification` folds legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files into `omo.json[c]`, and `2026-07-codex-config-jsonc` folds a legacy `~/.omo/config.jsonc` into the same target. Once the engine has run, those legacy files are read by nothing else in the system. Backups land at `~/.omo/migration-backup-<UTC-ts>-opencode-config/`. Four call sites trigger the engine: plugin startup (both `packages/omo-opencode` and `packages/omo-senpi`), Codex startup (`config.jsonc` migration group only), install, and the `oh-my-openagent config migrate` CLI command (`--dry-run` / `--json` flags).
 
 ## GENERATED SCHEMA
 

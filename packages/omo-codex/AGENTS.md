@@ -30,7 +30,13 @@
 
 ## OVERVIEW
 
-`@oh-my-opencode/omo-codex` (private, v4.19.4): the Codex harness adapter = the **Light Edition** (omo for the OpenAI Codex CLI). Vendors a Codex plugin namespace `omo` + a TypeScript installer + telemetry. Public distribution = the live `lazycodex-ai` npm package/bin alias. `lazycodex` remains a root bin alias and the [`code-yeongyu/lazycodex`](https://github.com/code-yeongyu/lazycodex) repository identity, but is not an npm package. Codex marketplace identity = `sisyphuslabs` / plugin `omo` (`omo@sisyphuslabs`). Full identity + the publish/deploy pipeline live in the root [`AGENTS.md`](../../AGENTS.md) "CODEX LIGHT EDITION" section.
+oh-my-openagent ships in two editions of one product. **Ultimate** = the OpenCode plugin, omo for OpenCode (`packages/omo-opencode/`). **Light** = `@oh-my-opencode/omo-codex` (private, v4.19.4), the Codex harness adapter documented here: omo for the OpenAI Codex CLI. "omo in Codex" / "omo for Codex" = **lazycodex**. Vendors a Codex plugin namespace `omo` + a TypeScript installer + telemetry. Public distribution = the live `lazycodex-ai` npm package/bin alias. `lazycodex` remains a root bin alias and the [`code-yeongyu/lazycodex`](https://github.com/code-yeongyu/lazycodex) repository identity, but is not an npm package; that public repo is a thin marketplace/distribution layer over this package. Codex marketplace identity = `sisyphuslabs` / plugin `omo` (`omo@sisyphuslabs`) - `lazycodex` is never the marketplace name. This file is the source of truth for identity, aliases, and the publish/deploy pipeline; the root [`AGENTS.md`](../../AGENTS.md) only points here.
+
+### Identity & aliases
+
+Root `package.json` maps the live npm alias `lazycodex-ai` to `bin/oh-my-opencode.js`, one of 5 bin aliases (`oh-my-opencode`, `oh-my-openagent`, `omo`, `lazycodex`, `lazycodex-ai`) that all resolve to the same CLI launcher. `bunx lazycodex-ai install` is exactly `bunx oh-my-openagent install --platform=codex`. Routing lives in [`packages/omo-opencode/src/cli/cli-program.ts`](../../packages/omo-opencode/src/cli/cli-program.ts) (`lazycodex` / `lazycodex-ai` default the platform to codex) and [`bin/platform.js`](../../bin/platform.js) (both resolve the `oh-my-openagent` platform family). [`packages/omo-opencode/src/cli/star-request.ts`](../../packages/omo-opencode/src/cli/star-request.ts) stars both repos.
+
+Disambiguation: [`.github/workflows/publish.yml`](../../.github/workflows/publish.yml) republishes this repo's CLI under the live npm alias `lazycodex-ai` (name + version rewrite, detail below). Bare `lazycodex` is only the `code-yeongyu/lazycodex` repository/bin identity, never an npm package; the bare `lazycodex` npm name itself was unpublished 2026-05-30.
 
 ## LAYOUT
 
@@ -76,9 +82,13 @@ The installer (`src/install/codex-multi-agent-v2-config.ts`) mirrors the migrati
 
 Event `omo_codex_daily_active`, at most once per UTC day per machine. Two sources: install (`install_completed`) + plugin `SessionStart` (`session_start`). Id `sha256("omo-codex:" + hostname)`; dedup state `~/.local/share/omo-codex/posthog-activity.json`; PostHog person profiles disabled. Opt-out: `OMO_CODEX_DISABLE_POSTHOG=1` / `OMO_CODEX_SEND_ANONYMOUS_TELEMETRY=0` (global `OMO_*` flags also disable). Parity with the main plugin pinned by `src/telemetry/cross-package-equivalence.test.ts`.
 
-## DEPLOY (sync script)
+## DEPLOY (publish + sync)
 
-`script/sync-lazycodex-marketplace.ts <source-root> <lazycodex-root>` copies `marketplace.json` to `.agents/plugins/marketplace.json` and `plugin/` to `plugins/omo/`, bundles LSP/Git Bash MCP runtime dists into `plugins/omo/components/*/dist/`, bundles root CLI runtimes into `plugins/omo/dist/cli` and `plugins/omo/dist/cli-node`, rewrites `.mcp.json` paths, then validates via `script/lazycodex-marketplace-validation.ts`. Mechanism = file copy + commit push, NOT a git subtree. The triggering `publish.yml` behavior (`publish_lazycodex` input + automatic stable-release Codex marketplace sync gated on empty `dist_tag`) is documented in the root `AGENTS.md`.
+**Publish** ([`.github/workflows/publish.yml`](../../.github/workflows/publish.yml), manual dispatch): the `publish_lazycodex` input (default **true**) publishes the npm alias `lazycodex-ai` - rewrites root `package.json` name to `lazycodex-ai` and version to the release, rewrites optionalDeps `oh-my-opencode-*` to `oh-my-openagent-*`, skips when `registry.npmjs.org/lazycodex-ai/${VERSION}` already exists, publishes `--access public --provenance --tag latest`, then restores `package.json`.
+
+**Marketplace sync** runs automatically for every **stable** release, with no manual toggle (the old `sync_lazycodex_marketplace` input was removed). The release-job steps are gated on `needs.release-metadata.outputs.dist_tag == ''` (stable only; prereleases skip) and require secret `LAZYCODEX_SYNC_TOKEN`, enforced up front by the `preflight-trust` token check (also stable-gated). They check out `code-yeongyu/lazycodex`, build the plugin + lsp-tools-mcp + lsp-daemon + git-bash-mcp, run `script/sync-lazycodex-marketplace.ts <source-root> <lazycodex-root>`, then `git push origin HEAD:main`.
+
+`script/sync-lazycodex-marketplace.ts <source-root> <lazycodex-root>` copies `marketplace.json` to `.agents/plugins/marketplace.json` and `plugin/` to `plugins/omo/`, bundles LSP/Git Bash MCP runtime dists into `plugins/omo/components/*/dist/`, bundles root CLI runtimes into `plugins/omo/dist/cli` and `plugins/omo/dist/cli-node`, rewrites `.mcp.json` paths, then validates via `script/lazycodex-marketplace-validation.ts`. Mechanism = file copy + commit push, NOT a git subtree. Root `package.json` `files` ships `dist/cli`, `dist/cli-node`, and `packages/omo-codex/{marketplace.json,plugin,plugin/.codex-plugin,scripts}` to support this. First-publish playbook: [`docs/reference/lazycodex-npm-reservation.md`](../../docs/reference/lazycodex-npm-reservation.md).
 
 ## NOTES
 
