@@ -105,6 +105,10 @@ export interface BackgroundTask {
   blockedParkCount?: number
   blockedAt?: Date
   blockedReason?: string
+  /** First poll observation of idle-with-output-but-incomplete-todos; cleared on real assistant/tool activity. Basis for the bounded todo gate. */
+  todoGateFirstObservedAt?: Date
+  /** Todos left non-terminal when the gate grace expired; surfaced in the completion notification. */
+  unfinishedTodoCount?: number
 }
 
 export interface BackgroundTaskSnapshot {

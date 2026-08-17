@@ -2,6 +2,9 @@ declare const require: (name: string) => any
 const { describe, it, expect, mock, spyOn, beforeEach, afterEach } = require("bun:test")
 
 import { checkAndInterruptStaleTasks, pruneStaleTasksAndNotifications } from "./task-poller"
+import { tmpdir } from "node:os"
+import type { PluginInput } from "@opencode-ai/plugin"
+import { BackgroundManager } from "./manager"
 import type { BackgroundTask } from "./types"
 
 describe("checkAndInterruptStaleTasks", () => {
@@ -1015,8 +1018,9 @@ describe("pruneStaleTasksAndNotifications", () => {
     expect(pruned).toEqual([])
   })
 
-  it("#given running task with stale progress #when lastUpdate exceeds TTL #then should prune", () => {
+  it("#given stale lastUpdate and older startedAt #when pruned #then reports inactivity from lastUpdate", () => {
     //#given
+    const fixedNow = new Date("2026-08-17T12:00:00.000Z").getTime()
     const tasks = new Map<string, BackgroundTask>()
     const staleTask: BackgroundTask = {
       id: "stale-task",
@@ -1026,26 +1030,115 @@ describe("pruneStaleTasksAndNotifications", () => {
       prompt: "stale",
       agent: "oracle",
       status: "running",
-      startedAt: new Date(Date.now() - 60 * 60 * 1000),
+      startedAt: new Date(fixedNow - 82 * 60 * 1000),
       progress: {
         toolCalls: 10,
-        lastUpdate: new Date(Date.now() - 35 * 60 * 1000),
+        lastUpdate: new Date(fixedNow - 30 * 60 * 1000),
       },
     }
     tasks.set("stale-task", staleTask)
+    const originalDateNow = Date.now
+    Date.now = () => fixedNow
+    let errorMessage = ""
 
-    const pruned: string[] = []
-    const notifications = new Map<string, BackgroundTask[]>()
+    try {
+      //#when
+      pruneStaleTasksAndNotifications({
+        tasks,
+        notifications: new Map<string, BackgroundTask[]>(),
+        taskTtlMs: 29 * 60 * 1000,
+        onTaskPruned: (_taskId, _task, message) => { errorMessage = message },
+      })
 
-    //#when
-    pruneStaleTasksAndNotifications({
-      tasks,
-      notifications,
-      onTaskPruned: (taskId) => pruned.push(taskId),
+      //#then
+      expect(errorMessage).toContain("1800s")
+      expect(errorMessage).not.toContain("4920s")
+    } finally {
+      Date.now = originalDateNow
+    }
+  })
+
+  it("#given a running task with output #when pruned #then reports stuck output separately", () => {
+    //#given
+    const fixedNow = new Date("2026-08-17T12:00:00.000Z").getTime()
+    const task: BackgroundTask = {
+      id: "stuck-output-task",
+      parentSessionId: "parent",
+      parentMessageId: "msg",
+      description: "stuck output",
+      prompt: "stuck output",
+      agent: "oracle",
+      status: "running",
+      startedAt: new Date(fixedNow - 31 * 60 * 1000),
+      progress: { toolCalls: 1, lastUpdate: new Date(fixedNow - 31 * 60 * 1000) },
+    }
+    const originalDateNow = Date.now
+    Date.now = () => fixedNow
+    let errorMessage = ""
+
+    try {
+      //#when
+      pruneStaleTasksAndNotifications({
+        tasks: new Map([[task.id, task]]),
+        notifications: new Map<string, BackgroundTask[]>(),
+        onTaskPruned: (_taskId, _task, message) => { errorMessage = message },
+      })
+
+      //#then
+      expect(errorMessage).toContain("stuck with output present")
+      expect(errorMessage).not.toContain("genuinely inactive")
+    } finally {
+      Date.now = originalDateNow
+    }
+  })
+
+  it("#given repeated incomplete-todo gate observations #when polled within one minute #then logs once", async () => {
+    //#given
+    let simulatedNow = new Date("2026-08-17T12:00:00.000Z").getTime()
+    const fixedNow = simulatedNow
+    const originalDateNow = Date.now
+    const logCalls: Array<{ message: string; data?: unknown }> = []
+    Date.now = () => simulatedNow
+    const client = {
+      session: {
+        status: async () => ({ data: { "ses-gate": { type: "idle" } } }),
+        messages: async () => ({ data: [{ info: { role: "assistant", finish: "end_turn", id: "out" }, parts: [{ type: "text", text: "done" }] }] }),
+        todo: async () => ({ data: [{ content: "open", status: "in_progress", priority: "high" }] }),
+        abort: async () => ({}),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        get: async () => ({ data: { id: "ses-gate" } }),
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: { client, project: {} as PluginInput["project"], directory: tmpdir(), worktree: tmpdir(), serverUrl: new URL("http://localhost"), $: {} as PluginInput["$"] },
+      config: { todoGateGraceMs: 60_000 },
+      enableParentSessionNotifications: false,
+      log: (message: string, data?: unknown) => { logCalls.push({ message, data }) },
     })
+    const task: BackgroundTask = {
+      id: "gate-task", sessionId: "ses-gate", parentSessionId: "parent", parentMessageId: "msg", description: "gate", prompt: "gate", agent: "explore", status: "running", startedAt: new Date(fixedNow - 1_000), progress: { toolCalls: 1, lastUpdate: new Date(fixedNow - 1_000) },
+    }
+    Reflect.get(manager, "tasks").set(task.id, task)
 
-    //#then
-    expect(pruned).toContain("stale-task")
+    try {
+      //#when
+      for (let poll = 0; poll < 20; poll += 1) await Reflect.get(manager, "pollRunningTasks").call(manager)
+      simulatedNow += 60_000
+      task.progress = { toolCalls: 1, lastUpdate: new Date(simulatedNow) }
+      await Reflect.get(manager, "pollRunningTasks").call(manager)
+      await Reflect.get(manager, "tryCompleteTask").call(manager, task, "test terminal cleanup")
+      const nextTask = { ...task, id: "gate-task-next", status: "running" as const, completedAt: undefined }
+      Reflect.get(manager, "tasks").set(nextTask.id, nextTask)
+      await Reflect.get(manager, "pollRunningTasks").call(manager)
+
+      //#then
+      expect(Reflect.get(manager, "todoGateLogLastEmittedAt").has(task.id)).toBe(false)
+      expect(logCalls.filter(({ message }) => message.includes("Task has incomplete todos via polling, waiting")).length).toBe(3)
+    } finally {
+      Date.now = originalDateNow
+      await manager.shutdown()
+    }
   })
 
   it("#given running task with stale progress and active session #when lastUpdate exceeds TTL #then should NOT prune", () => {

@@ -34,11 +34,12 @@ export function pruneStaleTasksAndNotifications(args: {
   tasks: Map<string, BackgroundTask>
   notifications: Map<string, BackgroundTask[]>
   onTaskPruned: (taskId: string, task: BackgroundTask, errorMessage: string) => void
+  onTaskRemoved?: (task: BackgroundTask) => void
   taskTtlMs?: number
   blockedExpiryMs?: number
   sessionStatuses?: SessionStatusMap
 }): void {
-  const { tasks, notifications, onTaskPruned } = args
+  const { tasks, notifications, onTaskPruned, onTaskRemoved } = args
   const effectiveTtl = args.taskTtlMs ?? TASK_TTL_MS
   const now = Date.now()
   const tasksWithPendingNotifications = new Set<string>()
@@ -64,7 +65,11 @@ export function pruneStaleTasksAndNotifications(args: {
       if (age <= TERMINAL_TASK_TTL_MS) continue
 
       removeTaskToastTracking(taskId)
-      tasks.delete(taskId)
+      if (onTaskRemoved) {
+        onTaskRemoved(task)
+      } else {
+        tasks.delete(taskId)
+      }
       continue
     }
 
@@ -90,9 +95,12 @@ export function pruneStaleTasksAndNotifications(args: {
     if (age <= effectiveTtl) continue
 
     const ttlMinutes = Math.round(effectiveTtl / 60000)
+    const inactivitySeconds = Math.round(age / 1000)
     const errorMessage = task.status === "pending"
       ? `Task timed out while queued (${ttlMinutes} minutes)`
-      : `Task timed out after ${ttlMinutes} minutes of inactivity`
+      : (task.progress?.toolCalls ?? 0) > 0
+        ? `Task stuck with output present after ${inactivitySeconds}s of inactivity (${ttlMinutes} minute TTL)`
+        : `Task genuinely inactive after ${inactivitySeconds}s (${ttlMinutes} minute TTL)`
 
     onTaskPruned(taskId, task, errorMessage)
   }

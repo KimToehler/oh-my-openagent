@@ -18,7 +18,9 @@ import {
 import { _resetTaskToastManagerForTesting, initTaskToastManager } from "../task-toast-manager/manager"
 import type { ConcurrencyManager } from "./concurrency"
 import { MIN_IDLE_TIME_MS } from "./constants"
+import { startAttempt } from "./attempt-lifecycle"
 import { BackgroundManager } from "./manager"
+import { resumeTask } from "./spawner"
 import { _resetForTesting as resetProcessCleanupState } from "./process-cleanup"
 import { clearBackgroundTaskRegistryForTesting } from "./task-registry"
 import type { BackgroundTask, ResumeInput } from "./types"
@@ -262,6 +264,10 @@ function getConcurrencyManager(manager: BackgroundManager): ConcurrencyManager {
 
 function getTaskMap(manager: BackgroundManager): Map<string, BackgroundTask> {
   return (cast<{ tasks: Map<string, BackgroundTask> }>(manager)).tasks
+}
+
+function getTodoGateLogLastEmittedAt(manager: BackgroundManager): Map<string, number> {
+  return Reflect.get(manager, "todoGateLogLastEmittedAt")
 }
 
 function getPendingByParent(manager: BackgroundManager): Map<string, Set<string>> {
@@ -1617,6 +1623,40 @@ describe("BackgroundManager.pruneStaleTasksAndNotifications", () => {
     expect(manager.getTaskCount()).toBe(0)
   })
 
+  test("clears todo gate log entry when TTL pruning removes task", async () => {
+    //#given
+    const manager = createBackgroundManagerWithOptions({
+      config: { taskTtlMs: 1 },
+      enableParentSessionNotifications: false,
+    })
+    const task = createMockTask({
+      id: "task-pruned-todo-gate",
+      sessionId: "session-pruned-todo-gate",
+      parentSessionId: "parent-pruned-todo-gate",
+      startedAt: new Date(Date.now() - 60_000),
+      progress: { toolCalls: 1, lastUpdate: new Date(Date.now() - 60_000) },
+    })
+    getTaskMap(manager).set(task.id, task)
+    getTodoGateLogLastEmittedAt(manager).set(task.id, Date.now())
+
+    const originalDateNow = Date.now
+    try {
+      //#when
+      pruneStaleTasksAndNotificationsForTest(manager)
+      await flushBackgroundNotifications()
+      Reflect.get(manager, "notifications").clear()
+      Date.now = () => originalDateNow() + 60 * 60_000
+      pruneStaleTasksAndNotificationsForTest(manager)
+
+      //#then
+      expect(getTaskMap(manager).has(task.id)).toBe(false)
+      expect(getTodoGateLogLastEmittedAt(manager).has(task.id)).toBe(false)
+    } finally {
+      Date.now = originalDateNow
+      manager.shutdown()
+    }
+  })
+
   test("should prune stale notifications", () => {
     // given
     const staleDate = new Date(Date.now() - 31 * 60 * 1000)
@@ -2379,6 +2419,27 @@ function buildNotificationPromptBody(
 }
 
 describe("BackgroundManager.tryCompleteTask", () => {
+  test("keeps clearing todo gate log entry on completion", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    const task = createMockTask({
+      id: "task-complete-todo-gate",
+      sessionId: "session-complete-todo-gate",
+      parentSessionId: "parent-complete-todo-gate",
+      status: "running",
+    })
+    getTaskMap(manager).set(task.id, task)
+    getTodoGateLogLastEmittedAt(manager).set(task.id, Date.now())
+
+    //#when
+    await tryCompleteTaskForTest(manager, task)
+
+    //#then
+    expect(getTodoGateLogLastEmittedAt(manager).has(task.id)).toBe(false)
+
+    manager.shutdown()
+  })
+
   let manager: BackgroundManager
 
   beforeEach(() => {
@@ -2920,6 +2981,117 @@ describe("BackgroundManager.trackTask", () => {
     const concurrencyManager = getConcurrencyManager(manager)
     expect(concurrencyManager.getCount("external-key")).toBe(1)
     expect(getTaskMap(manager).size).toBe(1)
+  })
+})
+
+describe("background-agent todo-gate stamp lifecycle", () => {
+  test("#given a stamped task #when a retry starts #then clears the todo-gate state", () => {
+    //#given
+    const task = createMockTask({
+      id: "task-retry-clears-todo-gate",
+      parentSessionId: "parent-session",
+      sessionId: "session-retry-clears-todo-gate",
+      status: "error",
+      todoGateFirstObservedAt: new Date(0),
+      unfinishedTodoCount: 2,
+    })
+
+    //#when
+    startAttempt(task, { providerID: "openai", modelID: "gpt-5.4" })
+
+    //#then
+    expect(task.todoGateFirstObservedAt).toBeUndefined()
+    expect(task.unfinishedTodoCount).toBeUndefined()
+  })
+
+  test("#given a stamped task #when spawner resumes it #then clears the todo-gate state", async () => {
+    //#given
+    const task = createMockTask({
+      id: "task-spawner-resume-clears-todo-gate",
+      parentSessionId: "parent-session",
+      sessionId: "session-spawner-resume-clears-todo-gate",
+      status: "completed",
+      todoGateFirstObservedAt: new Date(0),
+      unfinishedTodoCount: 2,
+    })
+
+    //#when
+    await resumeTask(task, {
+      sessionId: task.sessionId ?? "",
+      prompt: "continue",
+      parentSessionId: "new-parent-session",
+      parentMessageId: "new-parent-message",
+    }, {
+      client: { session: { promptAsync: async () => ({}) } },
+      concurrencyManager: { acquire: async () => {}, release: () => {} },
+      directory: "/tmp/test",
+      onTaskError: () => {},
+    } as never)
+
+    //#then
+    expect(task.todoGateFirstObservedAt).toBeUndefined()
+    expect(task.unfinishedTodoCount).toBeUndefined()
+  })
+
+  test("#given a stale stamped task #when BackgroundManager resumes then polls #then it remains running", async () => {
+    //#given
+    const fixedNow = 1_700_000_000_000
+    const originalNow = Date.now
+    Date.now = () => fixedNow
+    const client = {
+      session: {
+        status: async () => ({ data: { "session-manager-resume-clears-todo-gate": { type: "idle" } } }),
+        todo: async () => ({ data: [{ content: "unfinished", status: "pending", priority: "high" }] }),
+        messages: async () => ({
+          data: [{
+            info: { role: "assistant", finish: "end_turn", id: "message-result" },
+            parts: [{ type: "text", text: "finished" }],
+          }],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const manager = new BackgroundManager({
+      pluginContext: createPluginInput(client),
+      config: { todoGateGraceMs: 60_000 },
+      enableParentSessionNotifications: false,
+    })
+    const task = createMockTask({
+      id: "task-manager-resume-clears-todo-gate",
+      parentSessionId: "parent-session",
+      sessionId: "session-manager-resume-clears-todo-gate",
+      status: "completed",
+      startedAt: new Date(fixedNow - 120_000),
+      progress: { toolCalls: 1, lastUpdate: new Date(fixedNow - 120_000) },
+      todoGateFirstObservedAt: new Date(fixedNow - 120_000),
+      unfinishedTodoCount: 1,
+    })
+    getTaskMap(manager).set(task.id, task)
+
+    try {
+      //#when
+      await manager.resume({
+        sessionId: task.sessionId ?? "",
+        prompt: "continue",
+        parentSessionId: "new-parent-session",
+        parentMessageId: "new-parent-message",
+      })
+
+      //#then
+      expect(task.todoGateFirstObservedAt).toBeUndefined()
+      expect(task.unfinishedTodoCount).toBeUndefined()
+
+      //#when
+      await (cast<{ pollRunningTasks: () => Promise<void> }>(manager)).pollRunningTasks()
+
+      //#then
+      expect(task.status).toBe("running")
+    } finally {
+      Date.now = originalNow
+      await manager.shutdown()
+    }
   })
 })
 
@@ -4616,6 +4788,31 @@ describe("BackgroundManager - Non-blocking Queue Integration", () => {
 
       const pendingSet = pendingByParent.get(task.parentSessionId)
       expect(pendingSet?.has(task.id) ?? false).toBe(false)
+    })
+
+    test("clears todo gate log entry when task is cancelled", async () => {
+      //#given
+      const manager = createBackgroundManager()
+      const task = createMockTask({
+        id: "task-cancel-todo-gate",
+        sessionId: "session-cancel-todo-gate",
+        parentSessionId: "parent-cancel-todo-gate",
+        status: "running",
+      })
+      getTaskMap(manager).set(task.id, task)
+      getTodoGateLogLastEmittedAt(manager).set(task.id, Date.now())
+
+      //#when
+      const cancelled = await manager.cancelTask(task.id, {
+        source: "test",
+        skipNotification: true,
+      })
+
+      //#then
+      expect(cancelled).toBe(true)
+      expect(getTodoGateLogLastEmittedAt(manager).has(task.id)).toBe(false)
+
+      manager.shutdown()
     })
 
     test("should remove task from toast manager when notification is skipped", async () => {

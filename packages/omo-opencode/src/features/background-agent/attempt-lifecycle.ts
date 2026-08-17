@@ -100,6 +100,8 @@ export function startAttempt(task: BackgroundTask, model: DelegatedModelConfig |
   task.startedAt = undefined
   task.completedAt = undefined
   task.error = undefined
+  task.todoGateFirstObservedAt = undefined
+  task.unfinishedTodoCount = undefined
   task.model = model
 
   return attempt

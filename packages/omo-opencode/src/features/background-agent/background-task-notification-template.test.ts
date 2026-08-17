@@ -349,6 +349,77 @@ All sibling background tasks are complete. Your next action should be to call \`
     })
   })
 
+  describe("#given a completed task that left todos unfinished", () => {
+    test("#when building the final notification #then it annotates the completed summary with the unfinished todo count", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: { id: "task-todos", description: "Finish task", status: "completed", unfinishedTodoCount: 3 },
+        duration: "10s",
+        statusText: "COMPLETED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [
+          { id: "task-todos", description: "Finish task", status: "completed", unfinishedTodoCount: 3 },
+        ],
+      })
+
+      // then
+      expect(notification).toContain("- `task-todos`: Finish task - completed with 3 unfinished todos")
+    })
+
+    test("#when building the final notification without an unfinished todo count #then it preserves the completed summary format", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: { id: "task-no-todos", description: "Finish task", status: "completed" },
+        duration: "10s",
+        statusText: "COMPLETED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [{ id: "task-no-todos", description: "Finish task", status: "completed" }],
+      })
+
+      // then
+      expect(notification).toContain("- `task-no-todos`: Finish task")
+      expect(notification).not.toContain("unfinished todo")
+    })
+
+    test("#when building the final notification with zero unfinished todos #then it preserves the completed summary format", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: { id: "task-zero-todos", description: "Finish task", status: "completed", unfinishedTodoCount: 0 },
+        duration: "10s",
+        statusText: "COMPLETED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [
+          { id: "task-zero-todos", description: "Finish task", status: "completed", unfinishedTodoCount: 0 },
+        ],
+      })
+
+      // then
+      expect(notification).toContain("- `task-zero-todos`: Finish task")
+      expect(notification).not.toContain("unfinished todo")
+    })
+
+    test("#when an error task carries an unfinished todo count #then it preserves the error summary without an annotation", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: { id: "task-error-todos", description: "Fail task", status: "error", error: "Timed out", unfinishedTodoCount: 3 },
+        duration: "10s",
+        statusText: "ERROR",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [
+          { id: "task-error-todos", description: "Fail task", status: "error", error: "Timed out", unfinishedTodoCount: 3 },
+        ],
+      })
+
+      // then
+      expect(notification).toContain("- `task-error-todos`: Fail task [ERROR] - Timed out")
+      expect(notification).not.toContain("unfinished todo")
+    })
+  })
+
   describe("#given all tasks completed with undefined descriptions", () => {
     test("#when building the final notification #then it uses task ID as fallback instead of 'undefined'", () => {
       // given

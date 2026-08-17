@@ -13,6 +13,7 @@ export interface BackgroundTaskNotificationTask {
   sessionId?: string
   blockedAt?: Date
   blockedReason?: string
+  unfinishedTodoCount?: number
 }
 
 function formatAttemptModel(attempt: BackgroundTaskAttempt): string {
@@ -57,7 +58,9 @@ function formatTaskSummaryLine(task: BackgroundTaskNotificationTask): string {
   const sessionSuffix = task.sessionId ? ` | session: \`${task.sessionId}\`` : ""
   const baseLine = `- \`${task.id}\`: ${task.description || task.id}${sessionSuffix}`
   const statusSuffix = task.status === "completed"
-    ? ""
+    ? task.unfinishedTodoCount && task.unfinishedTodoCount > 0
+      ? ` - completed with ${task.unfinishedTodoCount} unfinished todo${task.unfinishedTodoCount === 1 ? "" : "s"}`
+      : ""
     : ` [${task.status.toUpperCase()}]${task.error ? ` - ${task.error}` : ""}`
   const timeline = formatAttemptTimeline(task)
 
