@@ -2698,6 +2698,7 @@ The task was re-queued on a fallback model after a retryable failure.
     }
 
     removeTaskToastTracking(task.id)
+    this.todoGateLogLastEmittedAt.delete(task.id)
 
     // Update continuation marker for CLI run mode
     if (task.parentSessionId) {
@@ -3151,6 +3152,7 @@ The task was re-queued on a fallback model after a retryable failure.
       taskTtlMs: this.config?.taskTtlMs,
       blockedExpiryMs: this.config?.blockedExpiryMs,
       sessionStatuses: allStatuses,
+      onTaskRemoved: (task) => this.removeTask(task),
       onTaskPruned: (taskId, task, errorMessage) => {
         const wasPending = task.status === "pending"
         const ttlTimestamp = wasPending
