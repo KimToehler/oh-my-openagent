@@ -3,6 +3,7 @@ import { buildCodegraphInitGuidanceForToolResult } from "@oh-my-opencode/utils"
 import type { CreatedHooks } from "../create-hooks"
 import { recordToolCall as recordShellToolCall } from "../hooks/unpolled-shell-job/tracker"
 import { log as defaultLog } from "../shared/logger"
+import { resolveToolOutputText } from "../shared/tool-output-text"
 import type { PluginContext } from "./types"
 
 const METADATA_LINKED_TOOLS = new Set([
@@ -122,12 +123,14 @@ export function createToolExecuteAfterHandler(args: {
     // Detached ctx_shell jobs never notify on completion, so track them here and warn at
     // idle if the turn would end with one outstanding. Recorded unconditionally: the
     // idle-time hook is configurable, but it is useless without this data.
+    const resolvedOutputText = resolveToolOutputText(output)
+
     try {
       recordShellToolCall({
         sessionID: input.sessionID,
         tool: input.tool,
         ...(input.args === undefined ? {} : { args: input.args as Record<string, unknown> }),
-        ...(typeof output.output === "string" ? { output: output.output } : {}),
+        ...(resolvedOutputText === undefined ? {} : { output: resolvedOutputText }),
       })
     } catch (error) {
       log("[tool-execute-after] Failed to record detached shell job", {

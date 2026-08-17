@@ -35,6 +35,76 @@ describe("createToolExecuteAfterHandler", () => {
     expect(getOutstandingJobs("ses_shell")[0]?.command).toBe("./gradlew test")
   })
 
+  it("#given an MCP-shaped result carrying text in content[] #when tool.execute.after runs #then the job is still tracked", async () => {
+    const handler = createToolExecuteAfterHandler({
+      ctx: { directory: "/repo" } as never,
+      hooks: {} as never,
+    })
+
+    // OpenCode 1.18.15 fires this hook for MCP tools with the raw MCP result: text lives
+    // in `content[]` and `.output` is built only after every plugin hook has run.
+    await handler(
+      {
+        tool: "lean-ctx_ctx_shell",
+        sessionID: "ses_mcp",
+        callID: "call_mcp",
+        args: { command: "./gradlew test", run_in_background: true },
+      },
+      {
+        content: [
+          {
+            type: "text",
+            text: '[background:shell_1234abcd5678ef90 started — use ctx_shell(background_action="status", job_id="shell_1234abcd5678ef90") to poll]',
+          },
+        ],
+        metadata: {},
+      } as never
+    )
+
+    expect(getOutstandingJobs("ses_mcp").map((job) => job.jobId)).toEqual([
+      "shell_1234abcd5678ef90",
+    ])
+    expect(getOutstandingJobs("ses_mcp")[0]?.command).toBe("./gradlew test")
+  })
+
+  it("#given an MCP-shaped terminal status poll #when tool.execute.after runs #then the job is cleared", async () => {
+    const handler = createToolExecuteAfterHandler({
+      ctx: { directory: "/repo" } as never,
+      hooks: {} as never,
+    })
+
+    await handler(
+      {
+        tool: "lean-ctx_ctx_shell",
+        sessionID: "ses_mcp_poll",
+        callID: "call_start",
+        args: { command: "./gradlew test", run_in_background: true },
+      },
+      {
+        content: [{ type: "text", text: "[background:shell_1234abcd5678ef90 started]" }],
+        metadata: {},
+      } as never
+    )
+    expect(getOutstandingJobs("ses_mcp_poll")).toHaveLength(1)
+
+    await handler(
+      {
+        tool: "lean-ctx_ctx_shell",
+        sessionID: "ses_mcp_poll",
+        callID: "call_poll",
+        args: { background_action: "status", job_id: "shell_1234abcd5678ef90" },
+      },
+      {
+        content: [
+          { type: "text", text: "[background:shell_1234abcd5678ef90 completed]\nBUILD SUCCESSFUL" },
+        ],
+        metadata: {},
+      } as never
+    )
+
+    expect(getOutstandingJobs("ses_mcp_poll")).toEqual([])
+  })
+
   it("#given the tracker would throw #when tool.execute.after runs #then the hook chain still runs", async () => {
     let chainRan = false
     const handler = createToolExecuteAfterHandler({

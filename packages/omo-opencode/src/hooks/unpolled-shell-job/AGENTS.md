@@ -27,6 +27,17 @@ and was still violated three times in one session. Facts stated as reference get
 
 - `tracker.ts` observes every `tool.execute.after` event whose tool name ends in
   `ctx_shell` (matching lean-ctx's MCP tool however the host prefixes it).
+
+  **The output text is read through `shared/tool-output-text.ts`, never off `output.output`
+  directly.** OpenCode fires this hook at a different point for MCP tools than for native
+  ones (verified against the 1.18.15 bundle): native tools are passed a result that already
+  carries `.output`, while MCP tools are passed the RAW MCP result, whose text lives in
+  `content[]` blocks — `.output` is built on the next line, after every plugin hook has run.
+  Guarding on `typeof output.output === "string"` therefore dropped 100% of `ctx_shell`
+  calls: jobs never registered at start, and terminal status polls could not clear them, so
+  every entry arrived through the status-adoption fallback labelled
+  `(started before it was tracked)` and each cleanup poll re-created it. Do not "simplify"
+  the helper away.
   - A call with `run_in_background: true` whose output contains a `shell_<hex>` id
     registers that job for the session.
   - A call with `background_action: "status"` clears the job **only if the parsed status
@@ -37,8 +48,12 @@ and was still violated three times in one session. Facts stated as reference get
     builds it exists for. An unparseable status is treated as **still running** (fail-safe).
   - A call with `background_action: "cancel"` always clears it.
   - A `status` poll naming an unknown job adopts it, so a reworded start message degrades
-    to still-guarded rather than untracked. Retired ids are remembered and refused, so a
-    late "job not found" reply cannot resurrect a reaped job into an endless warning.
+    to still-guarded rather than untracked — but **only when the parsed status positively
+    reports the job as running**. Adopting whenever the status merely failed to parse turns
+    an unreadable payload into a permanent phantom that every cleanup poll re-creates, which
+    is exactly what the MCP payload bug above produced. Retired ids are remembered and
+    refused, so a late "job not found" reply cannot resurrect a reaped job into an endless
+    warning.
   - Entries are pruned by TTL (2h) and capped per session, because `session.deleted` is
     **not** guaranteed — `client.session.abort()` does not reliably emit it, and aborted
     subagents are the heaviest users of detached shells.
@@ -74,6 +89,12 @@ and was still violated three times in one session. Facts stated as reference get
   A cooldown (`NUDGE_COOLDOWN_MS`) throttles repeat prompts, but the hook keeps firing
   while a job is outstanding — a guard against stalling must escalate, not go quiet after
   one attempt. A rejected dispatch does not start the cooldown, so the next idle retries.
+
+  A `"queued"` result carrying `coalesceKind: "already-delivered"` also does **not** start
+  the cooldown. `isInternalPromptDispatchAccepted` treats `"queued"` as accepted, but that
+  coalesce shape means the prompt was discarded inside the 15s semantic dedupe hold. This
+  warning is byte-identical on every fire while the same job set is outstanding, so it is
+  precisely the prompt that shape suppresses.
 - `session.deleted` drops all state — cleared centrally in
   `plugin/event-session-lifecycle.ts`, not inside the hook, because recording is
   unconditional. Clearing only in the (configurable) hook meant that disabling the hook
@@ -81,16 +102,18 @@ and was still violated three times in one session. Facts stated as reference get
 
 ## Testing
 
-`bun test packages/omo-opencode/src/hooks/unpolled-shell-job/` — 33 tests across
+`bun test packages/omo-opencode/src/hooks/unpolled-shell-job/` — 35 tests across
 `tracker.test.ts` (registration, status parsing, adoption, retirement, TTL/cap,
 per-session isolation) and `hook.test.ts` (dispatch shape, cooldown, settle gate,
-event filtering).
+event filtering, dedupe-discard retry).
 
 Wiring is pinned by two tests outside this directory:
 `plugin/tool-execute-after.test.ts` asserts a detached `ctx_shell` call reaches the
-tracker with the right argument shape (verified to fail when the call is removed), and
+tracker with the right argument shape — in **both** the native (`.output`) and MCP
+(`content[]`) payload shapes, the latter verified to fail before the fix — and
 `plugin/event-hook-dispatcher.test.ts` enumerates every session hook and asserts each is
-dispatched on `session.idle`.
+dispatched on `session.idle`. The extraction itself is unit-tested in
+`shared/tool-output-text.test.ts`.
 
 Fixtures use realistic `shell_*` ids and poll bodies, including the gradle/jest/bun log
 tails that previously caused a running job to be retired.
