@@ -37,6 +37,7 @@
 | Manifesto | [docs/manifesto.md](manifesto.md) |
 | Refreshing the model-capabilities cache | [docs/model-capabilities-maintenance.md](model-capabilities-maintenance.md) |
 | Ollama troubleshooting | [docs/troubleshooting/ollama.md](troubleshooting/ollama.md) |
+| Harness findings log (append-only field notes) | [docs/troubleshooting/harness-findings.md](troubleshooting/harness-findings.md) |
 | Copyable project rules template | [docs/templates/AGENTS.md.example](templates/AGENTS.md.example) |
 
 ## STRUCTURE
@@ -52,7 +53,8 @@ docs/
 ├── templates/
 │   └── AGENTS.md.example                     # Copyable OMO project rules template
 └── troubleshooting/
-    └── ollama.md
+    ├── ollama.md
+    └── harness-findings.md                   # Append-only log of harness defects found during real work
 ```
 
 ## CONVENTIONS

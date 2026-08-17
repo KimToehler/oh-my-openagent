@@ -1,0 +1,208 @@
+# Harness findings log
+
+**Purpose:** a running, append-only record of harness defects, footguns, and surprising
+behaviours discovered *while doing real work in other repositories*. This is the place
+those observations land so they are not lost in a session transcript.
+
+**Audience:** OMO maintainers. This file is diagnostic, not user-facing — internal jargon
+is fine here.
+
+**This is not a bug tracker.** Entries are field observations with evidence. Some become
+issues or fixes; some are resolved by documentation; some turn out to be user error and
+are kept anyway, because "an agent reliably misreads X" is itself a harness finding.
+
+## How to use this file
+
+Append a new entry when you hit harness behaviour that cost you time, made you guess, or
+would mislead the next agent. One entry per distinct finding. Do not rewrite or delete
+existing entries — correct them by appending a `**Update:**` line, so the history of what
+we believed and when stays intact.
+
+Keep entries short. Evidence over prose: the exact log line, the exact status output, the
+file:line. A finding nobody can reproduce is a rumour.
+
+### Entry template
+
+```markdown
+## YYYY-MM-DD — Short title
+
+**Severity:** blocker | costly | papercut | docs-gap
+**Area:** background tasks | rules injection | subagents | tools | config | provider | other
+**Observed in:** repo/context where it happened
+
+**What happened:** one or two sentences.
+
+**Evidence:**
+```
+exact output, log lines, or status text
+```
+
+**Root cause / hypothesis:** what actually caused it, or the best current theory —
+label it clearly as one or the other.
+
+**Workaround:** what unblocked it, if anything.
+
+**Fix status:** unfixed | worked around | fixed in `<commit>` | needs-decision
+```
+
+## Severity guide
+
+| Severity | Meaning |
+|---|---|
+| `blocker` | Work cannot proceed; no workaround found without intervention. |
+| `costly` | Recoverable, but burned real time or tokens (repeated runs, lost sessions, re-work). |
+| `papercut` | Small friction; correct behaviour eventually, annoying path there. |
+| `docs-gap` | Harness behaved correctly, but the docs/instructions led the agent to the wrong conclusion. |
+
+---
+
+# Findings
+
+## 2026-08-17 — Detached `ctx_shell` jobs never notify, and silently strand agent sessions
+
+**Severity:** blocker
+**Area:** background tasks
+**Observed in:** `~/git/onara`, during a 27-todo parallel implementation plan
+
+**What happened:** `ctx_shell(run_in_background=true)` returns a `shell_*` job id whose
+completion is **pull-only** — nothing ever pushes a notification. Agents that fired a long
+gradle build, ended their turn, and waited to be woken were never woken. Five subagent
+sessions died this way in one work session; each time the detached job ran to completion
+and wrote results to disk with no agent left to read them. Work sat uncommitted in a dirty
+worktree for ~2.5h before a human noticed.
+
+The trap is the spelling collision: `task(run_in_background=true)` **does** notify;
+`ctx_shell(run_in_background=true)` **never** does.
+
+**Evidence:** source read at `~/git/lean-ctx` (v3.9.18):
+
+- job registry is in-process memory only —
+  `rust/src/server/background_shell.rs:35` (`static JOBS: LazyLock<Mutex<HashMap<String, Job>>>`)
+- completion detected by the worker thread at `background_shell.rs:141-166`; emits nothing
+- the server *can* send MCP notifications, but only two exist —
+  `rust/src/server/notifications.rs:7-23` (`resources/updated`, `tools/list_changed`)
+- no disk-backed registry, socket, or DB — nothing external can watch job state
+- docs are consistent about it: `rust/LEAN-CTX.md:46` says "then poll job_id"
+
+**Root cause:** by design in lean-ctx; there is no configurable notify-on-completion path.
+Confirmed absent, not merely undocumented.
+
+**Workaround:** run the command in the **foreground** (~110s cap covers most builds), or
+use ONE bounded loop that breaks on completion and stay inside that call:
+
+```bash
+(./gradlew … > /tmp/j.log 2>&1; echo $? > /tmp/j.rc) &
+for i in $(seq 1 90); do [ -f /tmp/j.rc ] && break; sleep 2; done; cat /tmp/j.rc
+```
+
+**Fix status:** worked around. Options if we want a real fix: (1) caller-side command
+composition (`build.sh; on-done.sh` — lean-ctx runs raw shell text, so this needs no
+patch); (2) patch lean-ctx to emit a new MCP notification from the completion path and
+wire client subscription; (3) make OMO's own `<unpolled-background-shell-jobs>` hook
+reliable — see the next entry.
+
+## 2026-08-17 — `<unpolled-background-shell-jobs>` hook fires once, then stops
+
+**Severity:** costly
+**Area:** background tasks
+**Observed in:** `~/git/onara`
+
+**What happened:** OMO already has a rescue for the trap above — a hook that warns when a
+turn ends with a detached job outstanding. It fired once, the agent recovered and worked
+for ~35s, then relapsed into the same detach-and-yield pattern. The hook did **not** fire
+the second time, and the session was stranded again.
+
+**Evidence:** hook message in the child transcript reported the job as
+`shell_442363fc607eed99 — (started before it was tracked)`. Agent woke at 13:32:25, made
+three tool calls, went silent at 13:32:59. Files kept landing at 14:49–14:51 with no agent
+alive.
+
+**Root cause / hypothesis:** unconfirmed. Either the hook is one-shot per job, or the turn
+ended without a *tracked* outstanding job while gradle was still running — the tracking gap
+the hook's own message admits to (`started before it was tracked`).
+
+**Workaround:** none automatic; the parent had to notice and resume the lane manually.
+
+**Fix status:** unfixed — needs investigation of the hook's trigger condition and the
+tracking gap.
+
+## 2026-08-17 — Stale-cancellation timer misread as a wall-clock budget
+
+**Severity:** docs-gap
+**Area:** subagents
+**Observed in:** `~/git/onara`
+
+**What happened:** a subagent reported blocked at 8m35s with "lane time expired", having
+completed ~80% of its task. No such limit exists. It had read the instruction that idle
+subagents are stale-cancelled at 15 min and converted a *liveness* deadline into a *time
+budget*, then parked to protect uncommitted work from a cancellation that was never coming.
+
+**Evidence:** global `AGENTS.md:116` warned "idle until stale-cancellation at 15 min,
+work uncommitted", backed by a real setting — `staleTimeoutMs: 900000` in
+`~/.config/opencode/oh-my-openagent.json:28`.
+
+**Root cause:** the timer is real, but it measures **inactivity** and every tool call
+resets it. The instruction stated the hazard without stating the escape, so an agent asking
+"am I about to be cancelled?" had no reassuring answer available.
+
+**Workaround / fix:** added an explicit clause to global `AGENTS.md`: stale-cancellation is
+an inactivity timer, not a time budget; a polling agent is never at risk; there is no
+wall-clock limit on a task, lane, or session; "out of time" is never a valid block reason.
+
+**Fix status:** fixed in the user's global `AGENTS.md` (untracked config). Consider
+carrying the same wording into the shipped instructions template so every install gets it.
+
+## 2026-08-17 — Dead task reports `running`; resume requires cancel first
+
+**Severity:** costly
+**Area:** background tasks
+**Observed in:** `~/git/onara`
+
+**What happened:** after a subagent session died, `background_output` continued reporting
+`Status: running` with a frozen duration counter (e.g. stuck at 18m35s while 40+ min of
+wall-clock passed). Attempting `task(task_id=…)` to resume failed with
+`Task … is currently running and cannot accept a continuation prompt`. The task had to be
+explicitly cancelled first, then resumed.
+
+**Evidence:**
+```
+Error: Task bg_2ce3fa6b is currently running and cannot accept a continuation prompt.
+    at resume (…/oh-my-openagent/dist/index.js:141058:22)
+```
+Independently: last child tool call 12:54, files on disk written 14:49–14:51, no process
+alive.
+
+**Root cause / hypothesis:** the in-memory task record is not reconciled against actual
+child liveness, so a dead child stays `running` forever.
+
+**Workaround:** verify liveness from **disk** (file mtimes, `git status`, test-result
+timestamps) rather than trusting the status line; then
+`background_cancel(taskId=…)` followed by `task(task_id=…)` to resume with context intact.
+
+**Fix status:** unfixed.
+
+## 2026-08-17 — Provider outage drops the in-memory task record; sessions unrecoverable by `task_id`
+
+**Severity:** costly
+**Area:** background tasks
+**Observed in:** `~/git/onara`
+
+**What happened:** after a provider outage and runtime restart, resuming a lane by session
+id failed permanently — the runtime that owned the record was gone. The child session's
+*work* was intact on disk, but its conversation context could not be resumed.
+
+**Evidence:**
+```
+Error: Task not found for session: ses_ff0451424ffeWr7FTI4zAUYAYH
+```
+Earlier, `background_output` had already warned the task was "owned by a different runtime
+than the one serving this tool call".
+
+**Root cause:** task records live in the runtime's memory and do not survive a restart.
+
+**Workaround:** dispatch a fresh agent pointed at the existing worktree, with an explicit
+"here is what is already on disk" briefing. Cheap, because the work itself is on disk —
+only the reasoning is lost. This is a strong argument for instructing lanes to **commit
+early** rather than batching everything behind one final commit.
+
+**Fix status:** unfixed — persisting task records across restarts would close it.
