@@ -126,6 +126,35 @@ the hook's own message admits to (`started before it was tracked`).
 **Fix status:** unfixed — needs investigation of the hook's trigger condition and the
 tracking gap.
 
+**Update (2026-08-17, verified against `dev` source):** the hypothesis was wrong on the
+"one-shot" half and right on the tracking half — and the tracking half is now fixed.
+
+- **Not one-shot.** The hook re-fires on every `session.idle` while a job is still
+  outstanding, gated only by an in-flight check and a cooldown
+  (`hooks/unpolled-shell-job/hook.ts:84-91`); `lastNudgedAt` is armed only after an
+  *accepted* dispatch (`hook.ts:112-124`), so a rejected dispatch retries on the next
+  idle. Both behaviours are pinned by tests (`hook.test.ts:179-190`, `:192-201`).
+- **The tracking gap was real, and was the actual cause.** MCP tool results arrive with
+  the payload in `content[]` and `.output` populated only later, so `ctx_shell` jobs run
+  through an MCP server were never recorded at start — the tracker only learned of them
+  later via the adoption fallback, which is what stamps `(started before it was tracked)`
+  (`hooks/unpolled-shell-job/tracker.ts:173-184`). Fixed in `b9b0a8b5c`: the after-hook
+  resolves MCP text through `content[]` and records unconditionally
+  (`plugin/tool-execute-after.ts:123-134`), with a regression test at
+  `plugin/tool-execute-after.test.ts:38-68`.
+- **A second silent-skip on the same path** — MCP outputs bypassing the truncator, so
+  downstream hooks saw nothing — was fixed in `8810f3174`; the truncator now runs earlier
+  in the same after-chain (`tool-execute-after.ts:143-165`, test `:130-159`).
+
+Two limits remain, both by design rather than defect: a job started before tracking is
+still only *adopted* late (and only from a `background_action="status"` call that parses a
+running state, `tracker.ts:173-184`), and the warning is bound to `session.idle` — if no
+idle event arrives, no warning fires (`hook.ts:82-85`).
+
+**Fix status (revised):** fixed in `b9b0a8b5c` + `8810f3174` for the tracking gap; the
+"fires once" diagnosis is retracted. Late adoption and idle-only firing remain open by
+design.
+
 ## 2026-08-17 — Stale-cancellation timer misread as a wall-clock budget
 
 **Severity:** docs-gap
@@ -181,6 +210,14 @@ timestamps) rather than trusting the status line; then
 
 **Fix status:** unfixed.
 
+**Update (2026-08-17, verified against `dev` source):** still unfixed, and the hypothesis
+is confirmed. There is no code anywhere in `features/background-agent/` that reconciles a
+task's `running` status against actual child-session liveness. `resume()` reads the task
+record and throws purely on `existingTask.status === "running"`
+(`features/background-agent/manager.ts:1384-1399`), with no session probe in between. The
+cancel-then-resume dance remains the only recovery, and disk timestamps remain the only
+trustworthy liveness signal.
+
 ## 2026-08-17 — Provider outage drops the in-memory task record; sessions unrecoverable by `task_id`
 
 **Severity:** costly
@@ -206,6 +243,21 @@ only the reasoning is lost. This is a strong argument for instructing lanes to *
 early** rather than batching everything behind one final commit.
 
 **Fix status:** unfixed — persisting task records across restarts would close it.
+
+**Update (2026-08-17, verified against `dev` source):** still unfixed, root cause
+confirmed at source. The `bg_*` registry is memory-only, parked on `globalThis` with no
+disk, DB, or any restart-safe write path
+(`features/background-agent/task-registry.ts:11-29`, maps at `:22-29`). Nothing survives a
+runtime restart by design.
+
+Partially mitigated on the *guidance* side: the not-found messages now name the recovery
+explicitly instead of only blaming cross-instance state — `formatTaskNotFoundMessage`
+points at `session_read(session_id="ses_…")` and states that session transcripts are
+server-backed and readable from every runtime
+(`tools/background-task/create-background-output.ts:159-178`), and the completion
+notification carries the `| session: ses_…` suffix plus the same fallback instruction
+(`features/background-agent/background-task-notification-template.ts:114`, `:157`). The
+data loss is unchanged; the agent is merely told where to look now.
 
 ## 2026-08-17 — Completion summary replays every historical park as a current failure
 
@@ -294,3 +346,93 @@ an ambiguous spec, a missing API, a cross-lane conflict.
 **Fix status:** worked around per-prompt. A durable fix would put the waiting-vs-blocking
 test into the `report_blocked` tool description itself, so it applies without every parent
 re-teaching it.
+
+## 2026-08-17 — Mid-batch background completions starve a busy parent; delivery bounded, retention not
+
+**Severity:** blocker
+**Area:** background tasks
+**Observed in:** `~/git/onara` (orchestrator), diagnosed in `~/git/oh-my-openagent`
+
+**What happened:** an orchestrator fires 3–8 `task(run_in_background=true)` agents and
+keeps working. Over a two-day span, mid-batch completions almost never woke it — turn after
+turn ended with "I'll report when they land", and the trigger never arrived. When
+notifications did arrive they were usually the final `[ALL BACKGROUND TASKS COMPLETE]`,
+sometimes twice for one batch. `background_output(task_id="bg_…")` frequently returned
+`Task not found` even as the *first* action after a notification; recovery only ever worked
+through `session_read` / `task(task_id="ses_…")`. The subagent *sessions* survive; the
+`bg_*` registry entries do not.
+
+User's words: *"since 2 days you always say that you will report as soon as the background
+jobs return, but you never get any kind of trigger or continue on your own. The work just
+dies."*
+
+**Evidence:** two mechanisms, only one of which is now closed.
+
+- Only `shouldReply` wakes (`allComplete || isTaskFailure || isBlocked`,
+  `features/background-agent/manager.ts:2965-2968`) qualify for the 60s force-dispatch
+  ceiling — `shouldForceDispatchAfterActiveDefer` gates on `wake.shouldReply`
+  (`parent-wake-flush-runner.ts:295-297`, ceiling `:23`). A mid-batch success is
+  `shouldReply === false` and never qualifies.
+- The retention guard in `scheduleTaskRemoval` pins a task only while a **shouldReply**
+  wake is owed — three states, all `shouldReply === true` or an in-flight dispatch
+  (`manager.ts:2496-2516`). A `noReply` wake does not pin its task, so
+  `TASK_CLEANUP_DELAY_MS` can reap it while its notification is still queued.
+
+**Root cause:** a deliberate design tension, not a plain bug. Interrupting a working
+orchestrator for every sibling completion was intentionally avoided; the cost is that a
+parent which never idles defers `noReply` wakes indefinitely, and the result expires
+underneath the notification.
+
+**Update / partial fix (verified in source):** the *delivery* half is closed. A second,
+longer ceiling now re-admits a starved retained wake as a `noReply` deposit —
+`PENDING_PARENT_WAKE_MAX_RETAINED_ADMIT_DEFER_MS` = 300s,
+`shouldAdmitRetainedWakeAfterCeiling` (`parent-wake-flush-runner.ts:28`, `:299-309`),
+deliberately kept above the 60s reply ceiling so the reply path gets its chance first.
+Landed across `a47f804c9` → `c0af74ee1` → `e01b03315`, pinned by a 9-test suite
+(`parent-wake-midbatch-starvation.test.ts`), including the two cases that matter here:
+*"a mid-batch noReply wake with no final wake ever arriving … is delivered within a bounded
+deadline"* (`:446`) and the busy-parent merge case (`:141`).
+
+The *retention* half is still open: `wakeStillOwed` (`manager.ts:2496-2516`) remains
+`shouldReply`-only, so a deferred mid-batch wake still cannot pin its own task against
+cleanup. That is the `Task not found` path, and it is the minimum correct remaining fix.
+
+**Workaround:** on `Task not found`, fall back to `session_read(session_id="ses_…")` — the
+session id is carried on every notification line. Do NOT raise `TASK_CLEANUP_DELAY_MS`; it
+converts a loud failure into a rare one and leaves the ordering bug intact.
+
+**Fix status:** partially fixed — delivery bounded in `a47f804c9`/`c0af74ee1`/`e01b03315`;
+retention of `noReply` wakes unfixed. Full context and the required failing-test approach:
+`HANDOFF-PROMPT-mid-batch-wake-starvation.md` (repo root, untracked).
+
+## 2026-08-17 — Findings log had no review path; three entries were stale within hours
+
+**Severity:** costly
+**Area:** other
+**Observed in:** `~/git/oh-my-openagent`
+
+**What happened:** the first pass over this log after its creation found that of five
+entries, one diagnosis was outright wrong (`<unpolled-background-shell-jobs>` "fires once"
+— it does not; the real defect was MCP tracking), one had been fixed in commits already on
+`dev` at the time the finding was written, and one had been half-fixed. The capture rule
+(`~/.omo/rules/harness-findings.md`) mandates *appending*; nothing mandated ever *reading*
+the log back. Entries therefore rot at the speed the harness is fixed, which is fast.
+
+**Evidence:** `b9b0a8b5c` and `8810f3174` were both on `dev` when the "fires once" entry
+was written; `a47f804c9`/`c0af74ee1`/`e01b03315` had already bounded mid-batch delivery.
+None were referenced by any entry.
+
+**Root cause:** an append-only log with no scheduled verification pass is a write-only
+store. Worse, a stale `unfixed` entry is actively harmful: it is exactly the artifact the
+next agent trusts, and it will send that agent to re-diagnose a solved problem.
+
+**Workaround:** a verification pass — one background `explore` per entry, each required to
+answer with `file:line` and commit SHAs, then `**Update:**` lines appended. Note that even
+this pass produced a wrong answer (an agent reported the mid-batch defect fully open
+because it checked only the first of two ceilings); a second, targeted read caught it.
+**Corollary: verification agents need their conclusions cross-checked, not just their
+citations.**
+
+**Fix status:** needs-decision — a `harness-findings-review` skill (triage → verify →
+re-score severity → route the top findings into work) would make the read side routine
+instead of accidental.
