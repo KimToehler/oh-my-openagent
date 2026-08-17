@@ -405,6 +405,40 @@ converts a loud failure into a rare one and leaves the ordering bug intact.
 retention of `noReply` wakes unfixed. Full context and the required failing-test approach:
 `HANDOFF-PROMPT-mid-batch-wake-starvation.md` (repo root, untracked).
 
+**Update (2026-08-17, second pass — this entry's own diagnosis was partly wrong):** the
+entry above was written from the *untracked root copy* of the handoff prompt. A **tracked,
+54-lines-longer copy exists at `.omo/plans/HANDOFF-PROMPT-mid-batch-wake-starvation.md`**
+(committed in `c9fc012ae`), and it corrects two things this entry got wrong. That tracked
+copy is authoritative; the root copy is stale and should not be cited.
+
+- **The `Task not found` symptom is NOT the retention race described above.** That framing
+  is falsified by a production log ledger (n=6): `bg_a4f323d2` completed 14:47:01 and was
+  missing 14:47:09 — **8.8 seconds later**, against a 10-minute `TASK_CLEANUP_DELAY_MS`,
+  with no removal line ever logged. Across all six observed ids, `Removed completed task
+  from memory` lands 6–8 minutes *after* the failed lookup, never before it. No retention
+  timer produces an 8.8s miss. The real mechanism is a **process/realm boundary**:
+  `background_output` runs in a different OS process than the one whose in-memory
+  `BackgroundManager` owns the task. `create-background-output.cross-instance.test.ts`
+  (green) proves two managers in ONE realm still share the `globalThis` registry, so a
+  same-realm split cannot produce the symptom.
+- **That failure is now closed**, not by anything retention-shaped, but by a transcript-scan
+  fallback: `findSessionIdInParentTranscript` recovers the child session id from the
+  calling session's own transcript, which is server/DB-backed and therefore readable from
+  every runtime (`tools/background-task/create-background-output.ts:12`, `:88`, `:105-116`,
+  note text `:144`). Verified green this session: 19 tests pass across
+  `create-background-output.cross-instance.test.ts` + `parent-transcript-pairing.test.ts`.
+
+What remains true: `wakeStillOwed` (`manager.ts:2496-2516`) is still `shouldReply`-only, so
+a mid-batch wake still does not pin its own task. That is a real ordering weakness worth
+closing — but it is **not** the cause of the `Task not found` incidents that motivated this
+entry, and fixing it would not have prevented them.
+
+**Fix status (revised):** delivery bounded (`a47f804c9`/`c0af74ee1`/`e01b03315`);
+cross-process lookup closed by the transcript-scan fallback; `noReply` retention remains
+open as a lower-severity ordering issue, no longer blocker-grade. Authoritative context:
+`.omo/plans/HANDOFF-PROMPT-mid-batch-wake-starvation.md` (tracked), not the untracked root
+copy.
+
 ## 2026-08-17 — Findings log had no review path; three entries were stale within hours
 
 **Severity:** costly
