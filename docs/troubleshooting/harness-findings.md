@@ -206,3 +206,91 @@ only the reasoning is lost. This is a strong argument for instructing lanes to *
 early** rather than batching everything behind one final commit.
 
 **Fix status:** unfixed — persisting task records across restarts would close it.
+
+## 2026-08-17 — Completion summary replays every historical park as a current failure
+
+**Severity:** costly
+**Area:** background tasks
+**Observed in:** `~/git/onara`, wave of 3 parallel lanes
+
+**What happened:** the final "all background tasks finished" summary reported
+**`14 FAILED`** for a wave of **three** lanes. The list was not fourteen distinct
+failures — it was the same two task ids repeated, one line per *historical* park or error
+across each task's whole lifetime, most of them tagged `[RUNNING]`. Two of the entries were
+verbatim replays of block reasons that had already been resolved and superseded an hour
+earlier.
+
+Read literally, the summary says most of the wave failed. On disk, one lane was fully
+committed and clean, and the other two had complete work awaiting a commit. Nothing had
+failed.
+
+**Evidence:**
+```
+[ALL BACKGROUND TASKS FINISHED - 14 FAILED]
+Completed:
+- bg_3db0b708 … | bg_524a0301 … | bg_85e1ba37 …
+Failed:
+- bg_3db0b708 … [RUNNING]
+- bg_3db0b708 … [RUNNING]
+- bg_85e1ba37 … [RUNNING]
+   (× 14, only two distinct ids, several tagged [RUNNING], two replaying stale
+    block reasons already resolved)
+```
+Disk at the same moment: lane 23 `c701b35e0`, 0 dirty; lane 20 and 21 complete but
+uncommitted.
+
+**Root cause / hypothesis:** the summary appears to aggregate every park/error event ever
+recorded for a task rather than its terminal state, and does not dedupe by task id. The
+`[RUNNING]` tag on lines under a `Failed:` heading suggests state is being read from event
+history, not from the task's final status.
+
+**Workaround:** ignore the counts entirely; verify each lane from disk —
+`git log --oneline -1`, `git status --porcelain`, and test-result timestamps. This is the
+same rule that applies to the dead-task-reports-`running` finding above: **disk is the only
+trustworthy status.**
+
+**Fix status:** unfixed. Dedupe by task id and report only terminal state; a task that
+parked and later succeeded is a success.
+
+## 2026-08-17 — `report_blocked` used for waiting, not for blocking
+
+**Severity:** costly
+**Area:** subagents
+**Observed in:** `~/git/onara`, across ~8 lanes
+
+**What happened:** subagents repeatedly parked via `report_blocked` on situations that
+required no parent decision at all — most often a long-running gradle job **they had
+started themselves** that was either still alive or had already finished successfully. One
+lane parked twice this way; each park cost a full round-trip. In one case the agent had a
+completely green board (`detekt` `BUILD SUCCESSFUL`, `.rc` = 0, no gradle process alive)
+and parked anyway rather than reading it.
+
+The same mechanism was also used correctly and valuably: a different lane parked four
+times and every one was a genuine defect needing my decision (a repository signature that
+could not express its own acceptance criteria, a missing Flyway migration, a missing pgen
+enum entry, a dead enum constant). So the tool works; the calibration of *when* to use it
+does not.
+
+**Evidence:** representative false park —
+```
+Blocked: Final detekt process remains active after tool timeout;
+         source/evidence edits uncommitted.
+Needs from parent: Resume lane after detekt completes.
+```
+State at that moment: `/tmp/j23-detekt-final.log` → `BUILD SUCCESSFUL in 1m 25s`,
+`/tmp/j23-final.rc` → `0`, `pgrep -f gradlew` → nothing running.
+
+**Root cause / hypothesis:** the `report_blocked` tool description says to use it "if
+blocked and parent input is required", but gives no test for distinguishing *blocked* from
+*waiting*. A slow job that outlives a tool timeout reads to the agent as an external
+condition it cannot resolve. Compounded by the detached-job finding above: an agent that
+cannot be woken by its own job has no other move it trusts.
+
+**Workaround:** state the distinction explicitly in the lane prompt — *waiting is not
+blocking* — plus the three concrete checks to run before parking: `pgrep -f gradlew`,
+`cat /tmp/<job>.rc`, `tail` the log. Park only for something the parent alone can decide:
+an ambiguous spec, a missing API, a cross-lane conflict.
+
+**Fix status:** worked around per-prompt. A durable fix would put the waiting-vs-blocking
+test into the `report_blocked` tool description itself, so it applies without every parent
+re-teaching it.
