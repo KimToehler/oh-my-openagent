@@ -38,6 +38,7 @@
 | Refreshing the model-capabilities cache | [docs/model-capabilities-maintenance.md](model-capabilities-maintenance.md) |
 | Ollama troubleshooting | [docs/troubleshooting/ollama.md](troubleshooting/ollama.md) |
 | Harness findings log (append-only field notes) | [docs/troubleshooting/harness-findings.md](troubleshooting/harness-findings.md) |
+| Reviewing / re-verifying that findings log | `harness-findings-review` skill (`.agents/skills/harness-findings-review/`), manual invocation only |
 | Copyable project rules template | [docs/templates/AGENTS.md.example](templates/AGENTS.md.example) |
 
 ## STRUCTURE
@@ -55,6 +56,8 @@ docs/
 └── troubleshooting/
     ├── ollama.md
     └── harness-findings.md                   # Append-only log of harness defects found during real work
+                                              # Written by the ~/.omo/rules/harness-findings.md capture rule;
+                                              # read back by the harness-findings-review skill (manual only)
 ```
 
 ## CONVENTIONS

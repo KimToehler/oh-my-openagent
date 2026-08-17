@@ -1,0 +1,25 @@
+== QA probe: real skills-loader-core loader driven against both roots ==
+== date: 2026-08-17T20:08:50Z  host-branch: dev ==
+
+--- MAIN CHECKOUT (skill absent - control) ---
+root: /Users/tim/git/oh-my-openagent
+project .agents/skills discovered: 13
+harness-findings-review present: false
+
+--- WORKTREE (skill present) ---
+root: /Users/tim/git/oh-my-openagent/.worktrees/harness-findings-review
+project .agents/skills discovered: 14
+harness-findings-review present: true
+SKILL.md path: /Users/tim/git/oh-my-openagent/.worktrees/harness-findings-review/.agents/skills/harness-findings-review/SKILL.md
+scope: project
+description chars: 454
+body (template) chars: 7643
+body has mandatory cross-check step: true
+body has manual-only clause: true
+body has append-never-rewrite rule: true
+
+== frontmatter validation ==
+frontmatter chars: 482 (limit 1024)
+keys: ['description', 'name']
+name matches dir: True
+description summarizes workflow: False
