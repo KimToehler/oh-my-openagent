@@ -1,0 +1,49 @@
+(pass) buildBackgroundTaskNotificationText > #given a completed task that left todos unfinished > #when building the final notification with zero unfinished todos #then it preserves the completed summary format [0.06ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task that left todos unfinished > #when an error task carries an unfinished todo count #then it preserves the error summary without an annotation [0.05ms]
+(pass) buildBackgroundTaskNotificationText > #given all tasks completed with undefined descriptions > #when building the final notification #then it uses task ID as fallback instead of 'undefined' [0.04ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task with retry attempt history > #when building the final notification #then it includes the final completed heading [0.04ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task with retry attempt history > #when building the final notification #then it tells the agent to collect outputs immediately [0.05ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task with retry attempt history > #when building the final notification #then it renders the spec-aligned balanced attempt timeline [0.07ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task with a child session id > #when the completion notification is built #then the summary line carries the session id as a fallback handle [0.04ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task with a child session id > #when a partial completion notification is built #then it offers the session id as a fallback handle [0.04ms]
+(pass) buildBackgroundTaskNotificationText > #given a mid-batch notification recorded in the parent transcript > #when the transcript scanner reads the success variant #then it recovers the child session id [0.36ms]
+(pass) buildBackgroundTaskNotificationText > #given a mid-batch notification recorded in the parent transcript > #when the transcript scanner reads the failure variant #then it recovers the child session id [0.08ms]
+(pass) buildBackgroundTaskNotificationText > #given a mid-batch notification recorded in the parent transcript > #when a DIFFERENT task id is requested against the notification #then no session is recovered [0.05ms]
+(pass) buildBackgroundTaskNotificationText > #given a single task notification with undefined description > #when building the partial notification #then it uses task ID as fallback [0.04ms]
+744 |           { id: "bg_beta", description: "beta", status: "completed", sessionId: "ses_beta" },
+745 |         ],
+746 |       })
+747 | 
+748 |       // then - two distinct tasks, both finished: no failure count, one line each
+749 |       expect(notification).not.toContain("FAILED")
+                                     ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "FAILED"
+Received: "<system-reminder>\n[ALL BACKGROUND TASKS FINISHED - 4 FAILED]\n\n**Completed:**\n- `bg_alpha`: alpha | session: `ses_alpha`\n- `bg_beta`: beta | session: `ses_beta`\n\n**Failed:**\n- `bg_alpha`: alpha | session: `ses_alpha` [RUNNING]\n- `bg_beta`: beta | session: `ses_beta` [RUNNING]\n- `bg_alpha`: alpha | session: `ses_alpha` [RUNNING]\n- `bg_beta`: beta | session: `ses_beta` [ERROR] - transient\n\nAll sibling background tasks are complete. Your next action should be to call `background_output(task_id=\"<id>\")` for each task ID above. If a task ID returns not-found, fall back to `session_read(session_id=\"<session>\")` using the session id on that task's line.\n\n**ACTION REQUIRED:** 4 task(s) failed. Check errors above and decide whether to retry or proceed.\n</system-reminder>"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-summary-dedupe/packages/omo-opencode/src/features/background-agent/background-task-notification-template.test.ts:749:32)
+(fail) buildBackgroundTaskNotificationText > #given a task that parked and resumed several times before finishing > #when the same task id appears repeatedly in the summary #then it is reported once, in its final state [0.17ms]
+765 |           { id: "bg_gamma", description: "gamma", status: "error", error: "final failure", sessionId: "ses_gamma" },
+766 |         ],
+767 |       })
+768 | 
+769 |       // then
+770 |       expect(notification).toContain("1 FAILED")
+                                 ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "1 FAILED"
+Received: "<system-reminder>\n[ALL BACKGROUND TASKS FINISHED - 2 FAILED]\n\n**Failed:**\n- `bg_gamma`: gamma | session: `ses_gamma` [RUNNING]\n- `bg_gamma`: gamma | session: `ses_gamma` [ERROR] - final failure\n\nAll sibling background tasks are complete. Your next action should be to call `background_output(task_id=\"<id>\")` for each task ID above. If a task ID returns not-found, fall back to `session_read(session_id=\"<session>\")` using the session id on that task's line.\n\n**ACTION REQUIRED:** 2 task(s) failed. Check errors above and decide whether to retry or proceed.\n</system-reminder>"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-summary-dedupe/packages/omo-opencode/src/features/background-agent/background-task-notification-template.test.ts:770:28)
+(fail) buildBackgroundTaskNotificationText > #given a task that parked and resumed several times before finishing > #when a task's last state is a real failure #then it is still counted once as failed [0.09ms]
+
+2 tests failed:
+(fail) buildBackgroundTaskNotificationText > #given a task that parked and resumed several times before finishing > #when the same task id appears repeatedly in the summary #then it is reported once, in its final state [0.17ms]
+(fail) buildBackgroundTaskNotificationText > #given a task that parked and resumed several times before finishing > #when a task's last state is a real failure #then it is still counted once as failed [0.09ms]
+
+ 25 pass
+ 2 fail
+ 60 expect() calls
+Ran 27 tests across 1 file. [69.00ms]

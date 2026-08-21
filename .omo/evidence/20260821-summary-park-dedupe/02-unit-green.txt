@@ -1,0 +1,24 @@
+(pass) buildBackgroundTaskNotificationText > #given one task still running after a failed task notification > #when building the partial notification #then it preserves the existing failure format [0.05ms]
+(pass) buildBackgroundTaskNotificationText > #given one task still running after a failed task notification > #when building the partial notification #then ERROR still has the failure call-to-action not answer-oriented text [0.04ms]
+(pass) buildBackgroundTaskNotificationText > #given all sibling tasks completed with mixed outcomes > #when building the final notification #then it preserves the existing summary format [0.09ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task that left todos unfinished > #when building the final notification #then it annotates the completed summary with the unfinished todo count [0.04ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task that left todos unfinished > #when building the final notification without an unfinished todo count #then it preserves the completed summary format [0.05ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task that left todos unfinished > #when building the final notification with zero unfinished todos #then it preserves the completed summary format [0.09ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task that left todos unfinished > #when an error task carries an unfinished todo count #then it preserves the error summary without an annotation [0.07ms]
+(pass) buildBackgroundTaskNotificationText > #given all tasks completed with undefined descriptions > #when building the final notification #then it uses task ID as fallback instead of 'undefined' [0.06ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task with retry attempt history > #when building the final notification #then it includes the final completed heading [0.04ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task with retry attempt history > #when building the final notification #then it tells the agent to collect outputs immediately [0.08ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task with retry attempt history > #when building the final notification #then it renders the spec-aligned balanced attempt timeline [0.10ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task with a child session id > #when the completion notification is built #then the summary line carries the session id as a fallback handle [0.04ms]
+(pass) buildBackgroundTaskNotificationText > #given a completed task with a child session id > #when a partial completion notification is built #then it offers the session id as a fallback handle [0.04ms]
+(pass) buildBackgroundTaskNotificationText > #given a mid-batch notification recorded in the parent transcript > #when the transcript scanner reads the success variant #then it recovers the child session id [0.44ms]
+(pass) buildBackgroundTaskNotificationText > #given a mid-batch notification recorded in the parent transcript > #when the transcript scanner reads the failure variant #then it recovers the child session id [0.09ms]
+(pass) buildBackgroundTaskNotificationText > #given a mid-batch notification recorded in the parent transcript > #when a DIFFERENT task id is requested against the notification #then no session is recovered [0.06ms]
+(pass) buildBackgroundTaskNotificationText > #given a single task notification with undefined description > #when building the partial notification #then it uses task ID as fallback [0.04ms]
+(pass) buildBackgroundTaskNotificationText > #given a task that parked and resumed several times before finishing > #when the same task id appears repeatedly in the summary #then it is reported once, in its final state [0.06ms]
+(pass) buildBackgroundTaskNotificationText > #given a task that parked and resumed several times before finishing > #when a task's last state is a real failure #then it is still counted once as failed [0.04ms]
+
+ 27 pass
+ 0 fail
+ 65 expect() calls
+Ran 27 tests across 1 file. [66.00ms]

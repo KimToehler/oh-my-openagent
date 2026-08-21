@@ -1,0 +1,29 @@
+488 |       await manager["pollRunningTasks"]()
+489 | 
+490 |       //#then
+491 |       expect(task.status).toBe("running")
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: "running"
+Received: "error"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-summary-dedupe/packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:491:27)
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when first observation is inside grace window #then stamps and waits [0.17ms]
+
+packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts:
+186 |       await drainAsyncTimerWork()
+187 |     }
+188 | 
+189 |     // then
+190 |     expect(promptAsyncCalls).toHaveLength(2)
+191 |     expect(latestWake.coalesceRequeueCount).toBeLessThanOrEqual(MAX_COALESCE_REQUEUE_ATTEMPTS)
+                                                  ^
+error: Expected and actual values must be numbers or bigints
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-summary-dedupe/packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts:191:45)
+(fail) ParentWakePendingQueue scheduleFlush > #given an existing default timer and an already-delivered wake #when real queue cadence drives coalesce retries #then the wake reaches a second real dispatch before the cap [0.46ms]
+
+ 1445 pass
+ 4 fail
+ 3651 expect() calls
+Ran 1449 tests across 134 files. [33.86s]

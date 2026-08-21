@@ -423,6 +423,22 @@ park-resume-park task appears exactly once.
 push, no id dedupe) and `background-task-notification-template.ts:87,98` (count taken
 straight off the accumulated array).
 
+**Update:** (2026-08-21, fixed in `7d41a6f23`) Closed. The renderer now collapses the summary
+list to the last entry per task id before counting, so a task that parked N times is reported
+once, in its final state. Fixed at the renderer rather than at the push site: eight call sites
+funnel into `notifyParentSession`, and the count is derived during rendering, so one choke
+point covers every route. The repeated push upstream is left in place - that is a size
+question, not a correctness one.
+Reproduced and verified through the real renderer with the reported shape (2 tasks x 6
+park/resume cycles = 12 rows): `dev` renders `[ALL BACKGROUND TASKS FINISHED - 10 FAILED]`
+with 12 task lines and mid-flight `[RUNNING]` rows under a `Failed:` heading; patched renders
+`[BACKGROUND TASK COMPLETED]` with 2 lines and no `[RUNNING]`. Same-scope suites 1445 pass /
+4 fail vs 1440 / 4 on clean `dev` with a byte-identical failing set, typecheck exit 0, build
+exit 0, `dedupeByTaskId` confirmed in `dist/index.js`.
+Second test pins the direction that matters more than the headline one: a task whose LAST
+state is a genuine failure is still counted once as failed, so the dedupe cannot silently
+swallow real failures. Evidence: `.omo/evidence/20260821-summary-park-dedupe/`.
+
 ## 2026-08-17 — `report_blocked` used for waiting, not for blocking
 
 **Severity:** costly

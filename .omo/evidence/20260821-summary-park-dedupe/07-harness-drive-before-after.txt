@@ -1,0 +1,21 @@
+Real drive of buildBackgroundTaskNotificationText with the reported shape:
+2 real tasks, each parked/resumed across 6 cycles -> 12 accumulated summary rows.
+
+===== PATCHED =====
+SUMMARY_ROWS_FED    = 12 (for 2 real tasks)
+HEADER              = [BACKGROUND TASK COMPLETED]
+TASK_LINES_RENDERED = 2
+DISTINCT_TASK_IDS   = 2
+CLAIMS_RUNNING_AS_FAILED = false
+
+===== BASELINE_DEV =====
+SUMMARY_ROWS_FED    = 12 (for 2 real tasks)
+HEADER              = [ALL BACKGROUND TASKS FINISHED - 10 FAILED]
+TASK_LINES_RENDERED = 12
+DISTINCT_TASK_IDS   = 2
+CLAIMS_RUNNING_AS_FAILED = true
+
+dev invents 10 failures out of 0, and prints mid-flight [RUNNING] rows under a
+"Failed:" heading - the 14-for-2 inflation the finding reported.
+
+Bundle receipt (patched): grep -c dedupeByTaskId dist/index.js -> 2
