@@ -1,0 +1,683 @@
+bun test v1.4.0 (1381054db)
+
+script/agent-command-string-audit.test.ts:
+59 |     expect(allowlist["emit-migrate"]).toEqual([])
+60 |     expect(allowlist["test-expectation"]).toEqual([])
+61 | 
+62 |     const categorized = ALLOWLIST_CATEGORIES.flatMap((category) => allowlist[category])
+63 |     expect(new Set(categorized).size, "allowlist entries must be unique").toBe(categorized.length)
+64 |     expect(collectHits()).toEqual(categorized.sort())
+                               ^
+error: expect(received).toEqual(expected)
+
+@@ -3,4 +3,4 @@
+    ".github/workflows/publish.yml:915: /bin/omo",
+-   "AGENTS.md:412: omo doctor",
+-   "CLAUDE.md:412: omo doctor",
++   "AGENTS.md:272: omo doctor",
++   "CLAUDE.md:272: omo doctor",
+    "packages/omo-codex/README.md:52: omo get-local-version",
+
+- Expected  - 2
++ Received  + 2
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/script/agent-command-string-audit.test.ts:64:27)
+(fail) agent command string audit > #given tracked source files #when legacy agent and human commands are scanned #then every hit is categorized [775.38ms]
+
+script/sync-lazycodex-marketplace.test.ts:
+[sync-lazycodex-marketplace] previous-payload reconstruction: skipping missing LSP daemon dist at /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-sync-prev-source-BilXm8/packages/lsp-daemon/dist
+[sync-lazycodex-marketplace] previous-payload reconstruction: skipping missing OMO root CLI dist at /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-sync-prev-source-BilXm8/dist/cli
+[sync-lazycodex-marketplace] previous-payload reconstruction: skipping missing OMO node fallback CLI dist at /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-sync-prev-source-BilXm8/dist/cli-node
+[materialize] wrote 148 frontend reference files from submodules
+[materialize] wrote 148 frontend reference files from submodules
+[materialize] wrote 148 frontend reference files from submodules
+Bundled 769 modules in 37ms
+
+  omo.js  0.81 MB  (entry point)
+
+Bundled 600 modules in 23ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 12ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 88 modules in 7ms
+
+  omo-memory-mcp.js  68.97 KB  (entry point)
+
+Bundled 84 modules in 9ms
+
+  memory-run-supervisor.mjs  17.39 KB  (entry point)
+
+Bundled 111 modules in 10ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+Bundled 769 modules in 31ms
+
+  omo.js  0.81 MB  (entry point)
+
+Bundled 600 modules in 26ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 13ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 88 modules in 7ms
+
+  omo-memory-mcp.js  68.97 KB  (entry point)
+
+Bundled 84 modules in 8ms
+
+  memory-run-supervisor.mjs  17.39 KB  (entry point)
+
+Bundled 111 modules in 10ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+Bundled 769 modules in 34ms
+
+  omo.js  0.81 MB  (entry point)
+
+Bundled 600 modules in 22ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 12ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 88 modules in 7ms
+
+  omo-memory-mcp.js  68.97 KB  (entry point)
+
+Bundled 84 modules in 8ms
+
+  memory-run-supervisor.mjs  17.39 KB  (entry point)
+
+Bundled 111 modules in 10ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+Bundled 769 modules in 39ms
+
+  omo.js  0.81 MB  (entry point)
+
+Bundled 600 modules in 22ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 11ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 88 modules in 8ms
+
+  omo-memory-mcp.js  68.97 KB  (entry point)
+
+Bundled 84 modules in 7ms
+
+  memory-run-supervisor.mjs  17.39 KB  (entry point)
+
+Bundled 111 modules in 11ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+Bundled 769 modules in 32ms
+
+  omo.js  0.81 MB  (entry point)
+
+Bundled 600 modules in 26ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 13ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 88 modules in 6ms
+
+  omo-memory-mcp.js  68.97 KB  (entry point)
+
+Bundled 84 modules in 6ms
+
+  memory-run-supervisor.mjs  17.39 KB  (entry point)
+
+Bundled 111 modules in 10ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+Bundled 769 modules in 35ms
+
+  omo.js  0.81 MB  (entry point)
+
+Bundled 600 modules in 20ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 12ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 88 modules in 6ms
+
+  omo-memory-mcp.js  68.97 KB  (entry point)
+
+Bundled 84 modules in 6ms
+
+  memory-run-supervisor.mjs  17.39 KB  (entry point)
+
+Bundled 111 modules in 9ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+Bundled 769 modules in 35ms
+
+  omo.js  0.81 MB  (entry point)
+
+Bundled 600 modules in 25ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 15ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 88 modules in 8ms
+
+  omo-memory-mcp.js  68.97 KB  (entry point)
+
+Bundled 84 modules in 10ms
+
+  memory-run-supervisor.mjs  17.39 KB  (entry point)
+
+Bundled 111 modules in 12ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+Bundled 769 modules in 33ms
+
+  omo.js  0.81 MB  (entry point)
+
+Bundled 600 modules in 21ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 11ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 88 modules in 7ms
+
+  omo-memory-mcp.js  68.97 KB  (entry point)
+
+Bundled 84 modules in 6ms
+
+  memory-run-supervisor.mjs  17.39 KB  (entry point)
+
+Bundled 111 modules in 9ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+Bundled 769 modules in 38ms
+
+  omo.js  0.81 MB  (entry point)
+
+Bundled 600 modules in 26ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 12ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 88 modules in 7ms
+
+  omo-memory-mcp.js  68.97 KB  (entry point)
+
+Bundled 84 modules in 7ms
+
+  memory-run-supervisor.mjs  17.39 KB  (entry point)
+
+Bundled 111 modules in 10ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+Bundled 769 modules in 34ms
+
+  omo.js  0.81 MB  (entry point)
+
+Bundled 600 modules in 23ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 11ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 88 modules in 6ms
+
+  omo-memory-mcp.js  68.97 KB  (entry point)
+
+Bundled 84 modules in 6ms
+
+  memory-run-supervisor.mjs  17.39 KB  (entry point)
+
+Bundled 111 modules in 9ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+Bundled 769 modules in 35ms
+
+  omo.js  0.81 MB  (entry point)
+
+Bundled 600 modules in 22ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 11ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 88 modules in 7ms
+
+  omo-memory-mcp.js  68.97 KB  (entry point)
+
+Bundled 84 modules in 7ms
+
+  memory-run-supervisor.mjs  17.39 KB  (entry point)
+
+Bundled 111 modules in 9ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+Bundled 769 modules in 28ms
+
+  omo.js  0.81 MB  (entry point)
+
+Bundled 600 modules in 21ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 11ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 88 modules in 7ms
+
+  omo-memory-mcp.js  68.97 KB  (entry point)
+
+Bundled 84 modules in 7ms
+
+  memory-run-supervisor.mjs  17.39 KB  (entry point)
+
+Bundled 111 modules in 9ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+Bundled 769 modules in 36ms
+
+  omo.js  0.81 MB  (entry point)
+
+Bundled 600 modules in 24ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 13ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 88 modules in 7ms
+
+  omo-memory-mcp.js  68.97 KB  (entry point)
+
+Bundled 84 modules in 6ms
+
+  memory-run-supervisor.mjs  17.39 KB  (entry point)
+
+Bundled 111 modules in 8ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+Bundled 769 modules in 28ms
+
+  omo.js  0.81 MB  (entry point)
+
+Bundled 600 modules in 20ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 11ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 88 modules in 7ms
+
+  omo-memory-mcp.js  68.97 KB  (entry point)
+
+Bundled 84 modules in 7ms
+
+  memory-run-supervisor.mjs  17.39 KB  (entry point)
+
+Bundled 111 modules in 9ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+Bundled 769 modules in 32ms
+
+  omo.js  0.81 MB  (entry point)
+
+Bundled 600 modules in 20ms
+
+  omo-task.js  0.49 MB  (entry point)
+
+Bundled 279 modules in 10ms
+
+  omo-member.js  117.61 KB  (entry point)
+
+Bundled 88 modules in 6ms
+
+  omo-memory-mcp.js  68.97 KB  (entry point)
+
+Bundled 84 modules in 6ms
+
+  memory-run-supervisor.mjs  17.39 KB  (entry point)
+
+Bundled 111 modules in 8ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+ulw-loop help
+ulw-loop help
+ulw-loop help
+ulw-loop help
+ulw-loop help
+ulw-loop help
+ulw-loop help
+changed
+ulw-loop help
+
+packages/omo-senpi/src/extension/index.test.ts:
+omo-senpi ulw-loop inactive; omo binary not found undefined
+omo-senpi memory component skipped: missing ExtensionAPI capabilities {
+  missing: [ "appendEntry", "registerEntryRenderer" ],
+}
+config-watch skipped: events capability missing undefined
+omo-senpi ulw-loop inactive; omo binary not found undefined
+omo-senpi memory component skipped: missing ExtensionAPI capabilities {
+  missing: [ "appendEntry", "registerEntryRenderer" ],
+}
+config-watch skipped: events capability missing undefined
+
+packages/omo-senpi/src/extension/compose.test.ts:
+omo-senpi component disabled by flag {
+  component: "beta",
+}
+
+packages/ast-grep-mcp/src/tools/scan.test.ts:
+199 |   }, { timeout: 15000 });
+200 | });
+201 | 
+202 | describe.skipIf(!SG_AVAILABLE)("scan tool: pinned real-binary fixtures", () => {
+203 |   it("#given the provisioned runtime #when inspected #then it is the 0.43.0 OMO pin", () => {
+204 |     expect(existsSync(PINNED_SG_PATH)).toBe(true);
+                                             ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/ast-grep-mcp/src/tools/scan.test.ts:204:40)
+(fail) scan tool: pinned real-binary fixtures > #given the provisioned runtime #when inspected #then it is the 0.43.0 OMO pin [0.45ms]
+
+packages/senpi-task/src/__adversarial__/chaos-bench.test.ts:
+[chaos] seed=senpi-task-w1-chaos base=2337725802 iterations=200
+[lsp] ignored connection error notification failure during cleanup: Cannot call write after a stream was destroyed
+[lsp] ignored shutdown request failure during cleanup: LSP server workspace-edit-fixture at /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/lsp-apply-edit-d13jNL exited with code 0
+
+packages/omo-opencode/src/shared/module-resolution-failure.test.ts:
+26 | 
+27 | describe("isModuleResolutionFailure", () => {
+28 |   it("#given a real Bun dynamic-import failure #when classifying #then it is a resolution failure even though it is not an Error instance", async () => {
+29 |     const resolveMessage = await captureRealImportFailure()
+30 | 
+31 |     expect(resolveMessage instanceof Error).toBe(false)
+                                                 ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/shared/module-resolution-failure.test.ts:31:45)
+(fail) isModuleResolutionFailure > #given a real Bun dynamic-import failure #when classifying #then it is a resolution failure even though it is not an Error instance [0.29ms]
+
+packages/skills-loader-core/src/features/opencode-skill-loader/skill-content-async-resolution.test.ts:
+204 | 		expect(skill.path).toBeDefined()
+205 | 		expect(skill.resolvedPath).toBeDefined()
+206 | 		if (!skill.path || !skill.resolvedPath) {
+207 | 			throw new Error("ulw-plan skill is not path-backed")
+208 | 		}
+209 | 		expect(skill.path.replaceAll("\\", "/").endsWith("packages/shared-skills/skills/ulw-plan/SKILL.md")).toBe(true)
+                                                                                                             ^
+error: expect(received).toBe(expected)
+
+Expected: true
+Received: false
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/skills-loader-core/src/features/opencode-skill-loader/skill-content-async-resolution.test.ts:209:104)
+(fail) resolveSkillContentAsync > #given the shared ulw-plan skill source #when OpenCode skills are resolved #then ulw-plan is path-backed with workflow resources [3.46ms]
+
+packages/skills-loader-core/src/features/opencode-skill-loader/loader-deduplication.test.ts:
+190 |       try {
+191 |         const skills = await discoverSkills()
+192 |         const matches = skills.filter(s => s.name === "ulw-plan")
+193 | 
+194 |         expect(matches).toHaveLength(1)
+195 |         expect(matches[0]?.scope).toBe("project")
+                                        ^
+error: expect(received).toBe(expected)
+
+Expected: "project"
+Received: "opencode"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/skills-loader-core/src/features/opencode-skill-loader/loader-deduplication.test.ts:195:35)
+(fail) skill loader MCP parsing > deduplication > prioritizes project Claude ulw-plan over shared ulw-plan [3.02ms]
+237 |       try {
+238 |         const skills = await discoverSkills()
+239 |         const matches = skills.filter(s => s.name === "ulw-plan")
+240 | 
+241 |         expect(matches).toHaveLength(1)
+242 |         expect(matches[0]?.scope).toBe("project")
+                                        ^
+error: expect(received).toBe(expected)
+
+Expected: "project"
+Received: "opencode"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/skills-loader-core/src/features/opencode-skill-loader/loader-deduplication.test.ts:242:35)
+(fail) skill loader MCP parsing > deduplication > prioritizes project Agents ulw-plan over shared ulw-plan [3.02ms]
+346 | 
+347 |         expect(literalMatches).toHaveLength(1)
+348 |         expect(literalMatches[0]?.scope).toBe("opencode-project")
+349 |         expect(literalMatches[0]?.definition.description).toContain("Literal project skill")
+350 |         expect(ulwPlanMatches).toHaveLength(1)
+351 |         expect(ulwPlanMatches[0]?.scope).toBe("shared")
+                                               ^
+error: expect(received).toBe(expected)
+
+Expected: "shared"
+Received: "opencode"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/skills-loader-core/src/features/opencode-skill-loader/loader-deduplication.test.ts:351:42)
+(fail) skill loader MCP parsing > deduplication > treats a project skill literally named shared/ulw-plan as a plain name, not a canonical alias [6.02ms]
+
+packages/omo-senpi/src/components/ultrawork/ultrawork-arming.test.ts:
+omo-senpi memory component skipped: missing ExtensionAPI capabilities {
+  missing: [ "appendEntry", "registerEntryRenderer" ],
+}
+config-watch skipped: events capability missing undefined
+omo-senpi ulw-loop status ignored {
+  reason: "non-zero-exit",
+  code: 1,
+}
+omo-senpi memory component skipped: missing ExtensionAPI capabilities {
+  missing: [ "appendEntry", "registerEntryRenderer" ],
+}
+config-watch skipped: events capability missing undefined
+omo-senpi ulw-loop status ignored {
+  reason: "non-zero-exit",
+  code: 1,
+}
+fatal: not a git repository (or any of the parent directories): .git
+fatal: git cat-file: could not get object info
+fatal: git cat-file: could not get object info
+Preparing worktree (new branch 'linked-branch')
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+fatal: not a git repository (or any of the parent directories): .git
+
+packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:
+449 | 
+450 |       //#when
+451 |       await manager["pollRunningTasks"]()
+452 | 
+453 |       //#then
+454 |       expect(task.status).toBe("running")
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: "running"
+Received: "cancelled"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:454:27)
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when session remains active #then keeps task running [0.41ms]
+467 | 
+468 |       //#when
+469 |       await manager["pollRunningTasks"]()
+470 | 
+471 |       //#then
+472 |       expect(task.status).toBe("running")
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: "running"
+Received: "error"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:472:27)
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when valid output is absent #then keeps task running [0.33ms]
+486 | 
+487 |       //#when
+488 |       await manager["pollRunningTasks"]()
+489 | 
+490 |       //#then
+491 |       expect(task.status).toBe("running")
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: "running"
+Received: "error"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:491:27)
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when first observation is inside grace window #then stamps and waits [0.25ms]
+
+packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts:
+186 |       await drainAsyncTimerWork()
+187 |     }
+188 | 
+189 |     // then
+190 |     expect(promptAsyncCalls).toHaveLength(2)
+191 |     expect(latestWake.coalesceRequeueCount).toBeLessThanOrEqual(MAX_COALESCE_REQUEUE_ATTEMPTS)
+                                                  ^
+error: Expected and actual values must be numbers or bigints
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts:191:45)
+(fail) ParentWakePendingQueue scheduleFlush > #given an existing default timer and an already-delivered wake #when real queue cadence drives coalesce retries #then the wake reaches a second real dispatch before the cap [0.47ms]
+
+  ⚙ read_file filePath=/src/index.ts  
+
+packages/omo-opencode/src/__tests__/perf/plugin-init.test.ts:
+empty-project: cold=54.9ms warm=[21.6, 22.4] median=22.4ms
+in-tree-fixture: cold=55.8ms warm=[21.3, 32.8] median=32.8ms
+
+packages/omo-senpi/src/components/memory/worker/completion.test.ts:
+171 |     expect(api.renderers.map((item) => item.customType)).toEqual([
+172 |       "senpi-memory.reflection-completion",
+173 |       "senpi-memory.reflection-launched",
+174 |       "senpi-memory.reflection-summary",
+175 |     ])
+176 |     expect(api.entries).toEqual([{ customType: REFLECTION_COMPLETION_ENTRY_TYPE, data: consumed[0] }])
+                              ^
+error: expect(received).toEqual(expected)
+
+- [
+-   {
+-     "customType": "senpi-memory.reflection-completion",
+-     "data": {
+-       "category": "quick",
+-       "conversationIds": [
+-         "conversation-a",
+-       ],
+-       "delivery": {
+-         "consumedAt": "2026-08-21T23:05:15.849Z",
+-         "sessionId": "conversation-a",
+-         "status": "consumed",
+-       },
+-       "finishedAt": "2026-08-09T12:00:01.000Z",
+-       "identity": "agent-test",
+-       "model": "omo-mock/mock-1",
+-       "origin": "shutdown",
+-       "outcome": "merged",
+-       "runId": "run-offline",
+-       "schemaVersion": 1,
+-       "startedAt": "2026-08-09T12:00:00.000Z",
+-       "thinking": "high",
+-       "trigger": "dream",
+-     },
+-   },
+- ]
++ []
+
+- Expected  - 26
++ Received  + 1
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-senpi/src/components/memory/worker/completion.test.ts:176:25)
+(fail) reflection completion flow > #given a pending offline completion #when its source session starts #then appendEntry notify and consumed state happen without a model message [1.34ms]
+252 |           logger: { warn: (_message, details) => warnings.push(details) },
+253 |         })
+254 | 
+255 |         // then
+256 |         expect(consumed[0]?.delivery.status).toBe("consumed")
+257 |         expect(api.entries).toHaveLength(1)
+                                  ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 1
+Received length: 0
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-senpi/src/components/memory/worker/completion.test.ts:257:29)
+(fail) reflection completion flow > #given a throwing reflection UI > #when a pending completion is delivered > #then the entry is consumed and the UI failure is logged [0.84ms]
+
+packages/omo-opencode/src/cli/doctor/checks/dependencies.test.ts:
+107 |         requireFromHere.resolve("definitely-not-a-real-package-omo-doctor-test/package.json")
+108 |         throw new Error("expected the require.resolve probe to fail")
+109 |       } catch (error) {
+110 |         resolveMessage = error
+111 |       }
+112 |       expect(resolveMessage instanceof Error).toBe(false)
+                                                    ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/cli/doctor/checks/dependencies.test.ts:112:47)
+(fail) dependencies check > findCommentCheckerPackageBinary > #given a zero-dependency install where require.resolve throws Bun's non-Error ResolveMessage #when resolving package binary #then returns null instead of crashing [0.27ms]
+
+ 15573 pass
+ 5 skip
+ 14 fail
+ 1 snapshots, 117649 expect() calls
+Ran 15592 tests across 2017 files. [365.03s]
