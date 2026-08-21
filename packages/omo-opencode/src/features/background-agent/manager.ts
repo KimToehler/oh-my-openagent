@@ -3457,7 +3457,10 @@ The task was re-queued on a fallback model after a retryable failure.
             continue
           }
 
-          // Session is idle or no longer in status response (completed/disappeared)
+          // Absent from the status response. In practice `session.status()` lists only
+    // busy/retry sessions, so an idle-but-alive session is absent too - absence
+    // alone never proves the child finished, which is why the checks below still
+    // require valid output or an explicit 404 before completing the task.
           const sessionGoneFromStatus = allStatuses !== undefined && !sessionStatus
           const sessionGoneThresholdReached = sessionGoneFromStatus
             && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
