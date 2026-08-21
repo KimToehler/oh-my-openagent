@@ -1,0 +1,19 @@
+
+Bundled 84 modules in 5ms
+
+  memory-run-supervisor.mjs  17.39 KB  (entry point)
+
+Bundled 111 modules in 7ms
+
+  omo-init-deep-advisor.js  57.34 KB  (entry point)
+
+Built omo-senpi extensions: /Users/tim/git/oh-my-openagent/.local-ignore/wt-shutdown-abort/packages/omo-senpi/plugin/extensions/omo.js, /Users/tim/git/oh-my-openagent/.local-ignore/wt-shutdown-abort/packages/omo-senpi/plugin/extensions/omo-task.js, /Users/tim/git/oh-my-openagent/.local-ignore/wt-shutdown-abort/packages/omo-senpi/plugin/extensions/omo-member.js, /Users/tim/git/oh-my-openagent/.local-ignore/wt-shutdown-abort/packages/omo-senpi/plugin/extensions/omo-memory-mcp.js, /Users/tim/git/oh-my-openagent/.local-ignore/wt-shutdown-abort/packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs, /Users/tim/git/oh-my-openagent/.local-ignore/wt-shutdown-abort/packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+synced omo-senpi skills to /Users/tim/git/oh-my-openagent/.local-ignore/wt-shutdown-abort/packages/omo-senpi/plugin/skills
+generated directive is current: /Users/tim/git/oh-my-openagent/.local-ignore/wt-shutdown-abort/packages/omo-senpi/src/components/ultrawork/generated-directive.ts
+Bundled 6 modules in 3ms
+
+  install.mjs  19.86 KB  (entry point)
+
+Built omo-senpi installer: /Users/tim/git/oh-my-openagent/.local-ignore/wt-shutdown-abort/packages/omo-senpi/plugin/scripts/install.mjs
+build: all steps completed
+EXIT=0

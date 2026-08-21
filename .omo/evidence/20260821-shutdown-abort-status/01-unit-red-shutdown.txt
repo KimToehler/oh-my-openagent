@@ -1,0 +1,24 @@
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/features/background-agent/manager-shutdown-global-cleanup.test.ts:
+(pass) BackgroundManager shutdown global cleanup > removes tracked session IDs from subagentSessions and SessionCategoryRegistry on shutdown [1.07ms]
+(pass) BackgroundManager shutdown global cleanup > awaits running session aborts before shutdown resolves [0.14ms]
+175 |     // when
+176 |     await manager.shutdown()
+177 | 
+178 |     // then
+179 |     const archived = getRegisteredBackgroundTask("task-running-terminal-status")
+180 |     expect(archived).toBeDefined()
+                           ^
+error: expect(received).toBeDefined()
+
+Received: undefined
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-shutdown-abort/packages/omo-opencode/src/features/background-agent/manager-shutdown-global-cleanup.test.ts:180:22)
+(fail) BackgroundManager shutdown global cleanup > archives a still-running task with a terminal status instead of dropping it on shutdown [0.20ms]
+(pass) BackgroundManager shutdown global cleanup > does not relabel an already-terminal task when shutting down [0.08ms]
+
+ 3 pass
+ 1 fail
+ 11 expect() calls
+Ran 4 tests across 1 file. [70.00ms]

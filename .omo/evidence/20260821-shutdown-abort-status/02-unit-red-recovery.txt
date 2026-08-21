@@ -1,0 +1,26 @@
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/tools/background-task/create-background-output.cross-instance.test.ts:
+(pass) createBackgroundOutput cross-instance lookup > #given a task launched on manager A > #when background_output is bound to a separate manager B in the same realm > #then the global registry still resolves the task [2.29ms]
+(pass) createBackgroundOutput cross-instance lookup > #given a bg id unknown to this runtime > #when the parent transcript records that id paired with a child session id > #then background_output returns the child session transcript instead of a bare not-found [102.23ms]
+(pass) createBackgroundOutput cross-instance lookup > #given a bg id unknown to this runtime > #when a completion notification line pairs the id with a session id > #then background_output recovers the session for that specific task line [101.65ms]
+(pass) createBackgroundOutput cross-instance lookup > #given the global background task registry is empty (simulating a foreign realm) > #when background_output looks up a bg id and no transcript pairing exists > #then the not-found message names the runtime split and offers session_read [101.73ms]
+322 | 
+323 |         const outputTool = createBackgroundOutput(manager, client)
+324 |         const output = await outputTool.execute({ task_id: "bg_killed_midflight" }, mockContext)
+325 | 
+326 |         expect(output).toContain("partial work before the kill")
+327 |         expect(output).not.toContain("Status: completed")
+                                 ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "Status: completed"
+Received: "> **Note:** This background task is owned by a different runtime than the one serving this tool call, so its in-memory record is unreachable here. The result below was recovered from the child session transcript (`ses_killed`).\n\n# Full Session Output\n\nTask ID: bg_killed_midflight\nDescription: Recovered from the parent transcript (task owned by another runtime)\nStatus: completed\nSession ID: ses_killed\nTotal messages: 1\nReturned: 1\nHas more: false\n\n## Messages\n\n[assistant] 2026-08-07T00:01:00.000Z id=m-child\npartial work before the kill"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-shutdown-abort/packages/omo-opencode/src/tools/background-task/create-background-output.cross-instance.test.ts:327:28)
+(fail) createBackgroundOutput cross-instance lookup > #given a task recovered from the parent transcript > #when the recovery path renders the child session > #then it does not claim the task completed, because recovery cannot know that [101.89ms]
+
+ 4 pass
+ 1 fail
+ 17 expect() calls
+Ran 5 tests across 1 file. [490.00ms]

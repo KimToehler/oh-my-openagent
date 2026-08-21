@@ -1,0 +1,35 @@
+Real-harness drive: killed in-flight background task, cross-manager (OpenDesign topology).
+Driver imported the REAL manager + REAL createBackgroundOutput tool from source; the same
+change was verified present in the built bundle (see 06-build.txt and the grep receipts below).
+
+--- A. shutdown stamping, patched worktree -------------------------------------
+BEFORE_SHUTDOWN_status          = running
+AFTER_SHUTDOWN_reader_status    = cancelled
+AFTER_SHUTDOWN_archived_status  = cancelled
+AFTER_SHUTDOWN_error            = Task was still running when the background manager shut down, so it was aborted
+CALLER_OBJECT_MUTATED           = false
+REPORTS_FALSE_COMPLETED         = false
+
+--- A'. same driver, unpatched dev (control) -----------------------------------
+BEFORE_SHUTDOWN_status          = running
+AFTER_SHUTDOWN_reader_status    = <undefined>      <- record vanishes
+AFTER_SHUTDOWN_archived_status  = <undefined>
+AFTER_SHUTDOWN_error            = <none>
+CALLER_OBJECT_MUTATED           = false
+REPORTS_FALSE_COMPLETED         = false            <- only because the record is MISSING;
+                                                      the lie is manufactured downstream
+--- B. background_output recovery path, real tool, identical input -------------
+PATCHED:
+  RENDERED_STATUS_LINE = Status: unknown (recovered from transcript; this runtime cannot observe the task's outcome)
+  CLAIMS_COMPLETED     = false
+BASELINE_DEV:
+  RENDERED_STATUS_LINE = Status: completed
+  CLAIMS_COMPLETED     = true                      <- the reported defect, reproduced
+
+--- bundle receipts (dist/index.js, patched build) -----------------------------
+grep -c "still running when the background manager shut down" dist/index.js   -> 1
+grep -c "recovered from transcript; this runtime cannot observe" dist/index.js -> 1
+
+--- isolation -----------------------------------------------------------------
+SESSIONS_BEFORE=2299  SESSIONS_AFTER=2299  -> real ~/.local/share/opencode/opencode.db untouched
+QA scratch dirs (.local-qa/) removed after the run.
