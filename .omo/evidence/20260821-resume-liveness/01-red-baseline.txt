@@ -1,0 +1,49 @@
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/features/background-agent/stale-running-resume.test.ts:
+1390 |     if (!existingTask.sessionId) {
+1391 |       throw new Error(`Task has no sessionID: ${existingTask.id}`)
+1392 |     }
+1393 | 
+1394 |     if (existingTask.status === "running") {
+1395 |       throw new Error(
+                       ^
+error: Task task-session-dead is currently running and cannot accept a continuation prompt. Wait for it to complete before resuming it with task_id.
+      at resume (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-liveness/packages/omo-opencode/src/features/background-agent/manager.ts:1395:17)
+      at resume (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-liveness/packages/omo-opencode/src/features/background-agent/stale-running-resume.test.ts:73:17)
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-liveness/packages/omo-opencode/src/features/background-agent/stale-running-resume.test.ts:99:11)
+(fail) BackgroundManager.resume liveness reconciliation > #given a dead session absent from the status map beyond the gone threshold #when resume is called #then it reconciles and accepts the continuation [1.63ms]
+(pass) BackgroundManager.resume liveness reconciliation > #given a genuinely busy session #when resume is called #then it still rejects the continuation [0.15ms]
+(pass) BackgroundManager.resume liveness reconciliation > #given an absent session below the gone threshold #when resume is called #then it rejects rather than trusting a single blip [0.09ms]
+(pass) BackgroundManager.resume liveness reconciliation > #given the status endpoint throws #when resume is called #then it fails safe and rejects [0.08ms]
+(pass) BackgroundManager.resume liveness reconciliation > #given session.status is unavailable on the client #when resume is called #then it fails safe and rejects [0.07ms]
+1390 |     if (!existingTask.sessionId) {
+1391 |       throw new Error(`Task has no sessionID: ${existingTask.id}`)
+1392 |     }
+1393 | 
+1394 |     if (existingTask.status === "running") {
+1395 |       throw new Error(
+                       ^
+error: Task task-session-idle is currently running and cannot accept a continuation prompt. Wait for it to complete before resuming it with task_id.
+      at resume (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-liveness/packages/omo-opencode/src/features/background-agent/manager.ts:1395:17)
+      at resume (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-liveness/packages/omo-opencode/src/features/background-agent/stale-running-resume.test.ts:73:17)
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-liveness/packages/omo-opencode/src/features/background-agent/stale-running-resume.test.ts:197:11)
+(fail) BackgroundManager.resume liveness reconciliation > #given a terminal idle session #when resume is called #then it reconciles without waiting for the gone threshold [0.15ms]
+(pass) BackgroundManager.resume liveness reconciliation > #given the poller already claimed the task for completion #when resume is called #then it rejects instead of racing [0.10ms]
+1390 |     if (!existingTask.sessionId) {
+1391 |       throw new Error(`Task has no sessionID: ${existingTask.id}`)
+1392 |     }
+1393 | 
+1394 |     if (existingTask.status === "running") {
+1395 |       throw new Error(
+                       ^
+error: Task task-session-slot is currently running and cannot accept a continuation prompt. Wait for it to complete before resuming it with task_id.
+      at resume (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-liveness/packages/omo-opencode/src/features/background-agent/manager.ts:1395:17)
+      at resume (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-liveness/packages/omo-opencode/src/features/background-agent/stale-running-resume.test.ts:73:17)
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-liveness/packages/omo-opencode/src/features/background-agent/stale-running-resume.test.ts:248:11)
+(fail) BackgroundManager.resume liveness reconciliation > #given a reconciled dead task #when resume re-acquires concurrency #then the dead run's slot is released rather than leaked [0.21ms]
+
+ 5 pass
+ 3 fail
+ 12 expect() calls
+Ran 8 tests across 1 file. [75.00ms]

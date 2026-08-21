@@ -293,6 +293,45 @@ downgrade a vanished session to a terminal status instead of blocking the resume
 reconciliation exists on the resume path; `verifySessionExists()` (`manager.ts:3233`) is
 defined but never called there.
 
+**Update (2026-08-21, fixed in `8728fa5f1`):** fixed on the resume path, and the fix this
+entry suggested above turned out to be wrong. `verifySessionExists()` (`manager.ts:3233` ->
+`session-existence.ts:60`) reports whether a session ROW exists, not whether the child is
+alive: it returns `missing` only on 404 / "not found", and maps `unknown` to `true`. A dead
+child's row persists, so probing it before the guard would have returned `true` and changed
+nothing. The codebase already treats it that way - the poller calls it and, on `exists`,
+resets `consecutiveMissedPolls` and keeps waiting (`task-poller.ts:284-287`).
+
+The actual liveness signal is `client.session.status()`, classified by
+`session-status-classifier.ts` (active = busy|retry|running, terminal = idle|interrupted).
+`resume()` now probes it and distinguishes active / terminal / absent: an active session
+still rejects with the byte-identical message, a terminal or absent one is reconciled and
+the resume proceeds. Absent readings honour `MIN_SESSION_GONE_POLLS` by reusing the counter
+the poller keeps on the same record, so one status blip cannot double-prompt a live session;
+an unavailable or throwing status endpoint fails safe and still rejects. The task is claimed
+in `completingTaskIds` across reconciliation so the poller cannot complete it midway, and
+reconciliation releases the dead run's concurrency slot and clears its completion and idle
+timers, which a bare status flip would have leaked.
+
+Verified against the real `BackgroundManager` rather than only unit tests: driving
+`resume()` on a task whose session is absent from the status registry, `dev` rejects all
+three scenarios (dead-and-gone, single-poll blip, genuinely busy) while the patched build
+accepts only the first. Evidence: `.omo/evidence/20260821-resume-liveness/`.
+
+**Correction to the severity/mechanism recorded above:** the claim that a dead task stays
+`running` forever is too strong. Probing the poller directly shows a dead-but-row-present
+task at 20min idle stays `running` with `consecutiveMissedPolls` cycling 1 -> 2 -> 0, but at
+50min idle it is cancelled on the first poll by the `staleTimeoutMs` (45min) path. The real
+defect is narrower: because `checkSessionExistence` returning `exists` resets the gone
+counter, a dead task whose row survives can never take the 60s `sessionGoneTimeoutMs` fast
+path and always waits out the 45min slow one. Still open, and separate from the resume fix:
+`task-poller.ts:284-287,337-340` should let row existence reset the gone counter without
+vetoing the inactivity timeout.
+
+**Also still open:** `background_output` continues to render a stale `running` with a
+frozen-looking duration until that poller timeout fires. The resume fix does not touch the
+reporting path.
+
+
 ## 2026-08-17 — Provider outage drops the in-memory task record; sessions unrecoverable by `task_id`
 
 **Severity:** costly

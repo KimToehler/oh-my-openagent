@@ -1,0 +1,15 @@
+
+=== A. dead child session, seen gone 3+ polls (the reported bug) ===
+  before:  status=running concurrencyKey=explore
+  outcome: RESUME ACCEPTED
+  after:   status=running parentSession=ses_parent_new
+
+=== B. dead child session, only 1 missed poll (transient blip) ===
+  before:  status=running concurrencyKey=explore
+  outcome: RESUME REJECTED: Task bg_qa_stuck is currently running and cannot accept a continuation prompt
+  after:   status=running parentSession=ses_parent
+
+=== C. genuinely busy session (must still reject) ===
+  before:  status=running concurrencyKey=explore
+  outcome: RESUME REJECTED: Task bg_qa_stuck is currently running and cannot accept a continuation prompt
+  after:   status=running parentSession=ses_parent

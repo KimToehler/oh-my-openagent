@@ -1,0 +1,16 @@
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/features/background-agent/stale-running-resume.test.ts:
+(pass) BackgroundManager.resume liveness reconciliation > #given a dead session absent from the status map beyond the gone threshold #when resume is called #then it reconciles and accepts the continuation [5.14ms]
+(pass) BackgroundManager.resume liveness reconciliation > #given a genuinely busy session #when resume is called #then it still rejects the continuation [0.15ms]
+(pass) BackgroundManager.resume liveness reconciliation > #given an absent session below the gone threshold #when resume is called #then it rejects rather than trusting a single blip [0.09ms]
+(pass) BackgroundManager.resume liveness reconciliation > #given the status endpoint throws #when resume is called #then it fails safe and rejects [0.11ms]
+(pass) BackgroundManager.resume liveness reconciliation > #given session.status is unavailable on the client #when resume is called #then it fails safe and rejects [0.07ms]
+(pass) BackgroundManager.resume liveness reconciliation > #given a terminal idle session #when resume is called #then it reconciles without waiting for the gone threshold [0.20ms]
+(pass) BackgroundManager.resume liveness reconciliation > #given the poller already claimed the task for completion #when resume is called #then it rejects instead of racing [0.09ms]
+(pass) BackgroundManager.resume liveness reconciliation > #given a reconciled dead task #when resume re-acquires concurrency #then the dead run's slot is released rather than leaked [0.18ms]
+
+ 8 pass
+ 0 fail
+ 17 expect() calls
+Ran 8 tests across 1 file. [77.00ms]
