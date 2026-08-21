@@ -269,4 +269,64 @@ describe("createBackgroundOutput cross-instance lookup", () => {
       })
     })
   })
+
+  describe("#given a task recovered from the parent transcript", () => {
+    describe("#when the recovery path renders the child session", () => {
+      test("#then it does not claim the task completed, because recovery cannot know that", async () => {
+        const manager = createManager()
+        clearBackgroundTaskRegistryForTesting()
+
+        const client: BackgroundOutputClient = {
+          session: {
+            messages: async ({ path }) => {
+              if (path.id === "test-session") {
+                return {
+                  data: [
+                    {
+                      id: "m-parent",
+                      info: { role: "assistant", time: "2026-08-07T00:00:10.000Z" },
+                      parts: [
+                        {
+                          type: "text",
+                          text: [
+                            "Background task launched.",
+                            "",
+                            "Background Task ID: bg_killed_midflight",
+                            "",
+                            "<task_metadata>",
+                            "session_id: ses_killed",
+                            "background_task_id: bg_killed_midflight",
+                            "</task_metadata>",
+                          ].join("\n"),
+                        },
+                      ],
+                    },
+                  ],
+                }
+              }
+              if (path.id === "ses_killed") {
+                return {
+                  data: [
+                    {
+                      id: "m-child",
+                      info: { role: "assistant", time: "2026-08-07T00:01:00.000Z" },
+                      parts: [{ type: "text", text: "partial work before the kill" }],
+                    },
+                  ],
+                }
+              }
+              return { data: [] }
+            },
+          },
+        }
+
+        const outputTool = createBackgroundOutput(manager, client)
+        const output = await outputTool.execute({ task_id: "bg_killed_midflight" }, mockContext)
+
+        expect(output).toContain("partial work before the kill")
+        expect(output).not.toContain("Status: completed")
+        expect(output).toContain("Status: unknown")
+      })
+    })
+  })
 })

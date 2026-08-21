@@ -115,7 +115,6 @@ import { checkAndInterruptStaleTasks, pruneStaleTasksAndNotifications, type Sess
 import { toBackgroundTaskSnapshots } from "./task-snapshot"
 import {
   archiveBackgroundTask,
-  forgetBackgroundTask,
   getRegisteredBackgroundTask,
   rememberBackgroundTask,
 } from "./task-registry"
@@ -3484,11 +3483,21 @@ The task was re-queued on a fallback model after a retryable failure.
 
     // Release concurrency for all running tasks
     for (const task of this.tasks.values()) {
-      if (TERMINAL_BACKGROUND_TASK_STATUSES.has(task.status)) {
-        archiveBackgroundTask(task)
-      } else {
-        forgetBackgroundTask(task.id)
-      }
+      // A task still in flight at shutdown was killed, not finished. Archive a terminal
+      // copy so the record stays truthful instead of vanishing and being reported as a
+      // success by the transcript-recovery path. The archived copy is a clone: shutdown
+      // must not mutate a task object the caller still holds.
+      const archived = TERMINAL_BACKGROUND_TASK_STATUSES.has(task.status)
+        ? task
+        : {
+            ...task,
+            status: "cancelled" as const,
+            completedAt: new Date(),
+            error:
+              task.error ??
+              "Task was still running when the background manager shut down, so it was aborted before producing a result. This is a FINAL cancellation - the work did not complete.",
+          }
+      archiveBackgroundTask(archived)
 
       if (task.concurrencyKey) {
         this.concurrencyManager.release(task.concurrencyKey)

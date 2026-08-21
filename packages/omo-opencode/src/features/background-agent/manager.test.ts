@@ -8297,7 +8297,7 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
     await secondManager.shutdown()
   })
 
-  test("should forget active registry tasks during earlier manager shutdown", async () => {
+  test("should expose an in-flight task killed by an earlier manager shutdown as cancelled, not as missing", async () => {
     //#given
     const firstManager = createBackgroundManager()
     const secondManager = createBackgroundManager()
@@ -8318,7 +8318,13 @@ describe("BackgroundManager regression fixes - resume and aborted notification",
     await firstManager.shutdown()
 
     //#then
-    expect(secondManager.getTask(task.id)).toBeUndefined()
+    // A task still running when its owning manager shut down was killed, not finished.
+    // It must stay resolvable with a truthful terminal status: dropping the record makes
+    // background_output fall through to transcript recovery, which used to report the
+    // killed task as "completed".
+    const resolved = secondManager.getTask(task.id)
+    expect(resolved?.status).toBe("cancelled")
+    expect(resolved?.error).toContain("shut down")
 
     await secondManager.shutdown()
   })
