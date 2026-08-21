@@ -511,3 +511,78 @@ occurrences of `BUILD ` or `rc=` is prose.
 
 **Fix status:** unfixed — worth hoisting into whatever shared guidance tells subagents to
 record verification, since the failure is systemic across lanes rather than per-lane.
+
+## 2026-08-21 — OpenDesign kills in-flight background subagents at parent turn end, then reports them `completed`
+
+**Severity:** blocker
+**Area:** background tasks
+**Observed in:** Open Design desktop app (Onara design-canvas project); same plugin build works correctly in the CLI TUI
+
+**What happened:** Three `task(..., run_in_background=true)` builder subagents were launched to
+write four HTML mockups. All three were terminated within 550 ms of the parent's `step-finish`,
+having written **zero** files, and every one was reported to the parent as `completed`. An earlier
+pair of `explore` agents in the same session died the same way but had already finished their
+work, so the kill was invisible and they looked successful. This is distinct from the
+notification/lookup defects logged on 2026-08-17: the tasks here are not lost after completing —
+they are **killed before completing**.
+
+**Evidence:**
+
+Parent `step-finish` at `19:43:33.851`; all three children dead within 550 ms
+(`opencode.db`, `part` table, `session_id` = each child):
+
+```
+agent     start     death          parts  outcome
+buildA    19:42:19  19:43:34.396   32     tool:write = error
+buildB    19:42:47  19:43:34.304   17     never reached write
+buildC    19:43:17  19:43:34.205   15     never reached write
+```
+
+buildA's terminal part — note the empty `input`, i.e. the call was aborted before its
+arguments were delivered, so this is not a permission or path error:
+
+```json
+{"tool":"write","state":{"status":"error","error":"Tool execution aborted","input":{}}}
+```
+
+Every child's part stream ends `... reasoning → patch` with **no** `step-finish` and no error
+part — an external termination, not a model stop. Meanwhile the parent reported:
+
+```
+[BACKGROUND TASK COMPLETED]
+[ALL BACKGROUND TASKS COMPLETE]
+- `bg_919157ea`: Build discipline safety + cautioned pages
+```
+
+and `ls redesign/*.html` was unchanged at 101 files.
+
+Control: the earlier `explore` pair died at the *previous* parent `step-finish`
+(`19:30:39`–`19:30:40`), confirming the trigger is turn end rather than a per-task fault.
+
+**Root cause / hypothesis:** *Hypothesis, from process topology — not yet confirmed in OMO source.*
+Two independent `opencode` servers exist on this machine:
+
+```
+TUI         pid 4454   ppid 3993 (login shell)          uptime 6h50m
+OpenDesign  pid 68874  ppid 46475 (Open Design Helper)  uptime ~1h
+```
+
+This agent's ancestry is `Python → lean-ctx → opencode(68874) → Open Design Helper(46475) →
+Open Design(46465)`. In the TUI, `opencode` is a long-lived daemon owned by the user's shell, so
+a detached child outlives any single turn and its notification lands later. Under OpenDesign the
+server is a child of the app helper and its lifecycle appears bound to the request/response
+cycle, so in-flight children are torn down when the assistant turn completes. That would also
+explain the `owned by a different runtime than the one serving this tool call` warnings and the
+mid-word truncation of transcript-recovered results seen in the same session — per-turn runtimes,
+with recovery falling back to a capped transcript replay.
+
+**Workaround:** in OpenDesign, do not use `run_in_background=true`. Use synchronous `task()`
+(which holds the turn open) or do the work inline. The four mockups were produced inline after
+the delegated builds died.
+
+**Fix status:** unfixed — needs-decision. Three options, in descending value: (1) give detached
+children their own lifecycle under OpenDesign, as the TUI daemon has; (2) if teardown is
+intentional, report the task as `aborted`, never `completed`; (3) reject `run_in_background=true`
+in this harness rather than accepting and silently killing. The false `completed` is the
+expensive part — a task that dies loudly costs one retry, one that dies claiming success cost a
+full session here.
