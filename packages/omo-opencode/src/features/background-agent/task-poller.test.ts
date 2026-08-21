@@ -714,8 +714,11 @@ describe("checkAndInterruptStaleTasks", () => {
     expect(task.error).toContain("session gone from status registry")
   })
 
-  it("should NOT use session-gone timeout when session is idle (present in status map)", async () => {
-    //#given - lastUpdate 2min ago, session is idle (present in status but not active)
+  it("should NOT use session-gone timeout when the session is still present in the status map", async () => {
+    //#given - lastUpdate 2min ago, session present in the status map.
+    // NOTE: a real server lists only busy/retry sessions, so `idle` is not a
+    // membership value it ever emits. Kept as a present-in-map fixture because
+    // presence resetting consecutiveMissedPolls is the branch under test.
     const task = createRunningTask({
       startedAt: new Date(Date.now() - 300_000),
       progress: {
@@ -727,7 +730,7 @@ describe("checkAndInterruptStaleTasks", () => {
 
     mockClient.session.get.mockRejectedValue(new Error("missing"))
 
-    //#when - session is idle (present in map), staleTimeoutMs = 180s
+    //#when - session present in map, staleTimeoutMs = 180s
     await checkAndInterruptStaleTasks({
       tasks: [task],
       client: mockClient as never,

@@ -260,16 +260,19 @@ export async function checkAndInterruptStaleTasks(args: {
       task.consecutiveMissedPolls = 0
     }
 
-    const sessionGone = sessionMissing && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
-    const shouldSkipInactivityTimeout = task.teamRunId !== undefined && !sessionGone
-    const shouldRefreshFromSessionActivity = !sessionGone
+    // Named for what it actually observes. `session.status()` lists only
+    // busy/retry sessions, so "missing from the map" means idle-or-dead, and
+    // MIN_SESSION_GONE_POLLS of it is merely 9s of not being busy.
+    const sessionNotBusy = sessionMissing && (task.consecutiveMissedPolls ?? 0) >= MIN_SESSION_GONE_POLLS
+    const shouldSkipInactivityTimeout = task.teamRunId !== undefined && !sessionNotBusy
+    const shouldRefreshFromSessionActivity = !sessionNotBusy
       && sessionStatus !== undefined
       && isActiveSessionStatus(sessionStatus)
 
     if (!task.progress?.lastUpdate) {
       if (shouldSkipInactivityTimeout) continue
-      if (sessionMissing && !sessionGone) continue
-      const effectiveTimeout = sessionGone ? sessionGoneTimeoutMs : messageStalenessMs
+      if (sessionMissing && !sessionNotBusy) continue
+      const effectiveTimeout = sessionNotBusy ? sessionGoneTimeoutMs : messageStalenessMs
       if (runtime <= effectiveTimeout) continue
 
       if (shouldRefreshFromSessionActivity) {
@@ -279,7 +282,7 @@ export async function checkAndInterruptStaleTasks(args: {
         if (activityRefresh.type === "activity" && now - activityRefresh.activityTime <= effectiveTimeout) continue
       }
 
-      if (sessionGone) {
+      if (sessionNotBusy) {
         const existence = await checkSessionExistence(client, sessionID, directory)
         if (existence === "exists") {
           task.consecutiveMissedPolls = 0
@@ -289,7 +292,7 @@ export async function checkAndInterruptStaleTasks(args: {
       }
 
       const staleMinutes = Math.round(runtime / 60000)
-      const reason = sessionGone ? "session gone from status registry" : "no activity"
+      const reason = sessionNotBusy ? "session gone from status registry" : "no activity"
       staleInterruptions.push(
         interruptStaleTask({
           task,
@@ -300,7 +303,7 @@ export async function checkAndInterruptStaleTasks(args: {
           sessionID,
           reason,
           staleMinutes,
-          timeoutConfigKey: sessionGone ? "sessionGoneTimeoutMs" : "messageStalenessTimeoutMs",
+          timeoutConfigKey: sessionNotBusy ? "sessionGoneTimeoutMs" : "messageStalenessTimeoutMs",
           errorSuffix: " since start",
           logReason: "no progress since start",
           claimTaskInterruption,
@@ -315,7 +318,7 @@ export async function checkAndInterruptStaleTasks(args: {
     if (runtime < MIN_RUNTIME_BEFORE_STALE_MS) continue
 
     let timeSinceLastUpdate = now - task.progress.lastUpdate.getTime()
-    const effectiveStaleTimeout = sessionGone ? sessionGoneTimeoutMs : staleTimeoutMs
+    const effectiveStaleTimeout = sessionNotBusy ? sessionGoneTimeoutMs : staleTimeoutMs
     if (timeSinceLastUpdate <= effectiveStaleTimeout) continue
 
     if (shouldRefreshFromSessionActivity) {
@@ -332,7 +335,15 @@ export async function checkAndInterruptStaleTasks(args: {
 
     if (task.status !== "running") continue
 
-    if (sessionGone) {
+    if (sessionNotBusy) {
+      // LOAD-BEARING - do not delete this probe.
+      // `session.status()` lists only busy/retry sessions, so absence means "not
+      // busy", never "gone". A healthy task waiting on the todo gate (default
+      // grace 10min) is absent from the map within 9s and looks identical to a
+      // dead one. The row lookup is the only signal that separates them, so the
+      // 60s sessionGoneTimeoutMs path is reachable exclusively on a real 404.
+      // Resetting the counter on "exists" also rate-limits this probe to every
+      // third poll rather than every poll.
       const existence = await checkSessionExistence(client, sessionID, directory)
       if (existence === "exists") {
         task.consecutiveMissedPolls = 0
@@ -342,7 +353,7 @@ export async function checkAndInterruptStaleTasks(args: {
     }
 
     const staleMinutes = Math.round(timeSinceLastUpdate / 60000)
-    const reason = sessionGone ? "session gone from status registry" : "no activity"
+    const reason = sessionNotBusy ? "session gone from status registry" : "no activity"
     staleInterruptions.push(
       interruptStaleTask({
         task,
@@ -353,7 +364,7 @@ export async function checkAndInterruptStaleTasks(args: {
         sessionID,
         reason,
         staleMinutes,
-        timeoutConfigKey: sessionGone ? "sessionGoneTimeoutMs" : "staleTimeoutMs",
+        timeoutConfigKey: sessionNotBusy ? "sessionGoneTimeoutMs" : "staleTimeoutMs",
         errorSuffix: "",
         logReason: "stale timeout",
         claimTaskInterruption,
