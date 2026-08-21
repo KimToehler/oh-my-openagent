@@ -249,6 +249,8 @@ export interface BackgroundManagerConfig {
   log?: typeof log
 }
 
+type SessionLiveness = "active" | "terminal" | "absent" | "unknown"
+
 export class BackgroundManager {
 
 
@@ -1390,10 +1392,42 @@ The fallback retry session is now created and can be inspected directly.
       throw new Error(`Task has no sessionID: ${existingTask.id}`)
     }
 
+    let reconciledStaleRun = false
     if (existingTask.status === "running") {
-      throw new Error(
-        `Task ${existingTask.id} is currently running and cannot accept a continuation prompt. ` +
-        "Wait for it to complete before resuming it with task_id.",
+      // A `running` record is not proof of a live child: when a subagent session
+      // dies, nothing reconciles the in-memory status, so the task would reject
+      // continuations forever and force a cancel-then-resume dance. Probe real
+      // liveness and only reject when the session is actually working, or when
+      // we cannot tell.
+      const rejectResume = (): never => {
+        throw new Error(
+          `Task ${existingTask.id} is currently running and cannot accept a continuation prompt. ` +
+          "Wait for it to complete before resuming it with task_id.",
+        )
+      }
+
+      if (this.completingTaskIds.has(existingTask.id)) rejectResume()
+
+      const liveness = await this.probeSessionLiveness(existingTask.sessionId)
+      if (liveness === "active" || liveness === "unknown") rejectResume()
+      if (liveness === "absent" && (existingTask.consecutiveMissedPolls ?? 0) < MIN_SESSION_GONE_POLLS) {
+        // One absent reading can be a status-registry blip. The poller keeps this
+        // counter on the same record, so we get hysteresis without a loop here.
+        rejectResume()
+      }
+
+      // Claim the task so the poller cannot complete or interrupt it midway
+      // through reconciliation; released once the resume is under way.
+      if (this.completingTaskIds.has(existingTask.id)) rejectResume()
+      this.completingTaskIds.add(existingTask.id)
+      reconciledStaleRun = true
+      if (existingTask.status !== "running" || existingTask.sessionId !== input.sessionId) {
+        this.completingTaskIds.delete(existingTask.id)
+        rejectResume()
+      }
+      this.reconcileStaleRunningTask(
+        existingTask,
+        `Session was no longer running (${liveness}) when a continuation prompt arrived; the previous run did not report a result.`,
       )
     }
 
@@ -1417,6 +1451,7 @@ The fallback retry session is now created and can be inspected directly.
       await this.concurrencyManager.acquire(concurrencyKey)
     } catch (error) {
       this.resumingBlockedTaskIds.delete(existingTask.id)
+      if (reconciledStaleRun) this.completingTaskIds.delete(existingTask.id)
       throw error
     }
     existingTask.concurrencyKey = concurrencyKey
@@ -1609,6 +1644,8 @@ Task ${existingTask.id} resumed with parent answer.
     }).finally(() => {
       this.resumingBlockedTaskIds.delete(existingTask.id)
     })
+
+    if (reconciledStaleRun) this.completingTaskIds.delete(existingTask.id)
 
     return existingTask
   }
@@ -3231,6 +3268,68 @@ The task was re-queued on a fallback model after a retryable failure.
 
   private async verifySessionExists(sessionID: string): Promise<boolean> {
     return verifySessionStillExists(this.client, sessionID, this.directory)
+  }
+
+  /**
+   * Liveness of a child session, as opposed to mere existence of its row.
+   * `verifySessionExists` answers "is there a session record", which stays true
+   * long after the child process is gone; only the status registry reports
+   * whether a turn is actually in flight.
+   */
+  private async probeSessionLiveness(sessionID: string): Promise<SessionLiveness> {
+    const sessionStatusMethod = this.client?.session?.status
+    if (typeof sessionStatusMethod !== "function") return "unknown"
+
+    let statuses: SessionStatusMap | undefined
+    try {
+      statuses = normalizeSDKResponse(await this.client.session.status(), {})
+    } catch (error) {
+      log("[background-agent] Liveness probe failed, treating status as unknown:", { sessionID, error })
+      return "unknown"
+    }
+    if (statuses === undefined) return "unknown"
+
+    const sessionStatus = statuses[sessionID]?.type
+    if (sessionStatus === undefined) return "absent"
+    return isActiveSessionStatus(sessionStatus) ? "active" : "terminal"
+  }
+
+  /**
+   * Repair a task whose in-memory status says `running` but whose session is
+   * provably not. Deliberately narrower than `failCrashedTask` / `cancelTask`:
+   * the task is about to be resumed, so it must not notify the parent, write a
+   * history row, abort the session, or unregister its root descendant. It only
+   * releases resources the dead run still holds, so the subsequent resume does
+   * not leak a concurrency slot or fire a stale idle timer.
+   */
+  private reconcileStaleRunningTask(task: BackgroundTask, reason: string): void {
+    if (task.concurrencyKey) {
+      this.concurrencyManager.release(task.concurrencyKey)
+      task.concurrencyKey = undefined
+    }
+
+    const completionTimer = this.completionTimers.get(task.id)
+    if (completionTimer) {
+      clearTimeout(completionTimer)
+      this.completionTimers.delete(task.id)
+    }
+    const idleTimer = this.idleDeferralTimers.get(task.id)
+    if (idleTimer) {
+      clearTimeout(idleTimer)
+      this.idleDeferralTimers.delete(task.id)
+    }
+    this.todoGateLogLastEmittedAt.delete(task.id)
+    task.consecutiveMissedPolls = 0
+
+    if (task.currentAttemptID) {
+      finalizeAttempt(task, task.currentAttemptID, "error", reason)
+    } else {
+      task.status = "error"
+      task.error = reason
+      task.completedAt = new Date()
+    }
+
+    log("[background-agent] Reconciled stale running task before resume:", { taskId: task.id, reason })
   }
 
   private async failCrashedTask(task: BackgroundTask, errorMessage: string): Promise<void> {
