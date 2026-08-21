@@ -67,6 +67,20 @@ function formatTaskSummaryLine(task: BackgroundTaskNotificationTask): string {
   return `${baseLine}${statusSuffix}${timeline ? `\n${timeline}` : ""}`
 }
 
+/**
+ * A task that parks and resumes is notified once per cycle, and every cycle appends another
+ * row for the same task id. Rendering that list raw reports one "failure" per park - the
+ * summary once claimed 14 failures for 2 real tasks. Collapse to the LAST entry per id, which
+ * is the task's final observed state.
+ */
+function dedupeByTaskId(tasks: BackgroundTaskNotificationTask[]): BackgroundTaskNotificationTask[] {
+  const lastById = new Map<string, BackgroundTaskNotificationTask>()
+  for (const task of tasks) {
+    lastById.set(task.id, task)
+  }
+  return [...lastById.values()]
+}
+
 export function buildBackgroundTaskNotificationText(input: {
   task: BackgroundTaskNotificationTask
   duration: string
@@ -75,7 +89,8 @@ export function buildBackgroundTaskNotificationText(input: {
   remainingCount: number
   completedTasks: BackgroundTaskNotificationTask[]
 }): string {
-  const { task, duration, statusText, allComplete, remainingCount, completedTasks } = input
+  const { task, duration, statusText, allComplete, remainingCount, completedTasks: rawCompletedTasks } = input
+  const completedTasks = dedupeByTaskId(rawCompletedTasks)
 
   const safeDescription = (t: BackgroundTaskNotificationTask): string =>
     sanitizeUntrustedText(t.description || t.id, 200)
