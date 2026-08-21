@@ -1,0 +1,7 @@
+{"name":"UnknownError","data":{"message":"Unexpected server error. Check server logs for details.","ref":"err_2ae20639"}}
+SIDX=ses_fd98553b3ffemCqhQrB29344n7 (created with no directory param)
+--- while busy:
+  no-dir   : {"ses_fd98553b3ffemCqhQrB29344n7":{"type":"busy"}}
+  dir=proj : {"ses_fd98553b3ffemCqhQrB29344n7":{"type":"busy"}}
+  dir=other: {}
+  dir=/tmp : {}

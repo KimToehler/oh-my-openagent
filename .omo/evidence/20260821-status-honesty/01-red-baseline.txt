@@ -1,0 +1,54 @@
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/tools/background-task/task-status-format.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+(pass) formatTaskStatus session-activity honesty > #given a running task with recent activity #when formatted #then it reports the reassuring note unchanged [4.56ms]
+40 | 
+41 |     // when
+42 |     const output = formatTaskStatus(task)
+43 | 
+44 |     // then
+45 |     expect(output).toContain("No session activity")
+                        ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "No session activity"
+Received: "# Task Status\n\n| Field | Value |\n|-------|-------|\n| Task ID | `bg_status` |\n| Description | research task |\n| Agent | explore |\n| Status | **running** |\n| Duration | 20m 0s |\n| Session ID | `ses_child` |\n\n\n> **Note**: No need to wait explicitly - the system will notify you when this task completes.\n## Original Prompt\n\n```\ndo the research\n```"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-status-honesty/packages/omo-opencode/src/tools/background-task/task-status-format.test.ts:45:20)
+(fail) formatTaskStatus session-activity honesty > #given a running task silent past the stale threshold #when formatted #then it discloses the silence instead of reassuring [1.27ms]
+52 | 
+53 |     // when
+54 |     const output = formatTaskStatus(task)
+55 | 
+56 |     // then
+57 |     expect(output).toContain("not present in the session registry")
+                        ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "not present in the session registry"
+Received: "# Task Status\n\n| Field | Value |\n|-------|-------|\n| Task ID | `bg_status` |\n| Description | research task |\n| Agent | explore |\n| Status | **running** |\n| Duration | 20m 0s |\n| Session ID | `ses_child` |\n\n\n> **Note**: No need to wait explicitly - the system will notify you when this task completes.\n## Original Prompt\n\n```\ndo the research\n```"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-status-honesty/packages/omo-opencode/src/tools/background-task/task-status-format.test.ts:57:20)
+(fail) formatTaskStatus session-activity honesty > #given a running task the poller has not seen in the status registry #when formatted #then it discloses the missed polls [0.12ms]
+65 | 
+66 |     // when
+67 |     const output = formatTaskStatus(task)
+68 | 
+69 |     // then
+70 |     expect(output).toMatch(/No session activity for 4[67]m/)
+                        ^
+error: expect(received).toMatch(expected)
+
+Expected substring or pattern: /No session activity for 4[67]m/
+Received: "# Task Status\n\n| Field | Value |\n|-------|-------|\n| Task ID | `bg_status` |\n| Description | research task |\n| Agent | explore |\n| Status | **running** |\n| Duration | 20m 0s |\n| Session ID | `ses_child` |\n\n\n> **Note**: No need to wait explicitly - the system will notify you when this task completes.\n## Original Prompt\n\n```\ndo the research\n```"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-status-honesty/packages/omo-opencode/src/tools/background-task/task-status-format.test.ts:70:20)
+(fail) formatTaskStatus session-activity honesty > #given a silent running task #when formatted #then the reported silence matches the last activity age [0.34ms]
+(pass) formatTaskStatus session-activity honesty > #given a completed task #when formatted #then no activity warning is added [0.07ms]
+(pass) formatTaskStatus session-activity honesty > #given a blocked task silent for a long time #when formatted #then the blocked notice wins over the activity warning [0.06ms]
+
+ 3 pass
+ 3 fail
+ 8 expect() calls
+Ran 6 tests across 1 file. [2.13s]

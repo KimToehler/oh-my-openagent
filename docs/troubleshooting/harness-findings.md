@@ -331,6 +331,40 @@ vetoing the inactivity timeout.
 frozen-looking duration until that poller timeout fires. The resume fix does not touch the
 reporting path.
 
+**Update (2026-08-21, retraction - verified against a real `opencode serve` 1.18.15):** two
+claims I wrote above are wrong, including the poller "defect" I proposed fixing.
+
+First, the reporting half is fixed in `cc13ab687`: a `running` task whose child has been
+silent past the stale threshold, or absent from the session registry, now reports the
+silence and points at disk instead of promising "the system will notify you". The
+"frozen duration counter" in the original report is NOT reproduced: `formatDuration` falls
+back to `new Date()` when `completedAt` is unset (`time-format.ts:2`), so a running task's
+duration always advances. That symptom remains unexplained and may be a third, separate bug.
+
+Second, and more importantly, my claim that the poller's existence probe wrongly blocks the
+60s `sessionGoneTimeoutMs` path was based on a premise I never checked. Driving a real
+server against a mock streaming provider shows `session.status()` lists ONLY `busy`/`retry`
+sessions: an idle-but-alive session is absent from the map, and `idle` never appears as a
+membership value even though the SDK type permits it - it exists only as an SSE event
+payload. Evidence: `.omo/evidence/20260821-poller-not-busy/oracle-server-probe/probe4.txt`
+(`{}` -> `busy` -> `{}` with the row still resolving afterwards).
+
+So absence from the map means "not busy", never "gone", and `MIN_SESSION_GONE_POLLS` (3) at
+`POLLING_INTERVAL_MS` (3000) is merely 9 seconds of not being busy - the normal state of a
+task waiting on the todo gate, whose grace defaults to 10 minutes. Deleting the probe would
+have cancelled healthy todo-gated tasks at 60s. Confirmed by mutation: with the veto removed
+the new regression test drops to 1 pass / 2 fail. The 60s path being reachable only on a
+genuine 404 is correct behavior, not a defect. Locked in `d133f0f8d`.
+
+Third, my earlier "dies at 45min via `staleTimeoutMs`" correction was also wrong. That probe
+called `checkAndInterruptStaleTasks` directly and bypassed `pruneStaleTasksAndNotifications`,
+which the real loop runs first (`manager.ts:3310` before `:3312`) with no existence check and
+a 30-minute `TASK_TTL_MS`. A dead-but-row-present task actually dies at ~30min as `error`.
+The 45min ladder is reachable only for `teamRunId` tasks, which prune skips
+(`task-poller.ts:76-78`).
+
+
+
 
 ## 2026-08-17 — Provider outage drops the in-memory task record; sessions unrecoverable by `task_id`
 
@@ -983,3 +1017,43 @@ managers by design.
 The OpenDesign half remains open and is not fixable here: `opencode run` exits at turn end,
 so a background subagent cannot outlive it by construction. Severity for the host-side issue
 stays `blocker`; the silent-false-success half is closed on every one-shot host.
+
+## 2026-08-21 — `session.status()` polled without a directory, but the endpoint is directory-scoped
+
+**Severity:** costly
+**Area:** background tasks
+**Observed in:** `~/git/oh-my-openagent`
+**What happened:** found while auditing the stale-task poller, not from a user-visible
+failure — so treat the impact as indicated rather than confirmed.
+
+`BackgroundManager.pollRunningTasks` queries `this.client.session.status()` with no
+`directory` argument (`manager.ts:3300`), while every neighbouring call passes one:
+`checkSessionExistence` sends `query: { directory }` (`session-existence.ts:45-48`), and
+children are created with the PARENT session's directory
+(`spawner.ts:54-64`, `parentDirectory = parentSession?.data?.directory ?? directory`), which
+need not equal `manager.directory`.
+
+**Evidence:** the endpoint is directory-filtered. With one session busy in `proj`:
+
+```
+no-dir   : {"ses_fd98553b3ffemCqhQrB29344n7":{"type":"busy"}}
+dir=proj : {"ses_fd98553b3ffemCqhQrB29344n7":{"type":"busy"}}
+dir=other: {}
+dir=/tmp : {}
+```
+
+Full artifact: `.omo/evidence/20260821-poller-not-busy/oracle-server-probe/probe6.txt`
+(real `opencode serve` 1.18.15, XDG-isolated sandbox).
+
+**Root cause / hypothesis:** hypothesis, not yet proven end to end. A background session
+spawned into a directory other than the manager's would be absent from whatever map the
+no-argument call returns, making `sessionNotBusy` true forever for that task and pushing it
+onto the inactivity ladder regardless of how busy it actually is. I could not close the loop
+because the cross-directory prompt in the sandbox failed with an unrelated provider error.
+
+**Workaround:** none needed today; the 30-minute prune TTL still bounds such a task.
+
+**Fix status:** unfixed, deliberately. Adding `directory` is behavior-changing in the risky
+direction — if the no-argument call currently returns a BROADER map, filtering it would newly
+hide sessions and make `sessionNotBusy` fire more often, which is the failure mode we just
+proved is dangerous. Needs a real multi-directory server run before either direction ships.

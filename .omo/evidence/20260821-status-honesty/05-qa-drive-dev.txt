@@ -1,0 +1,15 @@
+
+=== A. healthy running task (activity 30s ago) ===
+  | Status | **running** |
+  | Duration | 1h 2m 0s |
+  > **Note**: No need to wait explicitly - the system will notify you when this task completes.
+
+=== B. dead child, silent 47m (the reported symptom) ===
+  | Status | **running** |
+  | Duration | 1h 2m 0s |
+  > **Note**: No need to wait explicitly - the system will notify you when this task completes.
+
+=== C. child missing from session registry for 3 polls ===
+  | Status | **running** |
+  | Duration | 1h 2m 0s |
+  > **Note**: No need to wait explicitly - the system will notify you when this task completes.

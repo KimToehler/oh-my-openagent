@@ -1,0 +1,8 @@
+=== 404 probe (bogus id):
+http=404
+{"name":"NotFoundError","data":{"message":"Session not found: ses_doesnotexist999"}}
+=== directory scoping test ===
+session in otherdir: ses_fd985b021ffe83rDEljz4iq5Gb
+status NO directory param : {}
+status WITH otherdir param: {}
+status WITH proj param    : {}

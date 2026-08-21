@@ -1,0 +1,5 @@
+SID3=ses_fd9881122ffe50qmnO8mQj61si
+T+0s TRANSITION -> {}
+T+0s TRANSITION -> {"ses_fd9881122ffe50qmnO8mQj61si":{"type":"busy"}}
+T+20s TRANSITION -> {}
+=== final: {}

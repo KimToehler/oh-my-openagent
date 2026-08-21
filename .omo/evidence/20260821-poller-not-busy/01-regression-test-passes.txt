@@ -1,0 +1,9 @@
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/features/background-agent/not-busy-is-not-gone.test.ts:
+[test-setup] vendored lsp-daemon dist missing; building once via `npm ci && npm run build`...
+
+ 3 pass
+ 0 fail
+ 5 expect() calls
+Ran 3 tests across 1 file. [2.04s]

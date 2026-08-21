@@ -1,0 +1,20 @@
+data: {"id":"evt_02673668d0011sRB8LY96BpZiN","type":"server.connected","properties":{}}
+
+data: {"id":"evt_026736e6d00177nV2huKZ034el","type":"session.updated","properties":{"sessionID":"ses_fd98cfa4affecENB9MLTykpXzO","info":{"id":"ses_fd98cfa4affecENB9MLTykpXzO","slug":"clever-mountain","projectID":"global","directory":"/private/tmp/omo-statusprobe.rbeR0X/proj","path":"private/tmp/omo-statusprobe.rbeR0X/proj","title":"probe","agent":"build","model":{"id":"claude-3-5-haiku-20241022","providerID":"anthropic","variant":"default"},"version":"1.18.15","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787351467445,"updated":1787351494252}}}}
+
+data: {"id":"evt_026736e72001Ui1cH9AT6jkv0H","type":"message.updated","properties":{"sessionID":"ses_fd98cfa4affecENB9MLTykpXzO","info":{"id":"msg_026736e6c001vlCnpZS07RVCU2","role":"user","sessionID":"ses_fd98cfa4affecENB9MLTykpXzO","time":{"created":1787351494252},"agent":"build","model":{"providerID":"anthropic","modelID":"claude-3-5-haiku-20241022"}}}}
+
+data: {"id":"evt_026736f340017u83yz4Qh0Ec5L","type":"message.part.updated","properties":{"sessionID":"ses_fd98cfa4affecENB9MLTykpXzO","part":{"type":"text","text":"hi","messageID":"msg_026736e6c001vlCnpZS07RVCU2","sessionID":"ses_fd98cfa4affecENB9MLTykpXzO","id":"prt_026736e72001TtCSYgyQI80GqA"},"time":1787351494452}}
+
+data: {"id":"evt_026736f36001SSOMcjSIj9Mhri","type":"session.updated","properties":{"sessionID":"ses_fd98cfa4affecENB9MLTykpXzO","info":{"id":"ses_fd98cfa4affecENB9MLTykpXzO","slug":"clever-mountain","projectID":"global","directory":"/private/tmp/omo-statusprobe.rbeR0X/proj","path":"private/tmp/omo-statusprobe.rbeR0X/proj","title":"probe","agent":"build","model":{"id":"claude-3-5-haiku-20241022","providerID":"anthropic","variant":"default"},"version":"1.18.15","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787351467445,"updated":1787351494454}}}}
+
+data: {"id":"evt_026736f3b0013d0b1CJnVrZgdx","type":"session.status","properties":{"sessionID":"ses_fd98cfa4affecENB9MLTykpXzO","status":{"type":"busy"}}}
+
+data: {"id":"evt_026736f3e001fve0s0PGaMrQ5G","type":"session.error","properties":{"sessionID":"ses_fd98cfa4affecENB9MLTykpXzO","error":{"name":"UnknownError","data":{"message":"Model not found: anthropic/claude-3-5-haiku-20241022. Did you mean: claude-haiku-4-5, claude-haiku-4-5-20251001, claude-fable-5?"}}}}
+
+data: {"id":"evt_026736f3f001H20ZM6taZM0mFl","type":"session.status","properties":{"sessionID":"ses_fd98cfa4affecENB9MLTykpXzO","status":{"type":"idle"}}}
+
+data: {"id":"evt_026736f3f002YOrZ7O02afTWGw","type":"session.idle","properties":{"sessionID":"ses_fd98cfa4affecENB9MLTykpXzO"}}
+
+data: {"id":"evt_026738da0001WZbsx3T1QF0Tdk","type":"server.heartbeat","properties":{}}
+

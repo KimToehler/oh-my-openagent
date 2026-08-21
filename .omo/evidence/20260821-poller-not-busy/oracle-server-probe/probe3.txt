@@ -1,0 +1,35 @@
+SID2=ses_fd98b03cdffewEzU5kdKr5WGLb
+status before prompt: {}
+t=1s  {}
+t=2s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=3s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=4s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=5s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=6s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=7s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=8s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=9s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=10s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=11s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=12s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=13s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=14s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=15s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=16s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=17s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=18s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=19s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=20s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=21s  {"ses_fd98b03cdffewEzU5kdKr5WGLb":{"type":"busy"}}
+t=22s  {}
+t=23s  {}
+t=24s  {}
+t=25s  {}
+t=26s  {}
+t=27s  {}
+t=28s  {}
+t=29s  {}
+t=30s  {}
+--- after settle:
+settled: {}
+row: {"id":"ses_fd98b03cdffewEzU5kdKr5WGLb","slug":"brave-falcon","projectID":"global

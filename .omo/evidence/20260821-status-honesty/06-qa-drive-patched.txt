@@ -1,0 +1,15 @@
+
+=== A. healthy running task (activity 30s ago) ===
+  | Status | **running** |
+  | Duration | 1h 2m 0s |
+  > **Note**: No need to wait explicitly - the system will notify you when this task completes.
+
+=== B. dead child, silent 47m (the reported symptom) ===
+  | Status | **running** |
+  | Duration | 1h 2m 0s |
+  > **Note**: No session activity for 47m. The task is still marked running, but nothing has been observed from the child; verify progress on disk rather than waiting on this status.
+
+=== C. child missing from session registry for 3 polls ===
+  | Status | **running** |
+  | Duration | 1h 2m 0s |
+  > **Note**: This session was not present in the session registry for the last 3 polls, so the child may already have exited. Verify progress on disk rather than waiting on this status.

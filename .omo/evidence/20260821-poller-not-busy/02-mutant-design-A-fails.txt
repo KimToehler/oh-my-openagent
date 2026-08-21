@@ -1,0 +1,36 @@
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/features/background-agent/not-busy-is-not-gone.test.ts:
+72 | 
+73 |     // when
+74 |     await poll(task, true)
+75 | 
+76 |     // then
+77 |     expect(task.status).toBe("running")
+                             ^
+error: expect(received).toBe(expected)
+
+Expected: "running"
+Received: "cancelled"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-not-busy/packages/omo-opencode/src/features/background-agent/not-busy-is-not-gone.test.ts:77:25)
+(fail) absence from the session status map is not proof of death > #given an idle live task past the gone threshold and the session-gone timeout #when polled #then it survives because its session row still resolves [2.40ms]
+101 |       await poll(task, true)
+102 |       if (task.status !== "running") break
+103 |     }
+104 | 
+105 |     // then
+106 |     expect(task.status).toBe("running")
+                              ^
+error: expect(received).toBe(expected)
+
+Expected: "running"
+Received: "cancelled"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-not-busy/packages/omo-opencode/src/features/background-agent/not-busy-is-not-gone.test.ts:106:25)
+(fail) absence from the session status map is not proof of death > #given an idle live task polled repeatedly #when it stays idle for a todo-gate grace period #then it is never cancelled [0.14ms]
+
+ 1 pass
+ 2 fail
+ 4 expect() calls
+Ran 3 tests across 1 file. [73.00ms]

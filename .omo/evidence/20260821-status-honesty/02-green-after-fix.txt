@@ -1,0 +1,14 @@
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/tools/background-task/task-status-format.test.ts:
+(pass) formatTaskStatus session-activity honesty > #given a running task with recent activity #when formatted #then it reports the reassuring note unchanged [1.30ms]
+(pass) formatTaskStatus session-activity honesty > #given a running task silent past the stale threshold #when formatted #then it discloses the silence instead of reassuring [0.07ms]
+(pass) formatTaskStatus session-activity honesty > #given a running task the poller has not seen in the status registry #when formatted #then it discloses the missed polls [0.05ms]
+(pass) formatTaskStatus session-activity honesty > #given a silent running task #when formatted #then the reported silence matches the last activity age [0.26ms]
+(pass) formatTaskStatus session-activity honesty > #given a completed task #when formatted #then no activity warning is added [0.05ms]
+(pass) formatTaskStatus session-activity honesty > #given a blocked task silent for a long time #when formatted #then the blocked notice wins over the activity warning [0.05ms]
+
+ 6 pass
+ 0 fail
+ 9 expect() calls
+Ran 6 tests across 1 file. [176.00ms]
