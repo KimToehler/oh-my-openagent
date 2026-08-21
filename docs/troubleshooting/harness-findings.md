@@ -899,3 +899,32 @@ worth doing regardless of what OpenDesign decides.
 OpenDesign one-shot-host property and is not fixable in this repo. The false `completed`
 is ours and is contained: `manager.ts:3490` drops still-running tasks through
 `forgetBackgroundTask()` (`task-registry.ts:127-131`) without writing a terminal status.
+
+**Update:** (2026-08-21, fixed in `9096d20da`) Our half is closed. Verification turned up a
+SECOND source the original entry did not name, and it was the one actually producing the
+reported symptom: `create-background-output.ts:119` hardcoded `status: "completed"` on the
+task it reconstructs from the parent transcript — for ANY unreachable task, not just killed
+ones. Because the registry is per-process (`globalThis`, `task-registry.ts:11-30`), the
+parent's `background_output` on a one-shot host misses the lookup regardless of what
+shutdown wrote and falls straight to that path. Fixing only the shutdown side would have
+left the false `completed` fully intact.
+Both are fixed. `manager.ts` now archives a terminal CLONE of any non-terminal task, stamped
+`cancelled` with a FINAL-cancellation reason, instead of calling `forgetBackgroundTask()`.
+Cloning is load-bearing: the first revision mutated the live task object and broke two
+poller tests that assert the poller left a task `running` — shutdown must not rewrite state
+a caller still holds. The recovery path no longer asserts an outcome it cannot observe; it
+renders `Status: unknown (recovered from transcript; this runtime cannot observe the task's
+outcome)` and says in prose that the transcript does not prove completion.
+Evidence (`.omo/evidence/20260821-shutdown-abort-status/`): driven through the real manager
+cross-manager and the real `background_output` tool, before and after. On `dev` the recovery
+path renders `Status: completed`; patched it renders `Status: unknown`. Same-scope suites
+1443 pass / 4 fail patched vs 1440 pass / 4 fail on clean `dev`, failing set byte-identical,
+typecheck exit 0, build exit 0, both strings confirmed in `dist/index.js`.
+One invariant was deliberately inverted: the test formerly named "should forget active
+registry tasks during earlier manager shutdown" asserted a killed task must become
+unreachable, which is the bug itself. Rewritten, not deleted, keeping its cross-manager
+check — commit `982fa8136` already established that terminal tasks stay visible across
+managers by design.
+The OpenDesign half remains open and is not fixable here: `opencode run` exits at turn end,
+so a background subagent cannot outlive it by construction. Severity for the host-side issue
+stays `blocker`; the silent-false-success half is closed on every one-shot host.
