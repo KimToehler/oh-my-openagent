@@ -116,7 +116,10 @@ async function recoverFromParentTranscript(
     description: `Recovered from the parent transcript (task owned by another runtime)`,
     prompt: "",
     agent: "unknown",
-    status: "completed",
+    // The task belongs to another runtime, so this one cannot observe whether it finished,
+    // failed, or was killed mid-flight. Keep the record non-terminal and render the status
+    // as unknown rather than asserting a success we have no evidence for.
+    status: "running",
   }
 
   await publishToolMetadata(ctx, {
@@ -137,11 +140,12 @@ async function recoverFromParentTranscript(
     includeToolResults: args.include_tool_results ?? false,
     thinkingMaxChars: args.thinking_max_chars,
     fromEnd: args.from_end ?? true,
+    statusLabel: "unknown (recovered from transcript; this runtime cannot observe the task's outcome)",
   })
 
   recordBackgroundOutputConsumption(ctx.sessionID, ctx.messageID, recoveredSessionId)
 
-  return `> **Note:** This background task is owned by a different runtime than the one serving this tool call, so its in-memory record is unreachable here. The result below was recovered from the child session transcript (\`${recoveredSessionId}\`).
+  return `> **Note:** This background task is owned by a different runtime than the one serving this tool call, so its in-memory record is unreachable here. The result below was recovered from the child session transcript (\`${recoveredSessionId}\`). The transcript shows what the child produced, but it does NOT prove the task ran to completion - it may have been killed mid-flight - so treat the outcome as unverified and check the final message before relying on it.
 
 ${output}`
 }

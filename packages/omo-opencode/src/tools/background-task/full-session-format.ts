@@ -41,6 +41,7 @@ export async function formatFullSession(
     includeToolResults: boolean
     thinkingMaxChars?: number
     fromEnd?: boolean
+    statusLabel?: string
   }
 ): Promise<string> {
   if (!task.sessionId) {
@@ -124,7 +125,7 @@ export async function formatFullSession(
   lines.push("")
   lines.push(`Task ID: ${task.id}`)
   lines.push(`Description: ${task.description}`)
-  lines.push(`Status: ${task.status}`)
+  lines.push(`Status: ${options.statusLabel ?? task.status}`)
   lines.push(`Session ID: ${task.sessionId}`)
   lines.push(`Total messages: ${normalizedMessages.length}`)
   lines.push(`Returned: ${visibleMessages.length}`)

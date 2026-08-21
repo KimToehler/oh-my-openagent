@@ -4,6 +4,7 @@ import { tmpdir } from "node:os"
 import { _resetForTesting, subagentSessions } from "../claude-code-session-state"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import { BackgroundManager } from "./manager"
+import { clearBackgroundTaskRegistryForTesting, getRegisteredBackgroundTask } from "./task-registry"
 import type { BackgroundTask } from "./types"
 
 function createDeferredPromise(): {
@@ -55,12 +56,14 @@ describe("BackgroundManager shutdown global cleanup", () => {
     // given
     _resetForTesting()
     SessionCategoryRegistry.clear()
+    clearBackgroundTaskRegistryForTesting()
   })
 
   afterEach(() => {
     // given
     _resetForTesting()
     SessionCategoryRegistry.clear()
+    clearBackgroundTaskRegistryForTesting()
   })
 
   test("removes tracked session IDs from subagentSessions and SessionCategoryRegistry on shutdown", async () => {
@@ -151,5 +154,59 @@ describe("BackgroundManager shutdown global cleanup", () => {
     await shutdownPromise
 
     expect(settled).toBe(true)
+  })
+
+  test("archives a still-running task with a terminal status instead of dropping it on shutdown", async () => {
+    // given
+    const runningSessionID = "ses-running-terminal-status"
+    const manager = createBackgroundManager()
+    const tasks = new Map<string, BackgroundTask>([
+      [
+        "task-running-terminal-status",
+        createTask({
+          id: "task-running-terminal-status",
+          sessionId: runningSessionID,
+        }),
+      ],
+    ])
+
+    Object.assign(manager, { tasks })
+
+    // when
+    await manager.shutdown()
+
+    // then
+    const archived = getRegisteredBackgroundTask("task-running-terminal-status")
+    expect(archived).toBeDefined()
+    expect(archived?.status).toBe("cancelled")
+    expect(archived?.error).toContain("shut down")
+    expect(archived?.error).toContain("FINAL cancellation")
+  })
+
+  test("does not relabel an already-terminal task when shutting down", async () => {
+    // given
+    const completedSessionID = "ses-completed-preserved-status"
+    const manager = createBackgroundManager()
+    const tasks = new Map<string, BackgroundTask>([
+      [
+        "task-completed-preserved-status",
+        createTask({
+          id: "task-completed-preserved-status",
+          sessionId: completedSessionID,
+          status: "completed",
+          completedAt: new Date(),
+        }),
+      ],
+    ])
+
+    Object.assign(manager, { tasks })
+
+    // when
+    await manager.shutdown()
+
+    // then
+    const archived = getRegisteredBackgroundTask("task-completed-preserved-status")
+    expect(archived?.status).toBe("completed")
+    expect(archived?.error).toBeUndefined()
   })
 })
