@@ -725,4 +725,51 @@ All sibling background tasks are complete. Your next action should be to call \`
       expect(notification).toContain("bg_xyz789")
     })
   })
+
+  describe("#given a task that parked and resumed several times before finishing", () => {
+    test("#when the same task id appears repeatedly in the summary #then it is reported once, in its final state", () => {
+      // given - each park/resume cycle pushed another row for the SAME two task ids
+      const notification = buildBackgroundTaskNotificationText({
+        task: { id: "bg_alpha", description: "alpha", status: "completed", sessionId: "ses_alpha" },
+        duration: "3m",
+        statusText: "COMPLETED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [
+          { id: "bg_alpha", description: "alpha", status: "running", sessionId: "ses_alpha" },
+          { id: "bg_beta", description: "beta", status: "running", sessionId: "ses_beta" },
+          { id: "bg_alpha", description: "alpha", status: "running", sessionId: "ses_alpha" },
+          { id: "bg_beta", description: "beta", status: "error", error: "transient", sessionId: "ses_beta" },
+          { id: "bg_alpha", description: "alpha", status: "completed", sessionId: "ses_alpha" },
+          { id: "bg_beta", description: "beta", status: "completed", sessionId: "ses_beta" },
+        ],
+      })
+
+      // then - two distinct tasks, both finished: no failure count, one line each
+      expect(notification).not.toContain("FAILED")
+      expect(notification.match(/`bg_alpha`/g) ?? []).toHaveLength(1)
+      expect(notification.match(/`bg_beta`/g) ?? []).toHaveLength(1)
+      expect(notification).not.toContain("[RUNNING]")
+    })
+
+    test("#when a task's last state is a real failure #then it is still counted once as failed", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: { id: "bg_gamma", description: "gamma", status: "error", error: "final failure", sessionId: "ses_gamma" },
+        duration: "1m",
+        statusText: "ERROR",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [
+          { id: "bg_gamma", description: "gamma", status: "running", sessionId: "ses_gamma" },
+          { id: "bg_gamma", description: "gamma", status: "error", error: "final failure", sessionId: "ses_gamma" },
+        ],
+      })
+
+      // then
+      expect(notification).toContain("1 FAILED")
+      expect(notification.match(/`bg_gamma`/g) ?? []).toHaveLength(1)
+      expect(notification).toContain("final failure")
+    })
+  })
 })
