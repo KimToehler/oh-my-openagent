@@ -586,3 +586,65 @@ intentional, report the task as `aborted`, never `completed`; (3) reject `run_in
 in this harness rather than accepting and silently killing. The false `completed` is the
 expensive part — a task that dies loudly costs one retry, one that dies claiming success cost a
 full session here.
+
+**Update (2026-08-21, same session):** hypothesis confirmed, and the fix splits across two
+owners. The mechanism is **not** an app-side teardown of a long-lived server — it is the
+choice of entrypoint.
+
+OpenDesign spawns a **one-shot batch process per turn**:
+
+```
+opencode run --format json -s ses_fdaa167f5ffeARGckJ5AbwtXeg -m onara/sisyphus
+```
+
+The CLI TUI instead runs one persistent process (`opencode`, bare, no args) for the whole
+session. Proof the OpenDesign process is per-turn, not per-session: across two consecutive
+turns of the *same* session the PID changed while `ppid` stayed constant, each time ~30 s old.
+
+```
+turn N    pid 68874  ppid 46475  uptime 37s
+turn N+1  pid 79221  ppid 46475  uptime 31s   # same session id on the command line
+CLI TUI   pid  4454  ppid  3993  uptime 7h01m # bare `opencode`, one process, all turns
+```
+
+`opencode run` exits when its answer completes. A background subagent's contract is
+"outlives the current turn", so on a one-shot host it cannot survive by construction. **No
+in-process retention or notifier change in OMO can fix that** — which also retro-explains the
+Wave-5 puzzle in `HANDOVER-background-task-notification-bug.md`, where `bg_a4f323d2` went
+missing 8.8 s after completing with *no* `Removed completed task from memory` line ever
+logged. A process exit leaves no removal log; nothing logs its own death.
+
+**However, the false `completed` is a genuine OMO defect and is separately fixable.** On
+shutdown, terminal tasks are archived but still-running tasks are dropped with no terminal
+status written:
+
+```ts
+// manager.ts:3486-3491
+for (const task of this.tasks.values()) {
+  if (TERMINAL_BACKGROUND_TASK_STATUSES.has(task.status)) {
+    archiveBackgroundTask(task)
+  } else {
+    forgetBackgroundTask(task.id)   // still-running -> erased, no status recorded
+  }
+```
+
+`forgetBackgroundTask` (`task-registry.ts:127-131`) only deletes from `activeTasks` and
+`completedTasks`; it records nothing. Shutdown is reached on every exit via
+`registerSignal("SIGINT"|"SIGTERM", true)` and `registerSignal("beforeExit"|"exit", false)`
+(`process-cleanup.ts:272-278`). The subagent's *session* still persists in `opencode.db`, so
+downstream the parent sees a session that exists and has stopped, and reports `completed`.
+Persistent state, ephemeral execution, reported as success.
+
+**Ownership split:**
+
+| Fix | Owner | Effort | Value |
+|---|---|---|---|
+| Use a persistent `opencode serve` + socket instead of `opencode run` per turn | OpenDesign | large | Actually restores background tasks |
+| Mark non-terminal tasks `aborted` (reason `host-shutdown`) and archive, instead of `forgetBackgroundTask` at `manager.ts:3490` | OMO | small | Removes the deception on every one-shot host |
+| Detect a one-shot host and reject `run_in_background=true` up front | OMO | small-medium | Stops the trap being entered at all |
+
+The third needs new code: there is currently no one-shot/headless detection in the
+background machinery (`process.argv` appears only in `mcp/lsp.ts` and `cli/codex-ulw-loop.ts`).
+
+Revised severity split: `blocker` for OpenDesign (feature is unusable there), `costly` for
+OMO (the silent drop is what converts an honest limitation into lost work).
