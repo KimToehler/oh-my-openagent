@@ -1057,3 +1057,68 @@ because the cross-directory prompt in the sandbox failed with an unrelated provi
 direction — if the no-argument call currently returns a BROADER map, filtering it would newly
 hide sessions and make `sessionNotBusy` fire more often, which is the failure mode we just
 proved is dangerous. Needs a real multi-directory server run before either direction ships.
+
+
+## 2026-08-23 — lean-ctx triage silently eats dense output; every per-call bypass is a dead end
+
+**Severity:** costly
+**Area:** tools
+**Observed in:** `~/git/onara`
+
+**What happened:** reading a Wave-2 task-spec slice out of a plan file took ~10 tool calls
+instead of 1. lean-ctx's content classifier ("triage") drops lines it judges low-signal and
+returns a stub. Dense enumerations — task specs with `Files:` lists, env-var names, directory
+listings, config arrays — are exactly its blind spot, and exactly the content that must be
+copied verbatim. The agent then escalated through six workarounds, none of which work.
+
+**Evidence:**
+
+```
+[lean-ctx: 109 lines filtered by triage (level 2)]
+```
+
+Reproduced ~12 times while investigating. Not size-based — `seq 1 40` (40 lines) passes,
+`lean-ctx --help` (12 lines) is filtered:
+
+| Probe | Result |
+|---|---|
+| `seq 1 40` | passes |
+| `lean-ctx --help` (12 lines) | filtered |
+| `raw=true` / `inline=true` / both | no effect |
+| `LEAN_CTX_COMPRESSION_LEVEL=0` via `env` | ignored |
+| `LEAN_CTX_TOOL_PROFILE=raw` via `env` | ignored |
+| `ctx_execute` python printing same text | filtered identically |
+| base64-encoding to defeat the classifier | filtered |
+| write `/tmp` -> `ctx_read` / `look_at` | filtered |
+| copy into repo -> `ctx_read` | filtered |
+
+`ctx_perf` during the same session reported `triage_profile: null`, `request_count: 0`,
+`tokens_saved_total: 0` — so on that session's own ledger the filtering saved nothing while
+costing ten calls.
+
+**Root cause / hypothesis:** part confirmed, part theory.
+
+Confirmed: `~/.lean-ctx/config.toml` `compress_protect` (line 139) shipped covering
+`.toml .lock .env .snap .html .css .kt .kts .ts .tsx .java .sql .yaml .yml .json` — and
+**not `.md`**. Plans, specs, and evidence files are the one class carrying exact paths and
+line numbers agents must transcribe, and the one class with no protection.
+
+Confirmed: no per-call bypass and no env knob exists. `strings` on
+`/Users/tim/.local/bin/lean-ctx` exposes only `LEAN_CTX_TRIAGE_MODEL_URL` — no level,
+profile, or disable variable. Filtering is content-based and applies to every read path
+in-process (`ctx_read`, `ctx_shell`, `ctx_execute` stdout alike), which is why the
+tmp-file, repo-copy, and base64 dodges all fail.
+
+Theory: `compress_protect` governs the compression layer only, and triage runs after it, so
+protecting `.md` fixes `ctx_read` of Markdown but is not expected to cover shell stdout.
+
+**Workaround:** delegate. `task(subagent_type="explore", ...)` returns the raw text first
+try — a subagent's context is unfiltered. Used it in the original session and again while
+writing this entry; both worked on the first call. The rule is one narrowing retry, then
+delegate — never iterate the bypass list.
+
+**Fix status:** worked around. `"**/*.md"` added to `compress_protect`
+(`~/.lean-ctx/config.toml:158`); requires an MCP server restart to take effect — a re-test
+in the same session was still filtered. Project rule written at
+`onara/.omo/rules/lean-ctx-triage.md` documenting the delegate-don't-iterate rule and the
+full dead-end table. Shell stdout stays unfixed and has no known knob.
