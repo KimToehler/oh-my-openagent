@@ -610,6 +610,8 @@ entry noted in `docs/reference/blocked-escalation-follow-up.md:19-25`.
 
 **Fix status (2026-08-24):** still unfixed, severity confirmed `docs-gap`. Contained fix: add the distinction to the tool description, mirror it in `prompt-builder.ts`, and add the owed row to `docs/reference/features.md`.
 
+**Fix status (2026-08-24, fixed):** fixed locally. Both remaining wording sites now separate blocked from waiting: the tool description at `packages/omo-opencode/src/tools/report-blocked/tools.ts:14-16` and the subagent prompt at `packages/omo-opencode/src/tools/delegate-task/prompt-builder.ts:17-19`. Both now say the tool is for a decision, credential, missing API, or clarification only the parent can supply, and explicitly NOT for a long-running or detached job that is still executing - a job that is still running is not a blocker, poll it. The existing parking semantics text was left intact, and the `docs/reference/features.md:681` row was already correct.
+
 **Update:** (2026-08-24, second pass, verified against `dev` source) One third of the scoped fix has quietly landed and the rest has not. The owed reference row now exists at `docs/reference/features.md:681`, and it already describes the parking semantics correctly. The two wording sites do not: the tool description at `packages/omo-opencode/src/tools/report-blocked/tools.ts:14-16` and the subagent prompt at `packages/omo-opencode/src/tools/delegate-task/prompt-builder.ts:16-18` both say only that the tool parks the task until the parent resumes it, with nothing distinguishing *blocked on parent input* from *waiting on a detached job*. Remaining fix is now two wording edits, not three.
 
 ## 2026-08-17 — Mid-batch background completions starve a busy parent; delivery bounded, retention not
@@ -865,6 +867,10 @@ delegation MUST-DO block.
 delegation path, so the subagent that writes the summary never sees it.
 
 **Update:** (2026-08-24, verified against dev source) Still open, and searched exhaustively rather than assumed. No instruction requiring verbatim tool output - no "paste the raw output, do not summarize" or equivalent - exists in `packages/prompts-core/prompts/`, `.omo/rules/`, `~/.omo/rules/`, the root `AGENTS.md`, or any `.agents/skills/*/SKILL.md`. The closest wording all falls short: Atlas tells subagents to "append findings" without defining findings as raw output (`packages/prompts-core/prompts/atlas/opus-4-7.md:387-389`, `kimi-k3.md:260-272`); the root `AGENTS.md:21-29` demands "the exact captured output" as an artifact but then permits summarizing for secret-bearing material and does not bind default delegation; `codex-qa` calls captured JSON "the evidence" (`SKILL.md:32-36`) without forbidding a prose summary in its place. The one place that does demand exact lines is the findings capture rule itself (`.omo/rules/harness-findings.md:45-50`), which applies to findings, not to every subagent result.
+
+**Fix status (2026-08-24, fixed):** fixed locally at the choke point. The paste-do-not-summarize requirement now lives in `buildTaskPrompt` (`packages/omo-opencode/src/tools/delegate-task/prompt-builder.ts`), as an `<evidence-reporting>` block prepended to every delegated prompt: paste the command, the real pass/fail lines, the counts, and the full failure text; a summarized result is not evidence and is treated as unverified, because an honest summary and a fabricated one are indistinguishable at review.
+
+Site choice matters here, so it is recorded. `buildSystemContent` was rejected because it returns `undefined` for a plain category delegation, so it is not a choke point. The nine `sisyphus-junior` model variants were rejected as a shotgun that would still miss non-category `subagent_type` delegations. `packages/prompts-core/prompts/` reaches the PARENT, not the spawned subagent. `buildTaskPrompt` is the single funnel: all four non-continuation delegation call sites route through it - background (`background-task.ts:117`), sync (`sync-session-lifecycle.ts:33`, `sync-prompt-sender.ts:88`), forced-background (`unstable-agent-task.ts:32`), and resume (`sync-continuation.ts:160`).
 
 **Fix status (2026-08-24):** still unfixed. Severity revised `costly` -> `docs-gap` per the review rule that a finding whose real fix is wording is a docs-gap regardless of cost - the operational impact remains high, since a summarized result and a fabricated one are indistinguishable at review.
 
@@ -1464,6 +1470,8 @@ Ownership differs and matters: `review-work` is tracked in this repo at `package
 
 **Fix status (2026-08-24):** still unfixed in both. Severity stays `docs-gap`. One line in each - if the range is empty because the work is already merged, ask for an explicit commit range - closes it.
 
+**Fix status (2026-08-24, partially fixed):** the repo half is fixed locally. `packages/shared-skills/skills/review-work/SKILL.md` now carries an explicit instruction after the auto-collection block: if the collected range is empty, the work is likely already merged or you are on the wrong branch, so stop and ask for an explicit commit range rather than reviewing nothing. The `full-code-review` half remains unfixed and is NOT actionable from this repository - it lives at `/Users/tim/.agents/skills/full-code-review/SKILL.md`, user-global. The proposed one-line edit for it, to be applied by the user at `:24` and again at `:41`, mirrors the wording above. Severity stays `docs-gap`.
+
 **Update:** (2026-08-24, second pass, verified against `dev` source) Still unfixed in both, with the exact lines to change now identified. `review-work` sets its range at `packages/shared-skills/skills/review-work/SKILL.md:85-86` (`git diff --name-only HEAD~1 or against the appropriate base`), with the concrete commands at `:99-103`; that file is tracked here and fixable in this repo. `full-code-review` sets its default at `/Users/tim/.agents/skills/full-code-review/SKILL.md:20-23` (`git diff main...HEAD` plus `git diff HEAD`), repeated at `:38-40`, and is user-global - outside this repository, so only the `review-work` half is actionable here. Neither mentions an empty range or already-merged work anywhere.
 
 ## 2026-08-24 — `ctx_shell` redirect guard also blocks heredoc appends
@@ -1666,4 +1674,39 @@ Cross-checked and classified as **false positives** - these gate OMO-internal to
 
 **Fix status (2026-08-24):** still unfixed, now scoped: five hooks to migrate, each needing its own failing MCP-qualified-name test first. Severity stays `costly`, led by the `write-existing-file-guard` fail-open.
 
+**Fix status (2026-08-24, fixed):** fixed locally. Four of the five scoped hooks now delegate to `matchesTrackedTool`: `write-existing-file-guard/tool-execute-before-handler.ts:116-117,135` (the security fail-open), `comment-checker/hook.ts:75,134`, `read-image-resizer/hook.ts:121` (local `isReadTool` deleted), and `atlas/write-edit-tool-policy.ts:1-7` (literal array replaced, redundant casing duplicates collapsed since the helper lowercases). Each migration was TDD: a failing MCP-qualified-name test first, then the swap. Combined suites for the touched dirs are 811 pass / 0 fail, typecheck exit 0.
+
+The fifth hook, `hashline-read-enhancer`, was assessed and DELIBERATELY NOT MIGRATED. Its read-tagging is paired with `hashline_edit`, which validates every anchor against `computeLineHash` on current disk content (`packages/hashline-core/src/validation.ts:67-79,162-179`) and accepts no other hash scheme. `ctx_read` emits `N:hash|content`, a different grammar that `parseReadLine` does not accept (`hook.ts:31-53`) carrying a different hash. Suffix-matching it would either leave output untouched, which is useless, or hand agents anchors that hard-fail at edit time. Safe migration would need an explicit allowlist rather than suffix matching, plus an integration test driving a paired read into `hashline_edit`. Recorded as a known non-migration, not an oversight.
+
+QA note worth keeping: the first `opencode-qa` boundary probe reported the guard STILL fail-open. That verdict was wrong - the probe passed a raw `/var/folders/...` session root, which macOS canonicalizes to `/private/var/...`, so `isPathInsideDirectory` early-returned before the tool-name gate mattered. It had no native-write positive control, so an environmental early-return was indistinguishable from the defect under test. Corrected probe and the retraction are in `.omo/evidence/20260824-mcp-tool-name-gating/`.
+
 **Update:** (2026-08-24, second pass, verified against `dev` source) Still unfixed, and the fail-open is now traced line by line rather than asserted. `matchesTrackedTool` (`packages/omo-opencode/src/shared/tool-name-match.ts:3-21`) lowercases both sides, accepts exact equality, and accepts a tracked-name suffix only when the preceding character is one of `_ - . : /` - so `mcp__foo__write` matches `write` while `todowrite` does not. Its production callers are still only the three injectors: `rules-injector/hook.ts:73`, `directory-readme-injector/hook.ts:44`, `directory-agents-injector/hook.ts:50`. On the guard side, `mcp__foo__write` fails both exact comparisons at `write-existing-file-guard/tool-execute-before-handler.ts:113` and returns at `:114`, before the path and permission checks at `:117-141` - the fail-open is confirmed, not inferred. Test coverage is the sharpest signal: `mcp__` appears in exactly two hook test files, `directory-readme-injector/hook.test.ts` and `directory-agents-injector/hook.test.ts`, both already-migrated injectors. None of the five hooks awaiting migration has an MCP-qualified-name test, which is why each needs its own failing test first.
+
+## 2026-08-24 - A negative-assertion QA probe with no positive control reported a false defect
+
+**Severity:** costly
+**Area:** tools
+**Observed in:** oh-my-openagent, `opencode-qa` evidence run for the MCP tool-name gating fix
+
+**What happened:** A QA subagent wrote a boundary probe to prove that `write-existing-file-guard` blocks an MCP-qualified write. The probe reported the guard still fail-open, and the agent returned a FAILED security verdict with that line as its headline evidence. The verdict was wrong. The guard was correct; the probe was broken.
+
+**Evidence:**
+```
+FAIL: mcp__foo__write returned without blocking
+```
+Corrected probe, same handler, session root canonicalized:
+```
+write:           BLOCKED (File already exists. Use edit tool instead.)
+mcp__foo__write: BLOCKED (File already exists. Use edit tool instead.)
+todowrite:       NOT BLOCKED
+```
+
+**Root cause:** The probe passed a raw `mkdtempSync` path (`/var/folders/...`) as the session root. macOS canonicalizes that to `/private/var/...`, so the guard's `isPathInsideDirectory(canonicalPath, canonicalSessionRoot)` check returned early, before the tool-name comparison was ever reached. The probe tested nothing about tool names.
+
+**Why it was not caught:** the probe asserted only the negative case. It ran `mcp__foo__write` and nothing else. A plain `write` would have produced the identical FAIL, which is the tell - but with no positive control in the output, an environmental early-return is indistinguishable from the defect under test. The agent then reported the failure confidently rather than questioning a result that contradicted its own passing unit tests.
+
+**Generalization worth enforcing:** any QA probe whose pass condition is "X is blocked / rejected / refused" MUST include a control that is already known to be blocked, and a control known NOT to be blocked. Without both, the probe cannot distinguish "the guard works" from "nothing reached the guard".
+
+**Workaround:** re-ran the probe with `realpathSync` on the session root and added `write` and `todowrite` controls. Retraction and corrected artifacts recorded in `.omo/evidence/20260824-mcp-tool-name-gating/` (`08-write-guard-boundary-corrected.txt`, plus a CORRECTION section prepended to the evidence README).
+
+**Fix status:** worked around per-probe. A durable fix would put the positive-and-negative-control requirement into the `opencode-qa` skill, which currently gives no guidance on constructing a negative-assertion probe.
