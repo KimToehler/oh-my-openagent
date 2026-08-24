@@ -2,8 +2,11 @@ import type { PluginInput } from "@opencode-ai/plugin";
 
 import { createDynamicTruncator } from "../../shared/dynamic-truncator";
 import { resolveSessionEventID } from "../../shared/event-session-id";
+import { matchesTrackedTool } from "../../shared/tool-name-match";
 import { processFilePathForReadmeInjection } from "./injector";
 import { clearInjectedPaths } from "./storage";
+
+const TRACKED_TOOL_NAMES = ["read"] as const;
 
 interface ToolExecuteInput {
   tool: string;
@@ -38,9 +41,7 @@ export function createDirectoryReadmeInjectorHook(
   const truncator = createDynamicTruncator(ctx, modelCacheState);
 
   const toolExecuteAfter = async (input: ToolExecuteInput, output: ToolExecuteOutput) => {
-    const toolName = input.tool.toLowerCase();
-
-    if (toolName === "read") {
+    if (matchesTrackedTool(input.tool, TRACKED_TOOL_NAMES)) {
       await processFilePathForReadmeInjection({
         ctx,
         truncator,

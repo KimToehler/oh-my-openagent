@@ -3,12 +3,15 @@ import type { PluginInput } from "@opencode-ai/plugin";
 
 import { createDynamicTruncator } from "../../shared/dynamic-truncator";
 import { resolveSessionEventID } from "../../shared/event-session-id";
+import { matchesTrackedTool } from "../../shared/tool-name-match";
 import { processFilePathForAgentsInjection } from "./injector";
 import {
   clearInjectedPaths,
   loadInjectedPaths,
   saveInjectedPaths,
 } from "./storage";
+
+const TRACKED_TOOL_NAMES = ["read"] as const;
 
 interface ToolExecuteInput {
   tool: string;
@@ -44,9 +47,7 @@ export function createDirectoryAgentsInjectorHook(
   const truncator = createDynamicTruncator(ctx, modelCacheState);
 
   const toolExecuteAfter = async (input: ToolExecuteInput, output: ToolExecuteOutput) => {
-    const toolName = input.tool.toLowerCase();
-
-    if (toolName === "read") {
+    if (matchesTrackedTool(input.tool, TRACKED_TOOL_NAMES)) {
       await processFilePathForAgentsInjection({
         rootDirectory: ctx.directory,
         truncator,
