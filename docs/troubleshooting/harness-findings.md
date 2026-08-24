@@ -1192,3 +1192,35 @@ substring or suffix check.
 **Fix status:** fixed in `8f3d2daa3` (shared `matchesTrackedTool` helper), `cea18ab27`
 (rules-injector), `00bb1d903` (directory injectors).
 
+## 2026-08-24 - The findings log was unfindable from root AGENTS.md
+
+**Severity:** docs-gap
+**Area:** other
+**Observed in:** `onara` session, filing harness findings
+
+**What happened:** An agent recorded harness defects in `docs/superpowers/specs/` in the
+wrong repo, then in an invented `docs/handovers/` file in the right repo. The user
+corrected it twice before the agent found `docs/troubleshooting/harness-findings.md`.
+
+**Evidence:**
+```
+root AGENTS.md STRUCTURE tree mentioned only docs/ ... troubleshooting/,
+never named harness-findings.md by name
+
+capture rule naming it lived only at machine-local ~/.omo/rules/harness-findings.md,
+uncommitted, and had been dropped from the session's context by a compaction
+(see the compaction entry above)
+
+docs/AGENTS.md:40-41 did register the log, but that file is read on demand
+while root AGENTS.md is always in context
+```
+
+**Root cause / hypothesis:** confirmed. The always-in-context file did not name the log,
+and the file that did name it was both machine-local and evicted by compaction. The agent
+pattern-matched a plausible existing tracked directory instead of finding the real one.
+
+**Workaround:** the user pointed the agent at the correct file by hand, twice.
+
+**Fix status:** fixed in `afc234a0c` (root AGENTS.md pointer) and `48f0c1345` (capture rule
+committed as `docs/templates/harness-findings-rule.md.example`).
+
