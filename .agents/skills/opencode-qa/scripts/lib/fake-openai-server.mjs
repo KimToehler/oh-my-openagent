@@ -75,16 +75,12 @@ const server = http.createServer(async (req, res) => {
 
   if (branch === "restart-resume" || branch === "active-control" || branch === "absent-control") {
     const match = inputStr.match(/ses_[A-Za-z0-9]+/)
-    sendSse(res, toolCallEvents(callCount, "background_output", `call_resume_${callCount}`, {
+    sendSse(res, toolCallEvents(callCount, "task", `call_resume_${callCount}`, {
       task_id: match?.[0] ?? "ses_missing",
-      block: false,
-      full_session: false,
-      include_thinking: false,
-      include_tool_results: false,
-      message_limit: 1,
-      thinking_max_chars: 2000,
-      from_end: true,
-      timeout: 1000,
+      prompt: "RESUME_ADOPT_PROBE_CONTINUATION",
+      description: "resume adopt probe continuation",
+      run_in_background: false,
+      load_skills: [],
     }))
     return
   }

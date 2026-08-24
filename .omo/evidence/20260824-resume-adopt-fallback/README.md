@@ -108,3 +108,35 @@ Execution proves child record exists, survives real server restart, and continua
 
 - No credentials, passwords, auth headers, or raw request payloads recorded.
 - No claim that active or nonexistent controls passed.
+
+## ATTEMPT 5 (corrected tool invocation)
+
+### WHAT WAS TESTED
+
+- Corrected fake model continuation tool from read-only `background_output` to `task`, with `task_id`, `prompt: RESUME_ADOPT_PROBE_CONTINUATION`, `description`, and `run_in_background: false`.
+- Added one-shot branch latches. Corrected run: `bash .agents/skills/opencode-qa/scripts/resume-adopt-restart-probe.sh --evidence-dir .omo/evidence/20260824-resume-adopt-fallback`.
+- Added child transcript marker assertion.
+
+### WHAT WAS OBSERVED
+
+- Attempt 4 HAPPY=FAIL was a probe defect: fake model called `background_output`, which cannot invoke continuation.
+- Corrected fake model selected `restart-resume` once. Capture: `33-fake-openai.log`.
+- Child survived restart. Capture: `40-child-survived-restart.txt`.
+- HAPPY still did not append child transcript content. `41-happy-counts.txt` records `pre=2 post=2`; `42-happy-marker.txt` is empty, so marker grep did not match.
+- Host DB count was `2663` before and after this isolated run. Captures: `32-host-session-count-before.txt`, `44-host-session-count-after.txt`.
+- Cleanup: server PID `5800` and fake model PID `5724` were dead. Capture: `43-cleanup-receipt.txt`.
+
+Verdicts:
+
+- HAPPY: FAIL. Deciding observable: `grep -F RESUME_ADOPT_PROBE_CONTINUATION 42-happy-marker.txt` produced no match; count remained `pre=2 post=2`.
+- REFUSAL: NOT-REACHED. Deciding observable: control assertion omitted after HAPPY result.
+- ABSENT: NOT-REACHED. Deciding observable: control assertion omitted after HAPPY result.
+
+### WHY IT IS ENOUGH
+
+Corrected run proves task continuation call was model-driven once, child persisted across real server restart, and marker did not land in child transcript. Product adoption remains unproven.
+
+### WHAT WAS OMITTED
+
+- No credentials, passwords, headers, or raw requests.
+- No active-session or nonexistent-session control claim.

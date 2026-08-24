@@ -14,6 +14,9 @@ export const branchCounts = {
 export const latches = {
   parentToolCallIssued: false,
   parentHoldIssued: false,
+  restartResumeIssued: false,
+  activeControlIssued: false,
+  absentControlIssued: false,
 }
 
 export function hasToolResult(inputStr) {
@@ -40,9 +43,18 @@ export function selectBranch(inputStr) {
 
   if (isTitle) return "title"
   if (isRestartParent) return "restart-parent"
-  if (isRestartResume) return "restart-resume"
-  if (isActiveControl) return "active-control"
-  if (isAbsentControl) return "absent-control"
+  if (isRestartResume && !latches.restartResumeIssued) {
+    latches.restartResumeIssued = true
+    return "restart-resume"
+  }
+  if (isActiveControl && !latches.activeControlIssued) {
+    latches.activeControlIssued = true
+    return "active-control"
+  }
+  if (isAbsentControl && !latches.absentControlIssued) {
+    latches.absentControlIssued = true
+    return "absent-control"
+  }
   if (isChild && !isSplitProbe) return "child"
   if (isWake) return "wake"
   if (isSplitProbe && !hasResult && !latches.parentToolCallIssued) return "parent-tool-call"
