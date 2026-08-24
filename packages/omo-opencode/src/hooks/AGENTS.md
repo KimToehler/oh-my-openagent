@@ -60,10 +60,10 @@ Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated
 |------|-------|---------|
 | `commentChecker` | tool.execute.after | Block AI-slop comment patterns (binary: `@code-yeongyu/comment-checker`) |
 | `toolOutputTruncator` | tool.execute.after | Truncate oversized tool output |
-| `directoryAgentsInjector` | tool.execute.before | Inject dir-local AGENTS.md into context |
-| `directoryReadmeInjector` | tool.execute.before | Inject dir-local README.md into context |
+| `directoryAgentsInjector` | tool.execute.after | Inject dir-local AGENTS.md into context |
+| `directoryReadmeInjector` | tool.execute.after | Inject dir-local README.md into context |
 | `emptyTaskResponseDetector` | tool.execute.after | Detect empty task results |
-| `rulesInjector` | tool.execute.before | Conditional rules injection (AGENTS.md, .rules) |
+| `rulesInjector` | tool.execute.after | Conditional rules injection (AGENTS.md, .rules) |
 | `tasksTodowriteDisabler` | tool.execute.before | Disable TodoWrite when Sisyphus task system active |
 | `writeExistingFileGuard` | tool.execute.before | Require Read before Write/Edit on existing files |
 | `bashFileReadGuard` | tool.execute.before | Guard bash commands that read files (cat/head/tail) |
