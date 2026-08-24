@@ -4,6 +4,7 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
   test("reports an error instead of false success when the task is already running", async () => {
     //#given - manager rejects a continuation that cannot be delivered
     const mockManager = {
+      findBySession: () => ({ id: "bg_existing" }),
       resume: async () => {
         throw new Error(
           "Task bg_running is currently running and cannot accept a continuation prompt. " +
@@ -47,6 +48,7 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
   test("includes subagent in task_metadata when task has agent", async () => {
     //#given - mock manager.resume returning task with agent info
     const mockManager = {
+      findBySession: () => ({ id: "bg_existing" }),
       resume: async () => ({
         id: "bg_task_001",
         description: "oracle consultation",
@@ -96,6 +98,7 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
   test("omits subagent from task_metadata when task agent is undefined", async () => {
     //#given - mock manager.resume returning task without agent
     const mockManager = {
+      findBySession: () => ({ id: "bg_existing" }),
       resume: async () => ({
         id: "bg_task_002",
         description: "unknown task",
@@ -139,9 +142,88 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
     expect(result).not.toContain("subagent:")
   })
 
+  test("discloses fidelity loss after adopting an orphaned server session", async () => {
+    //#given - unowned session adopts into a continue task
+    const mockManager = {
+      findBySession: () => undefined,
+      resume: async () => ({
+        id: "bg_adopted_001",
+        description: "adopted task",
+        agent: "continue",
+        status: "running",
+        sessionId: "ses_orphaned_123",
+      }),
+    }
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-adopted",
+      metadata: mock(() => Promise.resolve()),
+    }
+    const args = {
+      task_id: "ses_orphaned_123",
+      prompt: "continue after restart",
+      description: "resume orphaned task",
+      load_skills: [],
+      run_in_background: true,
+    }
+
+    //#when - orphaned session resumes successfully
+    const { executeBackgroundContinuation } = require("./background-continuation")
+    const result = await executeBackgroundContinuation(args, mockCtx, { manager: mockManager }, {
+      sessionID: "parent-session",
+      messageID: "msg-parent",
+      agent: "sisyphus",
+    })
+
+    //#then - caller receives adopted-task fidelity disclosure
+    expect(result).toContain("This continuation adopted an orphaned server session using agent: continue.")
+    expect(result).toContain("It has no original model, no fallback chain, no category, and no loaded skill content.")
+    expect(result).toContain("It will not auto-fall-back on a model error.")
+  })
+
+  test("keeps normal known-task continuation output free of adopted-task disclosure", async () => {
+    //#given - tracked session resumes normally
+    const mockManager = {
+      findBySession: () => ({ id: "bg_known_001" }),
+      resume: async () => ({
+        id: "bg_known_001",
+        description: "known task",
+        agent: "oracle",
+        status: "running",
+        sessionId: "ses_known_123",
+      }),
+    }
+    const mockCtx = {
+      sessionID: "parent-session",
+      callID: "call-known",
+      metadata: mock(() => Promise.resolve()),
+    }
+    const args = {
+      task_id: "ses_known_123",
+      prompt: "continue normally",
+      description: "resume known task",
+      load_skills: [],
+      run_in_background: true,
+    }
+
+    //#when - known session resumes successfully
+    const { executeBackgroundContinuation } = require("./background-continuation")
+    const result = await executeBackgroundContinuation(args, mockCtx, { manager: mockManager }, {
+      sessionID: "parent-session",
+      messageID: "msg-parent",
+      agent: "sisyphus",
+    })
+
+    //#then - normal output keeps its existing shape
+    expect(result).toContain("Background task continued.")
+    expect(result).toContain("Agent continues with full previous context preserved.")
+    expect(result).not.toContain("This continuation adopted an orphaned server session")
+  })
+
   test("does not advertise background_output CTA in continuation return (issue #5221)", async () => {
     //#given - mock manager.resume
     const mockManager = {
+      findBySession: () => ({ id: "bg_existing" }),
       resume: async () => ({
         id: "bg_task_cta",
         description: "continue task",

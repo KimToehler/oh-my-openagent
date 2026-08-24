@@ -25,6 +25,7 @@ export async function executeBackgroundContinuation(
     const effectivePrompt = systemContent
       ? `${systemContent}\n\n${args.prompt}`
       : args.prompt
+    const wasUnownedAtResumeStart = manager.findBySession?.(taskID) === undefined
 
     const task = await manager.resume({
       sessionId: taskID,
@@ -66,6 +67,11 @@ Agent: ${task.agent}
 Status: ${task.status}
 
 Agent continues with full previous context preserved.
+${wasUnownedAtResumeStart ? `
+
+This continuation adopted an orphaned server session using agent: continue.
+It has no original model, no fallback chain, no category, and no loaded skill content.
+It will not auto-fall-back on a model error.` : ""}
 Do NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it.
 
 ${buildTaskMetadataBlock({
