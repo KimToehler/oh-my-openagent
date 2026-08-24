@@ -1,0 +1,84 @@
+=== Blocker 1: unknown hydrated epoch must preserve known cache epoch ===
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/hooks/rules-injector/injector.test.ts:
+616 | 
+617 | 		// when
+618 | 		await processor.processFilePathForInjection(targetFile, "session-1", output);
+619 | 
+620 | 		// then
+621 | 		expect(output.output).not.toContain("[Rule:");
+                                  ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "[Rule:"
+Received: "\n\n[Rule: .github/instructions/typescript.instructions.md]\n[Match: matched]\nrule-content\n"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-rules-injector-gaps/packages/omo-opencode/src/hooks/rules-injector/injector.test.ts:621:29)
+(fail) createRuleInjectionProcessor > #given cached compaction epoch and unknown hydrated epoch #when processing rule #then keeps dedup cache [2.83ms]
+
+ 0 pass
+ 15 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [84.00ms]
+
+=== Blocker 2: agent-only compaction must stop transcript scan ===
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/hooks/rules-injector/transcript-hydration.test.ts:
+272 | 
+273 | 		// when
+274 | 		const result = await store.hydrateSession("session-1");
+275 | 
+276 | 		// then
+277 | 		expect([...result]).toEqual(["after.md"]);
+                            ^
+error: expect(received).toEqual(expected)
+
+  [
+    "after.md",
++   "before.md",
+  ]
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-rules-injector-gaps/packages/omo-opencode/src/hooks/rules-injector/transcript-hydration.test.ts:277:23)
+(fail) createTranscriptHydrationStore > #given agent-only compaction boundary #when hydrateSession runs #then scan stops at boundary [0.80ms]
+
+ 0 pass
+ 15 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [72.00ms]
+
+=== Blocker 3: missing compaction message id must keep epoch unknown ===
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/hooks/rules-injector/transcript-hydration.test.ts:
+332 | 
+333 | 		// when
+334 | 		const result = await store.hydrateSession("session-1");
+335 | 
+336 | 		// then
+337 | 		expect([...result]).toEqual(["after.md"]);
+                            ^
+error: expect(received).toEqual(expected)
+
+  [
+    "after.md",
++   "before.md",
+  ]
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-rules-injector-gaps/packages/omo-opencode/src/hooks/rules-injector/transcript-hydration.test.ts:337:23)
+(fail) createTranscriptHydrationStore > #given compaction without message id #when hydrateSession runs #then epoch remains unknown [0.75ms]
+
+ 0 pass
+ 15 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [66.00ms]

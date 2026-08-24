@@ -182,4 +182,174 @@ describe("createTranscriptHydrationStore", () => {
 		// then
 		expect([...result]).toEqual(["docs/AGENTS.md"]);
 	});
+
+	it("#given banner only before compaction #when hydrateSession runs #then banner is not returned", async () => {
+		// given
+		const store = createTranscriptHydrationStore({
+			client: makeClient(async () => ({
+				data: [
+					{ info: { id: "before" }, parts: [{ output: ruleMarker("AGENTS.md") }] },
+					{ info: { id: "epoch-1" }, parts: [{ type: "compaction" }] },
+					{ info: { id: "after" }, parts: [{ text: "summary" }] },
+				],
+			})),
+		});
+
+		// when
+		const result = await store.hydrateSession("session-1");
+
+		// then
+		expect([...result]).toEqual([]);
+	});
+
+	it("#given several compactions #when hydrateSession runs #then scan stops at last compaction", async () => {
+		// given
+		const store = createTranscriptHydrationStore({
+			client: makeClient(async () => ({
+				data: [
+					{ info: { id: "old" }, parts: [{ type: "compaction" }] },
+					{ parts: [{ output: ruleMarker("between.md") }] },
+					{ info: { id: "latest" }, parts: [{ type: "compaction" }] },
+					{ parts: [{ output: ruleMarker("after.md") }] },
+				],
+			})),
+		});
+
+		// when
+		const result = await store.hydrateSession("session-1");
+
+		// then
+		expect([...result]).toEqual(["after.md"]);
+	});
+
+	it("#given banner after compaction #when hydrateSession runs #then banner remains returned", async () => {
+		// given
+		const store = createTranscriptHydrationStore({
+			client: makeClient(async () => ({
+				data: [
+					{ info: { id: "epoch-1" }, parts: [{ type: "compaction" }] },
+					{ parts: [{ output: ruleMarker("after.md") }] },
+				],
+			})),
+		});
+
+		// when
+		const result = await store.hydrateSession("session-1");
+
+		// then
+		expect([...result]).toEqual(["after.md"]);
+	});
+
+	it("#given no compaction #when hydrateSession runs #then all existing markers remain returned", async () => {
+		// given
+		const store = createTranscriptHydrationStore({
+			client: makeClient(async () => ({
+				data: [
+					{ parts: [{ output: ruleMarker("first.md") }] },
+					{ parts: [{ output: ruleMarker("second.md") }] },
+				],
+			})),
+		});
+
+		// when
+		const result = await store.hydrateSession("session-1");
+
+		// then
+		expect([...result].sort()).toEqual(["first.md", "second.md"]);
+	});
+
+	it("#given agent-only compaction boundary #when hydrateSession runs #then scan stops at boundary", async () => {
+		// given
+		const store = createTranscriptHydrationStore({
+			client: makeClient(async () => ({
+				data: [
+					{ parts: [{ output: ruleMarker("before.md") }] },
+					{ info: { id: "agent-epoch", agent: "compaction" }, parts: [] },
+					{ parts: [{ output: ruleMarker("after.md") }] },
+				],
+			})),
+		});
+
+		// when
+		const result = await store.hydrateSession("session-1");
+
+		// then
+		expect([...result]).toEqual(["after.md"]);
+		expect(store.getCompactionEpoch("session-1")).toBe("agent-epoch");
+	});
+
+	it("#given a null transcript entry #when hydrateSession runs #then the scan skips it instead of aborting", async () => {
+		// given
+		const store = createTranscriptHydrationStore({
+			client: makeClient(async () => ({
+				data: [{ parts: [{ output: ruleMarker("keep.md") }] }, null],
+			})),
+		});
+
+		// when
+		const result = await store.hydrateSession("session-1");
+
+		// then
+		expect([...result]).toEqual(["keep.md"]);
+	});
+
+	it("#given compaction inside bounded window #when hydrateSession runs #then marker and epoch come from post-compaction window", async () => {
+		// given
+		const messages = [
+			{ parts: [{ output: ruleMarker("outside-message-cap.md") }] },
+			...Array.from({ length: 3 }, () => ({ parts: [{ text: "old" }] })),
+			{ info: { id: "epoch-1" }, parts: [{ type: "compaction" }] },
+			{ parts: [{ output: ruleMarker("inside-window.md") }] },
+			...Array.from({ length: 194 }, () => ({ parts: [{ text: "recent" }] })),
+		];
+		const store = createTranscriptHydrationStore({
+			client: makeClient(async () => ({ data: messages })),
+		});
+
+		// when
+		const result = await store.hydrateSession("session-1");
+
+		// then
+		expect([...result]).toEqual(["inside-window.md"]);
+		expect(store.getCompactionEpoch("session-1")).toBe("epoch-1");
+	});
+
+	it("#given compaction outside bounded window #when hydrateSession runs #then epoch remains unknown", async () => {
+		// given
+		const messages = [
+			{ info: { id: "outside-epoch" }, parts: [{ type: "compaction" }] },
+			{ parts: [{ output: ruleMarker("outside-message-cap.md") }] },
+			...Array.from({ length: 200 }, () => ({ parts: [{ text: "recent" }] })),
+		];
+		const store = createTranscriptHydrationStore({
+			client: makeClient(async () => ({ data: messages })),
+		});
+
+		// when
+		const result = await store.hydrateSession("session-1");
+
+		// then
+		expect([...result]).toEqual([]);
+		expect(store.getCompactionEpoch("session-1")).toBeUndefined();
+	});
+
+	it("#given compaction without message id #when hydrateSession runs #then epoch remains unknown", async () => {
+		// given
+		const store = createTranscriptHydrationStore({
+			client: makeClient(async () => ({
+				data: [
+					{ parts: [{ output: ruleMarker("before.md") }] },
+					{ info: { agent: "compaction" }, parts: [] },
+					{ parts: [{ output: ruleMarker("after.md") }] },
+				],
+			})),
+		});
+
+		// when
+		const result = await store.hydrateSession("session-1");
+
+		// then
+		expect([...result]).toEqual(["after.md"]);
+		expect(store.getCompactionEpoch("session-1")).toBeUndefined();
+	});
 });

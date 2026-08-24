@@ -1,0 +1,14 @@
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/shared/tool-name-match.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './tool-name-match' from '/Users/tim/git/oh-my-openagent/.local-ignore/wt-rules-injector-gaps/packages/omo-opencode/src/shared/tool-name-match.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [71.00ms]

@@ -1,0 +1,26 @@
+bun test v1.4.0 (1381054db)
+
+hook.test.ts:
+57 | 
+58 | 		return output.output;
+59 | 	}
+60 | 
+61 | 	it("#given matching project rule #when lean-ctx_ctx_read completes #then injects the rule", async () => {
+62 | 		expect(await executeAfter("lean-ctx_ctx_read")).toContain("[Rule: ");
+                                                       ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "[Rule: "
+Received: "file content"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-rules-injector-gaps/packages/omo-opencode/src/hooks/rules-injector/hook.test.ts:62:51)
+(fail) createRulesInjectorHook > #given matching project rule #when lean-ctx_ctx_read completes #then injects the rule [1.05ms]
+(pass) createRulesInjectorHook > #given matching project rule #when native read completes #then injects the rule [3.52ms]
+(pass) createRulesInjectorHook > #given matching project rule #when lean-ctx_ctx_shell completes #then injects nothing [0.51ms]
+(pass) createRulesInjectorHook > #given matching project rule #when bash completes #then injects nothing [0.50ms]
+(pass) createRulesInjectorHook > #given matching project rule #when todowrite completes #then injects nothing [0.61ms]
+
+ 4 pass
+ 1 fail
+ 5 expect() calls
+Ran 5 tests across 1 file. [60.00ms]

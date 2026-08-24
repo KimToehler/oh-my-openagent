@@ -1,0 +1,108 @@
+GAP 2 RED EVIDENCE - directory-agents-injector / directory-readme-injector
+==========================================================================
+
+WHAT WAS TESTED
+---------------
+Command:
+  bun test packages/omo-opencode/src/hooks/directory-agents-injector/hook.test.ts \
+           packages/omo-opencode/src/hooks/directory-readme-injector/hook.test.ts
+
+Surface driven: the `tool.execute.after` handler returned by
+`createDirectoryAgentsInjectorHook` and `createDirectoryReadmeInjectorHook`,
+invoked directly with a real temp project root containing a nested
+`src/AGENTS.md` / `src/README.md` beside the read file.
+
+Behavior it was meant to prove: an MCP-served read tool name
+(`lean-ctx_ctx_read`, `mcp__server__read`) must trigger the directory-context
+injection exactly as the native `read` tool does, while a non-read MCP tool
+(`lean-ctx_ctx_shell`) must not.
+
+Captured BEFORE any production edit. Both hook.ts files still gate on
+`toolName === "read"` at this point:
+  packages/omo-opencode/src/hooks/directory-agents-injector/hook.ts:47-49
+  packages/omo-opencode/src/hooks/directory-readme-injector/hook.ts:41-43
+
+WHAT WAS OBSERVED (verbatim run output)
+---------------------------------------
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/hooks/directory-readme-injector/hook.test.ts:
+62 |   describe("#given an MCP-prefixed read tool", () => {
+63 |     describe("#when tool.execute.after reports lean-ctx_ctx_read", () => {
+64 |       it("#then injects the directory README.md", async () => {
+65 |         const output = await runToolExecuteAfter("lean-ctx_ctx_read", "session-mcp-read")
+66 |
+67 |         expect(output.output).toContain("[Project README:")
+                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "[Project README:"
+Received: "base output"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-rules-injector-gaps/packages/omo-opencode/src/hooks/directory-readme-injector/hook.test.ts:67:31)
+(fail) createDirectoryReadmeInjectorHook tool matching > #given an MCP-prefixed read tool > #when tool.execute.after reports lean-ctx_ctx_read > #then injects the directory README.md [1.90ms]
+71 |
+72 |     describe("#when tool.execute.after reports mcp__server__read", () => {
+73 |       it("#then injects the directory README.md", async () => {
+74 |         const output = await runToolExecuteAfter("mcp__server__read", "session-mcp-double")
+75 |
+76 |         expect(output.output).toContain("[Project README:")
+                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "[Project README:"
+Received: "base output"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-rules-injector-gaps/packages/omo-opencode/src/hooks/directory-readme-injector/hook.test.ts:76:31)
+(fail) createDirectoryReadmeInjectorHook tool matching > #given an MCP-prefixed read tool > #when tool.execute.after reports mcp__server__read > #then injects the directory README.md [0.60ms]
+
+packages/omo-opencode/src/hooks/directory-agents-injector/hook.test.ts:
+62 |   describe("#given an MCP-prefixed read tool", () => {
+63 |     describe("#when tool.execute.after reports lean-ctx_ctx_read", () => {
+64 |       it("#then injects the directory AGENTS.md", async () => {
+65 |         const output = await runToolExecuteAfter("lean-ctx_ctx_read", "session-mcp-read")
+66 |
+67 |         expect(output.output).toContain("[Directory Context:")
+                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "[Directory Context:"
+Received: "base output"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-rules-injector-gaps/packages/omo-opencode/src/hooks/directory-agents-injector/hook.test.ts:67:31)
+(fail) createDirectoryAgentsInjectorHook tool matching > #given an MCP-prefixed read tool > #when tool.execute.after reports lean-ctx_ctx_read > #then injects the directory AGENTS.md [1.35ms]
+71 |
+72 |     describe("#when tool.execute.after reports mcp__server__read", () => {
+73 |       it("#then injects the directory AGENTS.md", async () => {
+74 |         const output = await runToolExecuteAfter("mcp__server__read", "session-mcp-double")
+75 |
+76 |         expect(output.output).toContain("[Directory Context:")
+                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "[Directory Context:"
+Received: "base output"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-rules-injector-gaps/packages/omo-opencode/src/hooks/directory-agents-injector/hook.test.ts:76:31)
+(fail) createDirectoryAgentsInjectorHook tool matching > #given an MCP-prefixed read tool > #when tool.execute.after reports mcp__server__read > #then injects the directory AGENTS.md [0.49ms]
+
+ 4 pass
+ 4 fail
+ 10 expect() calls
+Ran 8 tests across 2 files. [80.00ms]
+
+WHY IT IS ENOUGH
+----------------
+The 4 failures are exactly the MCP-prefixed read cases, one pair per hook, and
+they fail for the right reason: the injector never ran, so `output.output` is
+still the untouched `"base output"` fixture rather than a partially built or
+malformed block. The 4 passes in the same run are the regression pins - native
+`read` still injects, and `lean-ctx_ctx_shell` still does not - which proves the
+new tests are not simply asserting that the hook does nothing, and that the
+forthcoming fix must not widen matching to non-read tools.
+
+WHAT WAS OMITTED
+----------------
+Nothing redacted. The run touches no credentials, no network, and no real user
+state: each test builds its own `mktemp` project root, mocks the session storage
+module in-memory, and removes the temp root in `afterEach`.

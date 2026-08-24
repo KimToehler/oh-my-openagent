@@ -40,6 +40,7 @@
 | Harness findings log (append-only field notes) | [docs/troubleshooting/harness-findings.md](troubleshooting/harness-findings.md) |
 | Reviewing / re-verifying that findings log | `harness-findings-review` skill (`.agents/skills/harness-findings-review/`), manual invocation only |
 | Copyable project rules template | [docs/templates/AGENTS.md.example](templates/AGENTS.md.example) |
+| Harness-findings capture rule (copy to ~/.omo/rules/) | [docs/templates/harness-findings-rule.md.example](templates/harness-findings-rule.md.example) |
 
 ## STRUCTURE
 
@@ -52,7 +53,8 @@ docs/
 ├── examples/                                 # Sample JSONC configs (3 files)
 ├── legal/                                    # privacy-policy.md + terms-of-service.md
 ├── templates/
-│   └── AGENTS.md.example                     # Copyable OMO project rules template
+│   ├── AGENTS.md.example                     # Copyable OMO project rules template
+│   └── harness-findings-rule.md.example      # Copyable capture rule, install to ~/.omo/rules/
 └── troubleshooting/
     ├── ollama.md
     └── harness-findings.md                   # Append-only log of harness defects found during real work

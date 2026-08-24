@@ -1,0 +1,76 @@
+---
+description: Record harness defects, footguns, and surprising behaviours in the OMO findings log as they are discovered during real work
+globs:
+  - "**/*"
+---
+
+> Template - copy this file to `~/.omo/rules/harness-findings.md` to install it as a live rule.
+
+# Harness Findings - record what the harness got wrong
+
+We continuously improve the harness we work in. Findings are only useful if they are
+written down **when they happen**, in the repo that owns the harness - not left in a
+session transcript that disappears.
+
+**The log:** `docs/troubleshooting/harness-findings.md` (tracked, in the oh-my-openagent repo).
+
+## WHEN TO APPEND
+
+Append an entry when harness behaviour - OMO itself, its subagent/background-task
+machinery, rules injection, tools, MCP servers, or the model runtime - does any of:
+
+- **Blocks or strands work** - a session dies, a task hangs, a job is never collected.
+- **Costs real time or tokens** - repeated runs, lost context, re-work, a wrong turn you
+  had to back out of.
+- **Reports something untrue** - a status line that disagrees with disk, a duration that
+  froze, a success that did not happen.
+- **Reliably misleads an agent** - instructions or messages that a competent agent reads
+  the wrong way. This counts even when the harness behaved *correctly*: a predictable
+  misreading is a harness finding, not user error.
+- **Has no documented answer** - you had to read harness source to learn how something
+  actually works.
+
+Do NOT log ordinary product bugs in the repo you are working on. Those belong to that
+project. This file is only for the tooling we execute *with*.
+
+## HOW TO APPEND
+
+1. Read the file's own "How to use this file" section and follow its entry template.
+2. **Append only.** Never rewrite or delete an existing entry. If a finding turns out to
+   be wrong or later gets fixed, add an `**Update:**` line to it - the history of what we
+   believed and when is part of the value.
+3. **Evidence over prose.** Paste the exact log line, status output, error text, or
+   `file:line`. A finding nobody can reproduce is a rumour. Keep the narrative to a
+   sentence or two.
+4. **Label theory as theory.** If you do not know the root cause, write the hypothesis and
+   say it is one. Never present a guess as a diagnosis.
+5. **Verify before you write.** If you claim a mechanism, check it - read the harness
+   source, confirm the config value, re-check the timestamps. A confidently wrong entry is
+   worse than no entry, because the next agent will trust it.
+6. Set `Severity` and `Area` from the tables in the file. Include the repo you were
+   working in under `Observed in:` - the pattern across projects matters.
+
+## COMMITTING
+
+The findings log lives in a different repository from the work that produced the finding.
+Commit it there, separately, on its own:
+
+```bash
+cd <path-to-your-oh-my-openagent-checkout>
+git add docs/troubleshooting/harness-findings.md
+git commit -m "docs(findings): <short title of the finding>"
+```
+
+Never fold this into an unrelated commit in the project you are working on, and never
+`git add -A` in the harness repo - it frequently has unrelated work in progress.
+
+If the oh-my-openagent checkout is dirty with someone else's changes, still commit **your one
+file** by explicit path. Do not stash, rebase, or otherwise touch their work.
+
+## WHAT NOT TO DO
+
+- Do not interrupt the user's actual task to write a finding. Finish the work, then log it
+  - or log it at a natural pause, such as while waiting on a long-running job.
+- Do not log the same finding twice. Search the file first; if it is already there and you
+  learned something new, append an `**Update:**` to the existing entry instead.
+- Do not write speculative entries about behaviour you did not personally observe.

@@ -18,7 +18,9 @@ tool.execute.after (read/write/edit/multiedit)
 
 ## TRACKED TOOLS
 
-`["read", "write", "edit", "multiedit"]` — triggers only on file manipulation tools.
+`["read", "write", "edit", "multiedit"]`, matched via `matchesTrackedTool` (`../../shared/tool-name-match.ts`): exact name, or a case-insensitive suffix preceded by one of `_ - . : /`. This lets MCP-prefixed forms match, such as `lean-ctx_ctx_read`, `mcp__server__read`, and `hashline_edit`. It also excludes lookalike suffixes without a separator: `todowrite` ends with `write` but has no separator before it, so it deliberately stays untracked.
+
+One known over-match: `session_read` (a non-file tool) matches because of the `_` separator. It has no `metadata.filePath`, so `getRuleInjectionFilePath` falls back to `output.title`, which can cause one spurious, deduped rule injection per session. Accepted as harmless.
 
 ## KEY FILES
 

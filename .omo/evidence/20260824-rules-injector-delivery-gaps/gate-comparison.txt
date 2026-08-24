@@ -1,0 +1,42 @@
+FULL GATE COMPARISON - baseline (pre-change) vs post-change
+===========================================================
+
+BASELINE (commit 5be705366, before any of our commits)
+  bun test:       15573 pass / 5 skip / 14 fail / 2017 files / 337.39s / EXIT=1
+  bun typecheck:  EXIT=0
+
+POST-CHANGE (6 commits applied)
+  bun test:       15616 pass / 5 skip / 14 fail / 2021 files / 361.09s / EXIT=1
+  bun typecheck:  EXIT=0
+
+DELTA
+  +43 passing tests, +4 test files
+  NEW failures:              0   (set difference baseline -> now is EMPTY)
+  Incidentally fixed:        0
+  Failure set is IDENTICAL to the 14 pre-existing failures recorded at T0.
+
+Method: failure lines extracted with `grep -E "^\(fail\)"`, timing suffix stripped,
+sorted, compared with `comm`. Both directions empty.
+
+CONCLUSION: no regression introduced. The 14 remaining failures are all pre-existing
+and unrelated to rules injection, the shared helper, or the directory injectors
+(they live in agent command audit, scan-tool fixtures, module-resolution classification,
+skill-loader dedup, background-agent polling, parent-wake queue, senpi reflection flow,
+and a dependencies check).
+
+CORRECTION (added after an independent QA re-run): the baseline failure count is 14
+plus or minus one flake, not a fixed constant. A separate full-suite run observed 15
+failures, the extra being `createTeamSendMessageTool > live delivery uses the registered
+agent alias`, which times out at the 5000ms cap under full-suite load and passes 3 of 3
+in isolation. It is a load-dependent timeout in team-mode messaging, unrelated to this
+change. The "identical failure set" phrasing above is therefore stronger than repeated
+runs support. The no-regression conclusion is unaffected: no failure in rules-injector,
+the shared helper, or the directory injectors appears in any run.
+
+FINAL GATE (after the review-blocker fixes and the null-guard restoration)
+  bun test:       15621 pass / 5 skip / 14 fail / 2021 files / 312.96s / EXIT=1
+  bun typecheck:  EXIT=0
+  NEW failures vs the pre-change baseline: 0 (comm both directions empty)
+  Failures in rules-injector, shared, or the directory injectors: NONE
+  Artifacts: gate3-final-fulltest.txt, gate3-final-typecheck.txt
+  Net: +48 passing tests over the 15573 baseline.

@@ -1390,3 +1390,144 @@ than the heredoc anyway, since it fails loudly when the anchor has moved.
 
 **Fix status:** worked around. Worth documenting that the rule is syntactic, so agents
 reach for `Edit` first rather than discovering the guard.
+## 2026-08-24 - Rules injection re-suppressed after compaction by full-transcript hydration
+
+**Severity:** costly
+**Area:** rules injection
+**Observed in:** `onara`, long orchestration session under opencode + oh-my-openagent
+
+**What happened:** A rule injected before a session compaction could never be re-injected,
+because transcript hydration kept finding its `[Rule: ...]` banner in messages the model
+could no longer see.
+
+**Evidence:**
+```
+live opencode DB session ses_fd16c1c72fferXUROX6pmb41R1
+rule banner in message msg_032e51103001Lb1cRxxJR6LYM6 at 2026-08-24 08:31:08
+compaction part {"type":"compaction","auto":false,"tail_start_id":"msg_032e6577f0018RuplNhW0akUDj"}
+tail-start message at 2026-08-24 08:32:31
+banner predates tail-start -> dropped from context
+zero [Rule: ...harness-findings...] parts appear after 08:33:28
+persisted state file still listed the rule as injected
+```
+
+**Root cause / hypothesis:** confirmed. `transcript-hydration.ts` scanned the full
+transcript via `client.session.messages({path:{id}})`, unbounded by compaction.
+`injection-processor.ts:135-141` then marked the rule injected and `continue`d without
+emitting. `hook.ts:101-106` cleared the persisted cache on `session.compacted`, but
+hydration immediately re-suppressed it. A second, worse path also existed: the persisted
+cache was loaded and checked before hydration ran, so a plugin restart across a compaction
+made the stale on-disk cache win regardless.
+
+**Workaround:** none found before the code fix landed.
+
+**Fix status:** fixed in `08a8d55b1` - hydration now stops at the last compaction part, and
+the persisted cache carries a `compactionEpoch` stamp that invalidates it on mismatch.
+
+## 2026-08-24 - MCP-prefixed tool names bypass rules injection entirely
+
+**Severity:** blocker
+**Area:** rules injection
+**Observed in:** `onara` and `oh-my-openagent`
+
+**What happened:** Hooks gated on exact tool-name equality, so MCP-served file tools never
+matched and the injectors were silently dead for an entire session.
+
+**Evidence:**
+```
+hook.ts:36: const TRACKED_TOOLS = ["read", "write", "edit", "multiedit"]
+matched by TRACKED_TOOLS.includes(input.tool.toLowerCase())
+probe: "lean-ctx_ctx_read" matched false
+
+live DB session ses_fcc7a7320ffeqqbiGtzKPWFg5U used only
+lean-ctx_ctx_shell (38 calls) and lean-ctx_ctx_execute (6 calls),
+produced NO rules-injector state file at all
+
+second session tool mix: ctx_shell 391 / ctx_execute 101 / ctx_read 34
+against edit 41 / write 6, cutting injection opportunities ~90 percent
+```
+
+**Root cause / hypothesis:** confirmed. Exact-equality matching against a lowercase list,
+with no awareness of MCP name prefixes (`mcp__<server>__<tool>`, `lean-ctx_ctx_<tool>`).
+
+The naive fix is wrong: `"todowrite".endsWith("write")` is `true`, so a plain suffix match
+would have injected rules on every todo write. The fix needed a separator boundary, not a
+substring or suffix check.
+
+**Workaround:** none found before the code fix landed.
+
+**Fix status:** fixed in `8f3d2daa3` (shared `matchesTrackedTool` helper), `cea18ab27`
+(rules-injector), `00bb1d903` (directory injectors).
+
+## 2026-08-24 - The findings log was unfindable from root AGENTS.md
+
+**Severity:** docs-gap
+**Area:** other
+**Observed in:** `onara` session, filing harness findings
+
+**What happened:** An agent recorded harness defects in `docs/superpowers/specs/` in the
+wrong repo, then in an invented `docs/handovers/` file in the right repo. The user
+corrected it twice before the agent found `docs/troubleshooting/harness-findings.md`.
+
+**Evidence:**
+```
+root AGENTS.md STRUCTURE tree mentioned only docs/ ... troubleshooting/,
+never named harness-findings.md by name
+
+capture rule naming it lived only at machine-local ~/.omo/rules/harness-findings.md,
+uncommitted, and had been dropped from the session's context by a compaction
+(see the compaction entry above)
+
+docs/AGENTS.md:40-41 did register the log, but that file is read on demand
+while root AGENTS.md is always in context
+```
+
+**Root cause / hypothesis:** confirmed. The always-in-context file did not name the log,
+and the file that did name it was both machine-local and evicted by compaction. The agent
+pattern-matched a plausible existing tracked directory instead of finding the real one.
+
+**Workaround:** the user pointed the agent at the correct file by hand, twice.
+
+**Fix status:** fixed in `afc234a0c` (root AGENTS.md pointer) and `48f0c1345` (capture rule
+committed as `docs/templates/harness-findings-rule.md.example`).
+
+## 2026-08-24 - Exact-match tool-name gating survives in other hooks
+
+**Severity:** costly
+**Area:** tools
+**Observed in:** `oh-my-openagent`, found while verifying the fix for the MCP-prefix entry
+above
+
+**What happened:** After fixing three hooks for the same bug class, a repo-wide grep showed
+exact-equality tool-name matching still present elsewhere, including in a security-relevant
+guard.
+
+**Evidence:**
+```
+packages/omo-opencode/src/hooks/write-existing-file-guard/tool-execute-before-handler.ts:113
+  if (toolName !== "write" && toolName !== "read")
+packages/omo-opencode/src/hooks/write-existing-file-guard/tool-execute-before-handler.ts:131
+  if (toolName === "read")
+packages/omo-opencode/src/hooks/comment-checker/hook.ts:72
+  if (toolLower !== "write" && toolLower !== "edit" && toolLower !== "multiedit")
+
+local exact-match helpers also present at:
+packages/omo-opencode/src/hooks/read-image-resizer/hook.ts:15
+packages/omo-opencode/src/hooks/hashline-read-enhancer/hook.ts:19
+packages/omo-opencode/src/hooks/hashline-read-enhancer/hook.ts:23
+packages/omo-opencode/src/hooks/hashline-edit-diff-enhancer/hook.ts:31
+packages/omo-opencode/src/hooks/atlas/write-edit-tool-policy.ts:3
+```
+
+**Root cause / hypothesis:** confirmed as a systemic bug class, not an isolated bug. A
+shared `matchesTrackedTool` helper now exists at
+`packages/omo-opencode/src/shared/tool-name-match.ts`, and these call sites have not been
+migrated to it.
+
+The `write-existing-file-guard` case is the concerning one of the set: a guard that
+silently stops seeing MCP-prefixed writes fails open rather than closed.
+
+**Workaround:** none. Deliberately left out of scope for the change that found it.
+
+**Fix status:** unfixed - each migration needs its own failing test first, and (per the
+prior entry) a naive suffix match would break `todowrite`.

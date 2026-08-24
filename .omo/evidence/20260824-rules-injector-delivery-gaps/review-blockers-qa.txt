@@ -1,0 +1,19 @@
+WHAT WAS TESTED
+- bun test packages/omo-opencode/src/hooks/rules-injector/
+- bun run typecheck
+- bash .agents/skills/opencode-qa/scripts/lib/common.sh --self-check
+
+WHAT WAS OBSERVED
+- Rules-injector suite: 97 pass, 0 fail, 163 expect() calls across 17 files.
+- Typecheck completed successfully for root, script, and workspace packages.
+- OpenCode QA harness dependencies passed; live DB path resolved read-only; isolated XDG and HOME sandboxes were created and removed.
+- RED assertion output is captured in review-blockers-red.txt.
+
+WHY IT IS ENOUGH
+- Focused tests exercise cache preservation for an unknown observed epoch, agent-only compaction detection, bounded-window epoch identity, and missing message-ID fallback.
+- Full rules-injector suite protects all 93 pre-existing tests plus four added cases.
+- Typecheck covers strict TypeScript contracts across the workspace.
+- QA harness self-check proves OpenCode-connected verification can run without modifying the real OpenCode state.
+
+WHAT WAS OMITTED
+- No secret-bearing logs, environment dumps, tokens, credentials, or raw session content were captured.
