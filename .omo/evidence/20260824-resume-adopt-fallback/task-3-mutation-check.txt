@@ -1,0 +1,169 @@
+Task 3 mutation check: findBySession undefined-after-cleanup contract
+
+WHAT WAS TESTED
+- Source-level Bun test: `bun test packages/omo-opencode/src/features/background-agent/blocked-retention.test.ts`.
+- New regression test: `#then findBySession stays undefined after cleanup even when global registry retains task`.
+- Temporary mutation: make `findBySession` return registry entry when live-task lookup misses.
+- Post-revert source-level rerun after `GIT_MASTER=1 git checkout -- packages/omo-opencode/src/features/background-agent/manager.ts`.
+
+TDD EXCEPTION
+This characterization/regression test was green on first run because it pins existing intentional behavior. No production code was added. Mutation testing supplied teeth proof: changing the protected behavior made this test fail.
+
+PRISTINE GREEN OUTPUT
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/features/background-agent/blocked-retention.test.ts:
+(pass) blocked task retention > #given manager cleanup is scheduled > #then keeps a blocked task after the normal cleanup delay [1.64ms]
+(pass) blocked task retention > #given manager cleanup is scheduled > #then removes a blocked task after hard expiry [0.44ms]
+(pass) blocked task retention > #given manager cleanup is scheduled > #then removes an ordinary cancelled task on the normal schedule [0.18ms]
+(pass) blocked task retention > #given manager cleanup is scheduled > #then findBySession stays undefined after cleanup even when global registry retains task [0.12ms]
+(pass) blocked task retention > #given terminal TTL pruning runs > #then keeps an old terminal task while its block is within the expiry window [0.16ms]
+(pass) blocked task retention > #given terminal TTL pruning runs > #then removes an old terminal task once its block reaches hard expiry [0.11ms]
+
+ 6 pass
+ 0 fail
+ 7 expect() calls
+Ran 6 tests across 1 file. [137.00ms]
+
+EXIT=0
+
+TEMPORARY MUTATION DIFF
+diff --git a/packages/omo-opencode/src/features/background-agent/manager.ts b/packages/omo-opencode/src/features/background-agent/manager.ts
+index 17fbed0ec..db522ae46 100644
+--- a/packages/omo-opencode/src/features/background-agent/manager.ts
++++ b/packages/omo-opencode/src/features/background-agent/manager.ts
+@@ -1243,7 +1243,7 @@ The fallback retry session is now created and can be inspected directly.
+         return task
+       }
+     }
+-    return undefined
++    return getRegisteredBackgroundTask(sessionID)
+   }
+ 
+   private resolveTaskAttemptBySession(sessionID: string): { task: BackgroundTask; attemptID?: string; isCurrent: boolean } | undefined {
+
+FAILING OUTPUT
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/features/background-agent/blocked-retention.test.ts:
+(pass) blocked task retention > #given manager cleanup is scheduled > #then keeps a blocked task after the normal cleanup delay [1.13ms]
+(pass) blocked task retention > #given manager cleanup is scheduled > #then removes a blocked task after hard expiry [0.21ms]
+(pass) blocked task retention > #given manager cleanup is scheduled > #then removes an ordinary cancelled task on the normal schedule [0.09ms]
+148 |       currentTime += TASK_CLEANUP_DELAY_MS + 1
+149 |       jest.advanceTimersByTime(TASK_CLEANUP_DELAY_MS + 1)
+150 | 
+151 |       // then
+152 |       expect(getRegisteredBackgroundTask(task.id)).toBeDefined()
+153 |       expect(managerUnderTest.findBySession(task.sessionId ?? "")).toBeUndefined()
+                                                                         ^
+error: expect(received).toBeUndefined()
+
+Received: {
+  id: "session-registry-only",
+  rootSessionId: undefined,
+  parentSessionId: "session-parent",
+  parentMessageId: "message-parent",
+  teamRunId: undefined,
+  description: "blocked task",
+  prompt: "[redacted]",
+  agent: "test-agent",
+  spawnDepth: undefined,
+  sessionId: "session-registry-only",
+  status: "cancelled",
+  queuedAt: undefined,
+  startedAt: 2026-08-08T23:59:59.000Z,
+  completedAt: 2026-08-09T00:00:00.000Z,
+  result: undefined,
+  progress: undefined,
+  parentModel: undefined,
+  model: undefined,
+  fallbackChain: undefined,
+  attemptCount: undefined,
+  concurrencyKey: undefined,
+  concurrencyGroup: undefined,
+  parentAgent: undefined,
+  parentTools: undefined,
+  isUnstableAgent: undefined,
+  error: undefined,
+  category: undefined,
+  retryNotification: undefined,
+  attempts: undefined,
+  currentAttemptID: undefined,
+  lastMsgCount: undefined,
+  stablePolls: undefined,
+  consecutiveMissedPolls: undefined,
+}
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-3/packages/omo-opencode/src/features/background-agent/blocked-retention.test.ts:153:68)
+(fail) blocked task retention > #given manager cleanup is scheduled > #then findBySession stays undefined after cleanup even when global registry retains task [0.23ms]
+(pass) blocked task retention > #given terminal TTL pruning runs > #then keeps an old terminal task while its block is within the expiry window [0.13ms]
+(pass) blocked task retention > #given terminal TTL pruning runs > #then removes an old terminal task once its block reaches hard expiry [0.06ms]
+
+ 5 pass
+ 1 fail
+ 7 expect() calls
+Ran 6 tests across 1 file. [82.00ms]
+
+EXIT=1
+
+POST-REVERT GREEN OUTPUT
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/features/background-agent/blocked-retention.test.ts:
+(pass) blocked task retention > #given manager cleanup is scheduled > #then keeps a blocked task after the normal cleanup delay [1.42ms]
+(pass) blocked task retention > #given manager cleanup is scheduled > #then removes a blocked task after hard expiry [0.35ms]
+(pass) blocked task retention > #given manager cleanup is scheduled > #then removes an ordinary cancelled task on the normal schedule [0.12ms]
+(pass) blocked task retention > #given manager cleanup is scheduled > #then findBySession stays undefined after cleanup even when global registry retains task [0.26ms]
+(pass) blocked task retention > #given terminal TTL pruning runs > #then keeps an old terminal task while its block is within the expiry window [0.17ms]
+(pass) blocked task retention > #given terminal TTL pruning runs > #then removes an old terminal task once its block reaches hard expiry [0.07ms]
+
+ 6 pass
+ 0 fail
+ 7 expect() calls
+Ran 6 tests across 1 file. [101.00ms]
+
+EXIT=0
+
+CLEANUP RECEIPT: GIT STATUS --PORCELAIN
+
+--- GIT STATUS PORCELAIN ---
+ M packages/omo-codex/plugin/components/codegraph/dist/cli.js
+ M packages/omo-codex/plugin/components/codegraph/dist/serve.js
+ M packages/omo-codex/scripts/install-dist/install-local.mjs
+ M packages/omo-opencode/src/features/background-agent/blocked-retention.test.ts
+ M packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs
+ M packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+ M packages/omo-senpi/plugin/extensions/omo-member.js
+ M packages/omo-senpi/plugin/extensions/omo-memory-mcp.js
+ M packages/omo-senpi/plugin/extensions/omo-task.js
+ M packages/omo-senpi/plugin/extensions/omo.js
+
+WHAT WAS OBSERVED
+- Pristine source test passed: 6 pass, 0 fail. Output names new regression test, proving it ran.
+- Exact temporary mutation produced 5 pass, 1 fail. New test failed at `expect(...).toBeUndefined()` and received archived registry clone.
+- Post-revert source test passed: 6 pass, 0 fail. Output names new regression test, proving no zero-test or cached-success result.
+- `git status --porcelain` receipt lists no `manager.ts`; temporary mutation was reverted before commit.
+
+WHY IT IS ENOUGH
+`findBySession` must return live task objects because `resume()` mutates them and poller reads only manager task map. Global registry returns detached clones. Cleanup archives terminal task into registry, so temporary registry fallback makes old session resolve despite no live task. Failure proves regression test blocks that unsafe future change. Bun test imports current TypeScript source in this worktree; mutation changed behavior without rebuilding, so stale compiled output did not control result.
+
+ADVERSARIAL CLASSES
+- dirty_worktree: exact temporary `manager.ts` mutation captured above; cleanup receipt proves no manager.ts modification remains.
+- stale_state: pristine, mutated, and reverted source runs changed result with same direct Bun command; mutation was observed, so result was not cached build output.
+- misleading_success_output: every phase includes new regression test-name line and test count.
+- malformed input: not applicable; contract uses valid archived BackgroundTask fixture.
+- prompt injection: not applicable; no prompt parsing or untrusted text path exercised.
+- cancel/resume: not applicable; test pins lookup boundary, not resume state transition.
+- hung commands: not applicable; all Bun commands completed under 137 ms.
+- flaky tests: not applicable; deterministic fake timers and fixed clock used.
+- repeated interruptions: not applicable; no interruption loop in lookup contract.
+
+REQUIRED VERIFICATION
+- `bun run typecheck`: PASS, exit 0.
+- `bun test packages/omo-opencode/src/features/background-agent/blocked-retention.test.ts`: PASS, 6 pass, 0 fail after manager revert.
+- `bun test packages/omo-opencode/src/features/background-agent`: FAIL, 890 pass, 4 fail. Failures are in existing `manager.polling.test.ts` (three idle-output cases) and `parent-wake-pending-queue.test.ts` (numeric matcher case), outside this test-only change. Scoped regression test passes before and after mutation.
+- LSP diagnostics could not initialize: `Could not find a valid TypeScript installation`. Repository `bun run typecheck` supplies TypeScript validation instead.
+
+WHAT WAS OMITTED
+- No credentials, tokens, environment dumps, or provider logs.
+- Full received clone object remains in failing-output capture because it is test fixture data only.
