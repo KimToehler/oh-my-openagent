@@ -1122,3 +1122,38 @@ delegate — never iterate the bypass list.
 in the same session was still filtered. Project rule written at
 `onara/.omo/rules/lean-ctx-triage.md` documenting the delegate-don't-iterate rule and the
 full dead-end table. Shell stdout stays unfixed and has no known knob.
+
+## 2026-08-24 - Rules injection re-suppressed after compaction by full-transcript hydration
+
+**Severity:** costly
+**Area:** rules injection
+**Observed in:** `onara`, long orchestration session under opencode + oh-my-openagent
+
+**What happened:** A rule injected before a session compaction could never be re-injected,
+because transcript hydration kept finding its `[Rule: ...]` banner in messages the model
+could no longer see.
+
+**Evidence:**
+```
+live opencode DB session ses_fd16c1c72fferXUROX6pmb41R1
+rule banner in message msg_032e51103001Lb1cRxxJR6LYM6 at 2026-08-24 08:31:08
+compaction part {"type":"compaction","auto":false,"tail_start_id":"msg_032e6577f0018RuplNhW0akUDj"}
+tail-start message at 2026-08-24 08:32:31
+banner predates tail-start -> dropped from context
+zero [Rule: ...harness-findings...] parts appear after 08:33:28
+persisted state file still listed the rule as injected
+```
+
+**Root cause / hypothesis:** confirmed. `transcript-hydration.ts` scanned the full
+transcript via `client.session.messages({path:{id}})`, unbounded by compaction.
+`injection-processor.ts:135-141` then marked the rule injected and `continue`d without
+emitting. `hook.ts:101-106` cleared the persisted cache on `session.compacted`, but
+hydration immediately re-suppressed it. A second, worse path also existed: the persisted
+cache was loaded and checked before hydration ran, so a plugin restart across a compaction
+made the stale on-disk cache win regardless.
+
+**Workaround:** none found before the code fix landed.
+
+**Fix status:** fixed in `08a8d55b1` - hydration now stops at the last compaction part, and
+the persisted cache carries a `compactionEpoch` stamp that invalidates it on mismatch.
+
