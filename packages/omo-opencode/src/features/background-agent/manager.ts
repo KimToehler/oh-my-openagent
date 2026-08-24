@@ -1384,6 +1384,7 @@ The fallback retry session is now created and can be inspected directly.
 
   async resume(input: ResumeInput): Promise<BackgroundTask> {
     let existingTask = this.findBySession(input.sessionId)
+    let adoptedTask: BackgroundTask | undefined
     if (!existingTask) {
       const sessionExists = await this.verifySessionExists(input.sessionId)
       if (!sessionExists) {
@@ -1401,10 +1402,10 @@ The fallback retry session is now created and can be inspected directly.
           "Wait for it to complete before resuming it with task_id.",
         )
       }
-      if (liveness === "absent") {
+      if (liveness === "absent" && !(await this.validateSessionHasOutput(input.sessionId))) {
         throw new Error(
-          `Task for session ${input.sessionId} cannot accept a continuation prompt because its status registry is unavailable. ` +
-          "Wait for session status to become available before resuming it with task_id.",
+          `Task for session ${input.sessionId} exists but shows no agent output to continue from. ` +
+          `Use \`session_read(session_id="${input.sessionId}")\` to inspect the server-backed transcript.`,
         )
       }
 
@@ -1418,6 +1419,7 @@ The fallback retry session is now created and can be inspected directly.
         rootSessionId: input.parentSessionId,
         rootDescendantAlreadyReserved: false,
       })
+      adoptedTask = existingTask
     }
 
     if (!existingTask.sessionId) {
@@ -1425,7 +1427,7 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     let reconciledStaleRun = false
-    if (existingTask.status === "running") {
+    if (existingTask.status === "running" && !adoptedTask) {
       // A `running` record is not proof of a live child: when a subagent session
       // dies, nothing reconciles the in-memory status, so the task would reject
       // continuations forever and force a cancel-then-resume dance. Probe real
@@ -1484,6 +1486,10 @@ The fallback retry session is now created and can be inspected directly.
     } catch (error) {
       this.resumingBlockedTaskIds.delete(existingTask.id)
       if (reconciledStaleRun) this.completingTaskIds.delete(existingTask.id)
+      if (adoptedTask) {
+        this.unregisterRootDescendant(input.parentSessionId)
+        this.removeTask(adoptedTask)
+      }
       throw error
     }
     existingTask.concurrencyKey = concurrencyKey
