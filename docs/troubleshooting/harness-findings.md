@@ -118,6 +118,10 @@ stranded, and the ~110s foreground cap is not raisable by env var
 stays open; the rescue hook and the duration-routing table in `AGENTS.md:100-126` are what
 make it survivable.
 
+**Update:** (2026-08-24, verified against dev source) External half unchanged and confirmed live: the parent of this review reproduced it in-session. The polling contract wording is intact and accurate at `/Users/tim/.config/opencode/AGENTS.md:110-118` (`task` notifies, detached `ctx_shell` "never notifies", poll `background_action="status"`) and `:121-122`. Our side of the problem is closed and durable: detached jobs are tracked unconditionally at `packages/omo-opencode/src/plugin/tool-execute-after.ts:123-134`, the idle rescue hook is wired as a Session-tier hook (`packages/omo-opencode/src/hooks/unpolled-shell-job/`), and its message now recommends a bounded completion loop rather than repeated status calls (`packages/omo-opencode/src/hooks/unpolled-shell-job/message.ts:28-45`). Note the entry's reference to `core/instructions.md` no longer resolves - that file does not exist in the current checkout, so the tracked copy of this guidance now lives only in the root `AGENTS.md` and the user-global `AGENTS.md`.
+
+**Fix status (2026-08-24):** worked around, unchanged. External notification gap remains outside our control; repository-side tracking and rescue remain fixed. Severity revised `blocker` -> `costly`: the idle rescue prevents silent stranding in normal sessions, and the failure mode now requires a session that never goes idle.
+
 ## 2026-08-17 — `<unpolled-background-shell-jobs>` hook fires once, then stops
 
 **Severity:** costly
@@ -189,6 +193,10 @@ a job that started before tracking (`tracker.ts:173-184`) and idle-bound firing
 
 **Fix status (2026-08-21):** unchanged from the revised status — tracking gap closed,
 one-shot diagnosis retracted, two design limits open by intent.
+
+**Update:** (2026-08-24, verified against dev source) Revised diagnosis holds; the "fires once" framing stays retracted. The hook fires on every `session.idle` with outstanding jobs, gated only by an in-flight flag and a cooldown, at `packages/omo-opencode/src/hooks/unpolled-shell-job/hook.ts:82-89`. `lastNudgedAt` is armed only after an accepted, non-discarded dispatch (`:112-120`), so a rejected or semantically-deduped dispatch retries on the next idle (`:46-48`). There is no per-job warned `Set` or permanent dedupe map; state is session-level only (`:50-56`). Repeat-after-cooldown and retry-after-discard are both pinned by tests at `hook.test.ts:109-126` and `:179-200`. `8810f3174` confirmed on `dev` as `fix(hooks): truncate MCP tool outputs, which were silently skipped`.
+
+**Fix status (2026-08-24):** tracking gap remains fixed. Residual limits - idle-only firing (`hook.ts:82-85`) and positive-status-only late adoption (`tracker.ts:173-184`) - are deliberate design, not defects. Severity revised `costly` -> `papercut`.
 
 ## 2026-08-17 — Stale-cancellation timer misread as a wall-clock budget
 
@@ -363,6 +371,10 @@ a 30-minute `TASK_TTL_MS`. A dead-but-row-present task actually dies at ~30min a
 The 45min ladder is reachable only for `teamRunId` tasks, which prune skips
 (`task-poller.ts:76-78`).
 
+**Update:** (2026-08-24, verified against dev source) **Diagnosis retracted.** Resume no longer requires a cancel first. `BackgroundManager.resume()` now probes session liveness before rejecting: `packages/omo-opencode/src/features/background-agent/manager.ts:1396` enters the running branch, `:1402-1407` defines the rejection, `:1413-1417` withholds judgement until `MIN_SESSION_GONE_POLLS` is exceeded, and `:1424-1430` reconciles a confirmed-dead session and admits the continuation prompt with an explicit "previous run did not report a result" note. Verified fix commits: `8728fa5f1 fix(background-agent): reconcile stale running status on resume` and `cc13ab687 fix(background-task): disclose session silence instead of promising a notification` (both confirmed present in `git log`). Regression coverage at `stale-running-resume.test.ts:89-180` drives dead-session resume without cancellation and still rejects a genuinely busy session. The "frozen duration" symptom was not reproduced.
+
+**Fix status (2026-08-24):** fixed in `8728fa5f1` (resume path) + `cc13ab687` (reporting path); the earlier poller diagnosis was retracted in `d133f0f8`. Residual: a status endpoint failure still fails safe and blocks resume (`manager.ts:1411-1412`), which is intended. Severity revised `costly` -> `papercut`.
+
 
 
 
@@ -426,6 +438,12 @@ session id as context — recovers the work but not the tracking.
 **Fix status (2026-08-21):** still unfixed, confirmed at `task-registry.ts:11-30`. Neither
 log-only process cleanup nor the cross-process transcript fallback persists a task record;
 both address different axes.
+
+**Update:** (2026-08-24, verified against dev source) Still open, and independently cross-checked for a compensating mechanism. `activeTasks` and `completedTasks` are plain `Map`s hung off `globalThis` at `packages/omo-opencode/src/features/background-agent/task-registry.ts:6-29`; registration, archival, and lookup touch only those maps (`:99-124`). `TaskHistory` is likewise process-local (`task-history.ts:19-21`). No `~/.omo/` write, SQLite table, JSON state file, or hydrate path exists anywhere in the module. Plugin-restart orphaning is documented as expected behavior at `packages/omo-opencode/src/features/background-agent/AGENTS.md:52-53`.
+
+The cross-check did find a partial mitigation the original entry did not credit: `background_output` now falls back to reconstructing a child session from the parent transcript when the registry misses, pairing `bg_...` to `ses_...` (`packages/omo-opencode/src/tools/background-task/create-background-output.ts:88-179`, pairing logic in `parent-transcript-pairing.ts:114-142`, tests at `create-background-output.cross-instance.test.ts:135-191`). That recovers *output* but not task state - status, retry history, cancellation state, and resumability are all still lost, and the code says so at `:148-149`.
+
+**Fix status (2026-08-24):** partially fixed - result retrieval has a transcript fallback; task-record persistence does not exist. Severity stays `costly`: restart still breaks `task_id`-based control, and a missing transcript pairing is unrecoverable.
 
 ## 2026-08-17 — Completion summary replays every historical park as a current failure
 
@@ -512,6 +530,12 @@ Second test pins the direction that matters more than the headline one: a task w
 state is a genuine failure is still counted once as failed, so the dedupe cannot silently
 swallow real failures. Evidence: `.omo/evidence/20260821-summary-park-dedupe/`.
 
+**Update:** (2026-08-24, verified against dev source) **Fixed, at the render boundary rather than the one the entry predicted.** The manager still appends every completion row unconditionally at `packages/omo-opencode/src/features/background-agent/manager.ts:2938-2946` - so the original source citation is still accurate - but the notification template now collapses rows by task id before counting failures: `dedupeByTaskId` at `background-task-notification-template.ts:76-82`, applied at `:93` ahead of the failure filter at `:102` and the `${failedTasks.length} FAILED` render at `:113`. Regression tests at `background-task-notification-template.test.ts:729-773` prove repeated park/resume events collapse to one line with no `FAILED`, while a genuine final error still counts exactly once. Fix commit verified: `7d41a6f23 fix(background-agent): stop replaying every park as a current failure`.
+
+This is why reading the manager alone would have produced a false "still open" - the compensating mechanism is one module downstream.
+
+**Fix status (2026-08-24):** fixed in `7d41a6f23`. Residual is cosmetic: duplicate rows are still retained in memory at `manager.ts:2938-2946`. Severity revised `costly` -> `papercut`.
+
 ## 2026-08-17 — `report_blocked` used for waiting, not for blocking
 
 **Severity:** costly
@@ -579,6 +603,10 @@ only its trigger condition is under-specified.
 wording changes close it: the tool description at `tools/report-blocked/tools.ts:14-16`, the
 delegation prompt at `tools/delegate-task/prompt-builder.ts:16-18`, and the owed reference
 entry noted in `docs/reference/blocked-escalation-follow-up.md:19-25`.
+
+**Update:** (2026-08-24, verified against dev source) Still open, and the fix is still wording. The tool description at `packages/omo-opencode/src/tools/report-blocked/tools.ts:12-20` still says only "cannot continue without parent input" and asks what prevents progress - it never says that a job which will finish on its own is *waiting*, not *blocked*. The delegation prompt repeats the same incomplete framing at `packages/omo-opencode/src/tools/delegate-task/prompt-builder.ts:16-18`. A repo-wide search of `packages/prompts-core/` and `.omo/rules/` found no wait-versus-block instruction anywhere. The owed user-facing documentation is still listed as missing at `docs/reference/blocked-escalation-follow-up.md:15-24`. The runtime mechanism itself is correct - it parks the task as designed (`tools.ts:38-50`).
+
+**Fix status (2026-08-24):** still unfixed, severity confirmed `docs-gap`. Contained fix: add the distinction to the tool description, mirror it in `prompt-builder.ts`, and add the owed row to `docs/reference/features.md`.
 
 ## 2026-08-17 — Mid-batch background completions starve a busy parent; delivery bounded, retention not
 
@@ -698,6 +726,14 @@ is bounded and pinned by tests; what remains is ordering.
 **Fix status (2026-08-21):** delivery bounded and pinned (`parent-wake-flush-runner.ts:28`,
 `:303-309`, nine tests); cross-process retention closed via the parent-transcript fallback.
 Residual `shouldReply`-only `wakeStillOwed` ordering weakness remains open at `costly`.
+
+**Update:** (2026-08-24, verified against dev source) Verified separately per half, with the earlier false-verdict trap explicitly avoided.
+
+*Delivery: fixed.* Two ceilings now exist, not one. `PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS = 60_000` at `parent-wake-flush-runner.ts:23`, and the second ceiling `PENDING_PARENT_WAKE_MAX_RETAINED_ADMIT_DEFER_MS = 300_000` at `:28`. `shouldForceDispatchAfterActiveDefer` is indeed still `shouldReply`-gated at `:295-297` - which is what misled the first verifier - but `shouldAdmitRetainedWakeAfterCeiling` at `:303-309` closes the noReply path, and the active-session flush drives it with `forceNoReply: true, retainPendingWake: true` at `:61-81`. Pinned by `parent-wake-midbatch-starvation.test.ts:184-239` and `:446-496`.
+
+*Retention: still open.* Task cleanup still counts only `pendingParentWake?.shouldReply`, `dispatchedParentWake?.shouldReply`, or an in-flight dispatch toward `wakeStillOwed` at `manager.ts:2545-2553`. A pending noReply wake does not pin its completed task; cleanup is bounded only by `TASK_TTL_MS`. Retention coverage at `task-completion-retention-guard.test.ts:304-539` tests the shouldReply cases, not this one.
+
+**Fix status (2026-08-24):** delivery fixed and pinned; retention still open at `manager.ts:2545-2553`. Severity revised `blocker` -> `costly`: unbounded parent starvation is gone, and the remainder is an in-memory lookup window, not a delivery failure.
 
 ## 2026-08-17 — Findings log had no review path; three entries were stale within hours
 
@@ -821,6 +857,10 @@ delegation MUST-DO block.
 **Fix status (2026-08-21):** still unfixed. Evidence discipline exists
 (`AGENTS.md:21-29`, `verification-before-completion`) but is not wired into the default
 delegation path, so the subagent that writes the summary never sees it.
+
+**Update:** (2026-08-24, verified against dev source) Still open, and searched exhaustively rather than assumed. No instruction requiring verbatim tool output - no "paste the raw output, do not summarize" or equivalent - exists in `packages/prompts-core/prompts/`, `.omo/rules/`, `~/.omo/rules/`, the root `AGENTS.md`, or any `.agents/skills/*/SKILL.md`. The closest wording all falls short: Atlas tells subagents to "append findings" without defining findings as raw output (`packages/prompts-core/prompts/atlas/opus-4-7.md:387-389`, `kimi-k3.md:260-272`); the root `AGENTS.md:21-29` demands "the exact captured output" as an artifact but then permits summarizing for secret-bearing material and does not bind default delegation; `codex-qa` calls captured JSON "the evidence" (`SKILL.md:32-36`) without forbidding a prose summary in its place. The one place that does demand exact lines is the findings capture rule itself (`.omo/rules/harness-findings.md:45-50`), which applies to findings, not to every subagent result.
+
+**Fix status (2026-08-24):** still unfixed. Severity revised `costly` -> `docs-gap` per the review rule that a finding whose real fix is wording is a docs-gap regardless of cost - the operational impact remains high, since a summarized result and a fabricated one are indistinguishable at review.
 
 ## 2026-08-21 — OpenDesign kills in-flight background subagents at parent turn end, then reports them `completed`
 
@@ -1018,6 +1058,16 @@ The OpenDesign half remains open and is not fixable here: `opencode run` exits a
 so a background subagent cannot outlive it by construction. Severity for the host-side issue
 stays `blocker`; the silent-false-success half is closed on every one-shot host.
 
+**Update:** (2026-08-24, verified against dev source) Verified separately per half; the ownership split the entry predicted is confirmed, and our half is now closed.
+
+*Mislabeling (ours): fixed.* `BackgroundManager.shutdown()` now archives every still-running task as a cloned `cancelled` record carrying a FINAL-cancellation reason at `manager.ts:3586-3602`, instead of dropping it. Cross-runtime `background_output` recovery no longer asserts success: it carries task status `running` and renders `Status: unknown` with an explicit warning that a transcript does not prove completion (`create-background-output.ts:111-148`). Fix commit verified: `9096d20da fix(background-agent): stop reporting killed in-flight tasks as completed`. Tests at `manager-shutdown-global-cleanup.test.ts:159-203` pin both the cancel-on-shutdown path and terminal-status preservation.
+
+*The kill itself (OpenDesign's): still open.* The one-shot `opencode run` lifecycle still terminates in-flight background tasks at parent turn end. Nothing in our source can keep them alive.
+
+Note for anyone extending this: there is still no `aborted`/`killed` status (`types.ts:5-11`) and no parser for the literal `"Tool execution aborted"` string anywhere in source - that string appears only in this log and in evidence files.
+
+**Fix status (2026-08-24):** OMO false-success reporting fixed in `9096d20da`; the external kill remains unfixed and stays a `blocker` for OpenDesign specifically, where background work is unusable by construction.
+
 ## 2026-08-21 — `session.status()` polled without a directory, but the endpoint is directory-scoped
 
 **Severity:** costly
@@ -1057,6 +1107,14 @@ because the cross-directory prompt in the sandbox failed with an unrelated provi
 direction — if the no-argument call currently returns a BROADER map, filtering it would newly
 hide sessions and make `sessionNotBusy` fire more often, which is the failure mode we just
 proved is dangerous. Needs a real multi-directory server run before either direction ships.
+
+**Update:** (2026-08-24, verified against dev source) Still open, and the surface is wider than the entry recorded. Both cited call sites remain unscoped: `manager.ts:3285` (liveness probe) and `:3398` (`pollRunningTasks`) call `session.status()` with no `query`. Cross-checked for a wrapper supplying the directory one level up - there is none, and `spawner.ts:49-64` can give a child session a parent-derived directory, so the call is not harmless by construction.
+
+Two corrections to the original entry. First, the contrast case is imprecise: `session-existence.ts:39-65` does conditionally scope with `query: { directory }` at `:45-48`, but it calls `session.get`, not `session.status`. Second, this is not two call sites but roughly fifteen. Scoped: `cli/run/completion.ts:87-89`, `cli/run/poll-for-completion.ts:230-232`, `cli/run/prompt-start.ts:38-40`. Unscoped: the two manager sites plus `features/tmux-subagent/polling-manager.ts:70-71`, `features/tmux-subagent/polling.ts:76-77` and `:113-114`, `features/tmux-subagent/session-ready-waiter.ts:20-22`, `features/tmux-subagent/manager.ts:714-718`, `features/tui-sidebar/snapshot-builder.ts:55-62`, `tools/look-at/session-poller.ts:41-47`, `tools/call-omo-agent/completion-poller.ts:33-37`, `tools/delegate-task/sync-session-poller.ts:163-167`, `tools/delegate-task/unstable-agent-task.ts:123-129`, `plugin/unstable-agent-babysitter.ts:27-28`, and `packages/utils/src/session-idle-settle.ts:52-63`.
+
+Mitigating: `not-busy-is-not-gone.test.ts:6-20,41-48` pins the invariant that an absent status does not mean a dead session, and the poller confirms row existence with a directory before acting (`task-poller.ts:263-353`), so an unscoped miss currently fails safe.
+
+**Fix status (2026-08-24):** still unfixed, still deliberately. Severity stays `costly`, confidence moderate - end-to-end harm remains unproven, and any fix should now be scoped as a sweep of all fifteen sites rather than a two-line change.
 
 
 ## 2026-08-23 — lean-ctx triage silently eats dense output; every per-call bypass is a dead end
@@ -1134,6 +1192,14 @@ entry. `ctx_shell` stdout **without** `raw=true` is still filtered. The delegate
 above is no longer the first move — `raw=true` is.
 
 ---
+
+**Update:** (2026-08-24, live reproduction during the harness-findings review) **The `compress_protect` workaround does not hold, and the upstream-fix claim above is not true for this runtime.** Reading this very file during its own review failed through every path attempted: `ctx_read` in `full`, `lines:N-M`, and `map` modes including `aggressiveness=0`; `ctx_search` with `action=regex`; `ctx_shell` running `grep` with both `raw=true` and `inline=true`; and `ctx_execute` in both `shell` and `python` printing the slice to stdout. All returned `[lean-ctx: N lines filtered by triage (level 2)]` with zero content.
+
+The active config is `/Users/tim/.lean-ctx/config.toml`, not `~/.config/lean-ctx/config.toml` as the error message advertises. `"**/*.md"` **is** present in `compress_protect` at `:158` - so the glob is neither missing nor mis-scoped. The key sits under `[proxy]` (`:137-139`), and no `triage_protect` or any triage-level exclusion key exists in the config at all. That is the actual mechanism: `compress_protect` governs *compression*; triage is a separate, earlier layer with no protect list, and protecting a file from one does not protect it from the other.
+
+Delegation remained the only working route: `task(subagent_type="explore", ...)` returned the file's contents in full. Every step of this review that needed this file's text - the initial inventory, and each of the 17 verifier lanes - went through a subagent for that reason.
+
+**Fix status (2026-08-24, revised):** NOT worked around. `compress_protect` is the wrong lever; there is no triage-side equivalent to set. Severity revised `costly` -> `blocker`: recurrence outranks the original guess, this now reproduces on a file being actively worked on, it is silent, and no per-call bypass exists. Only delegation works.
 
 ## 2026-08-24 — `formatTaskResult` discards a lane's whole transcript when the session errors
 
@@ -1215,6 +1281,12 @@ completion notification distinguish aborted from completed would close the secon
 
 ---
 
+**Update:** (2026-08-24, verified against dev source) Still open, confirmed at the exact shape the entry described. `formatTaskResult` returns on `if (sessionError)` at `task-result-format.ts:71-82`, emitting only the header and `Session error:`, before `consumeNewMessages` is ever reached at `:84-97`. The default `background_output` path routes completed tasks straight into it at `create-background-output.ts:292-295`.
+
+Cross-checked for a compensating path: `formatFullSession` does preserve the transcript, but only on two routes that do not cover the default - `full_session=true` (`create-background-output.ts:275-285`) and cross-runtime registry-miss recovery (`:120-145`). Neither helps a caller who just asks for a result. The existing test supplies a single errored message with `parts: []` and asserts only the error text (`task-result-format.test.ts:24-47`), so it cannot catch this: there is no good-turns-then-error case.
+
+**Fix status (2026-08-24):** still unfixed. Severity stays `costly`. This is the most contained fix in the log: emit the consumed partial transcript alongside the session error in `task-result-format.ts:71-82`, with an N-good-turns-then-error regression test beside `task-result-format.test.ts:23-47`. Touches an OpenCode-connected path, so it needs `opencode-qa` evidence.
+
 ## 2026-08-24 — A timed-out `ctx_shell` is indistinguishable from a failed one
 
 **Severity:** papercut
@@ -1265,6 +1337,10 @@ make recovery obvious rather than guesswork.
 
 ---
 
+**Update:** (2026-08-24, verified against dev source) Largely closed by guidance that already exists, though not in this repo. `/Users/tim/.config/opencode/AGENTS.md:128` states "Verify by effect, not by status line" and names the artifacts to check; `:126` documents the fixed ~110s foreground cap and separates it from a detached job's lifetime; `:130` says to prefer reading existing build artifacts over re-running. Together those cover the recovery this entry asked for. The repo-local `AGENTS.md` and `.omo/rules/*.md` carry no equivalent wording, so an agent running without the user-global file is still uncovered. Note the entry's `core/instructions.md` reference no longer resolves - that file is absent from the current checkout.
+
+**Fix status (2026-08-24):** effectively fixed for agents that load the user-global `AGENTS.md`; uncovered otherwise. Severity stays `papercut`.
+
 ## 2026-08-24 — `multimodal-looker` reports high confidence on image regions outside the frame
 
 **Severity:** costly
@@ -1311,6 +1387,10 @@ dimensions and confirm the target is in frame before answering, and to prefer
 `NOT VISIBLE` over inference — would close it at the source.
 
 ---
+
+**Update:** (2026-08-24, verified against dev source) Still open. Neither of the two places a guard could live has one. The agent system prompt at `packages/omo-opencode/src/agents/multimodal-looker.ts:24-59` instructs attachment analysis and reporting missing information, but never requires stating actual pixel dimensions, confirming the target is within frame, or preferring `NOT VISIBLE`. The runtime prompt passes goal and attachment straight through (`packages/omo-opencode/src/tools/look-at/look-at-prompt.ts:23-31`). The tool description warns against using `look_at` for precision (`packages/omo-opencode/src/tools/look-at/constants.ts:1-3`) but adds no frame check, and the schema validates paths and goal only (`tools.ts:13-22`). A search for `dimensions`, `out of frame`, `bounds`, and `NOT VISIBLE` across the module returned nothing relevant.
+
+**Fix status (2026-08-24):** still worked around at the caller. Severity stays `costly` - the recorded hit rate was five false findings out of five, and false confidence closes visual-QA work incorrectly. Contained prompt-only fix, best applied at `multimodal-looker.ts:53-57` and mirrored in `look-at-prompt.ts:29-31`.
 
 ## 2026-08-24 — `review-work` and `full-code-review` default to a diff range that is empty for merged work
 
@@ -1360,6 +1440,12 @@ improvised.
 
 ---
 
+**Update:** (2026-08-24, verified against dev source) Still open in both skills, and neither has the fallback that would rescue it. `review-work` defaults to `git diff --name-only HEAD~1` and `git diff HEAD~1`, offering `main...HEAD` only as an alternate (`packages/shared-skills/skills/review-work/SKILL.md:95-102`); its input section mentions "the appropriate base (branch point, specific commit)" at `:85-86` but gives no trigger or procedure for merged work, and nothing in `:76-110` refuses an empty range. `full-code-review` defaults to `git diff main...HEAD` plus uncommitted changes (`/Users/tim/.agents/skills/full-code-review/SKILL.md:20-23`, repeated at `:38-40`) with no merged-work branch; its merge-base handling at `:46-54` applies only to validating regression claims, not to picking the review scope.
+
+Ownership differs and matters: `review-work` is tracked in this repo at `packages/shared-skills/skills/review-work/SKILL.md`, so it is fixable here. `full-code-review` is user-global at `/Users/tim/.agents/skills/` and outside this repository.
+
+**Fix status (2026-08-24):** still unfixed in both. Severity stays `docs-gap`. One line in each - if the range is empty because the work is already merged, ask for an explicit commit range - closes it.
+
 ## 2026-08-24 — `ctx_shell` redirect guard also blocks heredoc appends
 
 **Severity:** papercut
@@ -1390,6 +1476,18 @@ than the heredoc anyway, since it fails loudly when the anchor has moved.
 
 **Fix status:** worked around. Worth documenting that the rule is syntactic, so agents
 reach for `Edit` first rather than discovering the guard.
+
+**Update:** (2026-08-24, reproduced live during the harness-findings review) Confirmed, verbatim. A heredoc append to a throwaway path under `.local-ignore/` was rejected:
+
+```
+ERROR: ctx_shell detected a file-write command (shell redirect > or >>). Use the native Write tool to create/modify files. ctx_shell is ONLY for reading command output (git status, cargo test, npm run, etc.). File writes via shell cause MCP protocol corruption on large payloads. Output capture to temp paths (/tmp, /var/tmp, $TMPDIR) is allowed.
+```
+
+The message text confirms the mechanism is syntactic: it matches on `>` / `>>` and reasons about payload size, with no notion of the heredoc body being small and literal. Worth noting the message names an escape hatch the entry did not - output capture to `/tmp`, `/var/tmp`, or `$TMPDIR` is explicitly permitted, so redirecting to a temp path and reading it back is a supported route where the native `Write` tool is not wanted.
+
+A documentation search found no note anywhere - repo `AGENTS.md`, user-global `AGENTS.md`, `.omo/rules/*.md` - that the guard is syntactic, and no documented `ctx_execute(language="shell")` escalation for it. The closest is `/Users/tim/.config/opencode/AGENTS.md:78`, "File editing -> native Edit/StrReplace".
+
+**Fix status (2026-08-24):** still worked around, still undocumented. Severity stays `papercut`.
 ## 2026-08-24 - Rules injection re-suppressed after compaction by full-transcript hydration
 
 **Severity:** costly
@@ -1531,3 +1629,19 @@ silently stops seeing MCP-prefixed writes fails open rather than closed.
 
 **Fix status:** unfixed - each migration needs its own failing test first, and (per the
 prior entry) a naive suffix match would break `todowrite`.
+
+**Update:** (2026-08-24, verified against dev source) Still open, and now enumerated. `matchesTrackedTool` (`packages/omo-opencode/src/shared/tool-name-match.ts:3-21`) has exactly three production callers, all injectors: `rules-injector/hook.ts:73`, `directory-agents-injector/hook.ts:50`, `directory-readme-injector/hook.ts:44`. Fix commit verified as `8f3d2daa3 feat(shared): add MCP-aware tool-name matching helper`; no later migration commit exists.
+
+Genuinely affected active hooks - each gates a *built-in* tool name that can arrive MCP-qualified:
+
+1. `write-existing-file-guard/tool-execute-before-handler.ts:113` - `toolName !== "write" && toolName !== "read"`, and `:131`. Security-relevant: the guard fails open for a qualified write.
+2. `comment-checker/hook.ts:72` - `toolLower !== "write" && toolLower !== "edit" && toolLower !== "multiedit"`, and `:115-116`.
+3. `read-image-resizer/hook.ts:15-16,121` - qualified reads skip resizing.
+4. `hashline-read-enhancer/hook.ts:19-25,201-202` - qualified reads skip hashline tagging, which also breaks the `hashline_edit` pairing invariant.
+5. `atlas/write-edit-tool-policy.ts:1-4`, consumed at `atlas/tool-execute-before.ts:13,82` and `atlas/tool-execute-after-direct-work.ts:14,24`.
+
+Latent, not active: `hashline-edit-diff-enhancer/hook.ts:31-33,60,75` uses exact `write` matching but the directory is unwired.
+
+Cross-checked and classified as **false positives** - these gate OMO-internal tool names that cannot arrive MCP-qualified, where exact matching is correct and a prefix match would wrongly catch unrelated MCP tools: `team-tool-gating/hook.ts:98-133`, `prometheus-md-only/hook.ts:27,40`, `question-label-truncator/hook.ts:58`, `interactive-bash-session/hook.ts:54`, `empty-task-response-detector.ts:18`, `sisyphus-junior-notepad/hook.ts:16`, `non-interactive-env/non-interactive-env-hook.ts:74`, `bash-file-read-guard.ts:23`, `delegate-task-retry/hook.ts:12`, `session-notification.ts:74,153`, `todo-continuation-enforcer/pending-question-detection.ts:21,29`. `edit-error-recovery/hook.ts:45` could not be classified from source alone.
+
+**Fix status (2026-08-24):** still unfixed, now scoped: five hooks to migrate, each needing its own failing MCP-qualified-name test first. Severity stays `costly`, led by the `write-existing-file-guard` fail-open.
