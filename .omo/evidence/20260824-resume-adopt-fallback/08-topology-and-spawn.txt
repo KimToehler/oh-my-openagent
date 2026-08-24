@@ -1,0 +1,7 @@
+sandbox=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.POR7OaGZ4a
+project=/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.POR7OaGZ4a/proj
+parent=ses_fca95c0ddffeUPmv5qEdj3G1YP
+child=ses_def456
+server1_pid=78746
+port1=55782
+status={"ses_fca95c0ddffeUPmv5qEdj3G1YP":{"type":"busy"}}

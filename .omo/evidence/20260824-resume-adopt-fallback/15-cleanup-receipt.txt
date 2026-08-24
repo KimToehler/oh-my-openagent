@@ -1,0 +1,6 @@
+server1_alive=no
+server2_alive=no
+mock_alive=no
+port1_listener=2
+port2_listener=2
+sandbox_exists=yes

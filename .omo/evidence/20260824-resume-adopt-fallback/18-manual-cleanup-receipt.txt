@@ -1,0 +1,16 @@
+Corrected-run cleanup after intermediate runner fault
+
+Manual actions:
+1. kill 78748 78853
+2. verified no `opencode serve` or `mock-model.mjs` process remained via `ps -axo pid,command | grep -E 'opencode serve|mock-model.mjs' | grep -v grep || true`
+3. removed /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.POR7OaGZ4a
+4. verified `sandbox_exists=no`
+5. queried host DB: `sqlite3 "$(opencode db path)" 'SELECT count(*) FROM session'`
+
+Observed:
+- no matching process output after kill
+- sandbox_exists=no
+- host DB count=2661
+- 07-host-db-before-corrected-run.txt also records 2661
+
+No credentials, auth headers, or secrets recorded.

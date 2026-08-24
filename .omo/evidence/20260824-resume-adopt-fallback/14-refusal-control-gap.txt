@@ -1,0 +1,1 @@
+REFUSAL control BLOCKED: bundled mock emits each child response immediately; no delay/hang primitive provides active-session positive control without product or harness changes.

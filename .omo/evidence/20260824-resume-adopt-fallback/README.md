@@ -38,3 +38,42 @@ Missing capability: supported executable client/host driver able to invoke OMO r
 - No fake provider/server/client logs exist because topology was not started.
 - No cleanup command ran against pre-existing listeners, preventing unrelated process disruption.
 - No product source changed.
+
+## CORRECTED TOPOLOGY RUN (server restart)
+
+### WHAT WAS TESTED
+
+1. Fresh bundle build and freshness comparison: `bun run build`; `dist/index.js` is newer than all four requested changed source files. Capture: `02-build-freshness.txt`.
+2. Strict sandbox setup: `script/agent/qa-sandbox.sh` conventions via `oqa_mk_isolated_xdg`, canonical project path from `realpathSync`, local OpenAI-compatible mock provider, local `dist/index.js` plugin bundle, password-protected `opencode serve`. First server PID, sandbox path, canonical project root, parent session, and attempted child ID: `08-topology-and-spawn.txt`.
+3. Correct orphaning action: first `opencode serve` PID was killed. Capture: `10-server1-death.txt`.
+4. Restart path: fresh server started against same sandbox DB and canonical project root. Sandbox session-row lookup before and after restart: `09-child-pre-restart-sandbox-row.txt`, `11-child-survives-restart.txt`.
+5. Model-side continuation and absent-session probes: `12-post-restart-child-transcript.json`, `13-absent-response.json`.
+6. Cleanup and host DB isolation: `15-cleanup-receipt.txt`, `16-host-db-after-corrected-run.txt`.
+
+### WHAT WAS OBSERVED
+
+- Build freshness passed. `dist/index.js` mtime `1787602092799053387` exceeded all requested source mtimes. `02-build-freshness.txt` records full comparison.
+- Host DB count before corrected run was `2661`; after cleanup was `2661`. The isolated run did not write host DB.
+- First server death passed: `10-server1-death.txt` records `PASS server1 78746 gone`.
+- Mock-provider model-side spawn did **not** yield a real child session. Capture regex selected fixture-looking `ses_def456` from mock request content instead of a server-minted child ID. Both sandbox DB row queries are empty: `09-...` and `11-...`.
+- Therefore no persisted child existed for restart adoption. `12-post-restart-child-transcript.json` is server error `Session not found: ses_def456`, not happy-path proof.
+- ABSENT probe did not reach fallback. `13-absent-response.json` contains mock `PARENT_FINAL`, proving scripted `ABSENT_MARKER` tool turn was not selected after earlier turn mismatch.
+- REFUSAL has no valid active-session control pair. `14-refusal-control-gap.txt` records missing deterministic active-child capability. This run also cannot use a negative-only assertion.
+- Initial cleanup command exposed two server descendants and sandbox removal failure. Manual cleanup killed both remaining `opencode serve` processes, verified no `opencode serve` or `mock-model.mjs` remained, removed sandbox, and host DB count stayed `2661`. This manual receipt must be treated as final cleanup evidence; stale `15-cleanup-receipt.txt` is failed intermediate evidence, not success proof.
+
+Verdicts:
+
+- HAPPY: BLOCKED. Deciding observable: no server-minted child `ses_...` was captured or found in sandbox DB, so post-restart `resume()` adoption was never invoked.
+- REFUSAL: BLOCKED. Deciding observable: no deterministic active-child positive control exists; negative-only probe prohibited.
+- ABSENT: BLOCKED. Deciding observable: `ABSENT_MARKER` did not execute `task`, so restart-specific `session_read` error was not observed.
+
+### WHY IT IS ENOUGH
+
+Run proves corrected topology mechanics up to killing real server process and preserving strict host DB isolation. It does not prove product behavior. Mock script capture matched an instruction/schema fixture ID before server returned a real `task_id`, so model-side spawn cannot deterministically supply required child identity. No weaker HTTP prompt substitute was used because it bypasses `BackgroundManager.resume()`.
+
+### WHAT WAS OMITTED
+
+- No product source changed.
+- No credentials, tokens, password, or authorization headers recorded.
+- No fabricated happy-path transcript, active-session control, or absent-session error claimed.
+- Temporary QA runner lived in `/tmp` and was removed with sandbox cleanup; it is not product or evidence source.
