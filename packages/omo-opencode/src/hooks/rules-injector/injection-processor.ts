@@ -96,19 +96,15 @@ export function createRuleInjectionProcessor(
 			loadedCache.compactionEpoch !== compactionEpoch;
 		const cache = shouldReset
 			? {
-						contentHashes: new Set<string>(),
-						realPaths: new Set<string>(),
-						...(compactionEpoch === undefined ? {} : { compactionEpoch }),
-					}
+					contentHashes: new Set<string>(),
+					realPaths: new Set<string>(),
+					compactionEpoch,
+				}
 			: loadedCache;
 		if (cache !== loadedCache) {
 			loadedCache.contentHashes = cache.contentHashes;
 			loadedCache.realPaths = cache.realPaths;
-			if (cache.compactionEpoch === undefined) {
-				delete loadedCache.compactionEpoch;
-			} else {
-				loadedCache.compactionEpoch = cache.compactionEpoch;
-			}
+			loadedCache.compactionEpoch = cache.compactionEpoch;
 		}
 		const ruleScanCache = getSessionRuleScanCache?.(sessionID);
 		const home = getHomeDir();

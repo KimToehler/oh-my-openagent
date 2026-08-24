@@ -149,7 +149,7 @@ async function fetchTranscriptRelativePaths(
 	let scannedChars = 0;
 	for (let index = data.length - 1; index >= start; index -= 1) {
 		const message = data[index];
-		if (isCompactionMessage(message)) {
+		if (isCompactionRecord(message)) {
 			compactionEpoch = getMessageID(message);
 			break;
 		}
@@ -170,11 +170,16 @@ async function fetchTranscriptRelativePaths(
 		: { relativePaths, compactionEpoch };
 }
 
-function getMessageParts(value: unknown): unknown {
-	if (value === null || typeof value !== "object" || !("parts" in value)) {
-		return undefined;
+/**
+ * `isCompactionMessage` dereferences `message.info`, so a null or non-object
+ * transcript entry would throw and abort the whole scan for the session.
+ * Narrow before delegating.
+ */
+function isCompactionRecord(value: unknown): boolean {
+	if (value === null || typeof value !== "object") {
+		return false;
 	}
-	return value.parts;
+	return isCompactionMessage(value);
 }
 
 function getMessageID(value: unknown): string | undefined {

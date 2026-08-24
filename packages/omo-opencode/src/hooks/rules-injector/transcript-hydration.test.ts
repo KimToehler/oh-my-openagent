@@ -278,6 +278,21 @@ describe("createTranscriptHydrationStore", () => {
 		expect(store.getCompactionEpoch("session-1")).toBe("agent-epoch");
 	});
 
+	it("#given a null transcript entry #when hydrateSession runs #then the scan skips it instead of aborting", async () => {
+		// given
+		const store = createTranscriptHydrationStore({
+			client: makeClient(async () => ({
+				data: [{ parts: [{ output: ruleMarker("keep.md") }] }, null],
+			})),
+		});
+
+		// when
+		const result = await store.hydrateSession("session-1");
+
+		// then
+		expect([...result]).toEqual(["keep.md"]);
+	});
+
 	it("#given compaction inside bounded window #when hydrateSession runs #then marker and epoch come from post-compaction window", async () => {
 		// given
 		const messages = [

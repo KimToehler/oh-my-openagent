@@ -81,3 +81,45 @@ limitation is unchanged from the original QA and is stated in `README.md`. The
 `createTeamSendMessageTool` timeout observed in one QA run is a load-dependent flake,
 green 3 of 3 in isolation, unrelated to this change; `gate-comparison.txt` carries a
 correction noting the baseline is 14 plus or minus that flake rather than a fixed count.
+
+## Re-review follow-ups (second pass)
+
+The scoped re-review of the fix delta returned PASS with no blocking issues, and named
+four MINOR cleanups. Three were applied, one was recorded rather than coded.
+
+Applied:
+1. **Restored a null guard that the Blocker-2 fix silently dropped.** The previous
+   `hasCompactionPart(getMessageParts(message))` was null-safe because `getMessageParts`
+   returned `undefined` for a null or non-object entry. `isCompactionMessage` is not: it
+   evaluates `message.info?.agent ?? message.agent`, where the optional chain protects
+   `info`, not `message`. Reproduced by driving the real store with a null element in
+   `data`:
+   ```
+   with a null element in data -> paths: []
+   CONFIRMED: one bad element aborts the ENTIRE scan (marker lost)
+   ```
+   The throw was caught by `hydrateSession`, so it degraded to empty paths and an
+   undefined epoch, which is fail-open and therefore not a blocker. The cost was that one
+   malformed entry discarded the whole scan for that session for the process lifetime.
+   Fixed with an `isCompactionRecord` wrapper that narrows before delegating.
+   Guarded by a new test, which was mutation-proved: reverting the wrapper to a direct
+   `isCompactionMessage` call turns the suite red on exactly that case, and restoring it
+   returns 17 pass / 0 fail.
+2. **Removed dead code in `injection-processor.ts`.** `shouldReset` already guarantees
+   `compactionEpoch !== undefined`, so the `compactionEpoch === undefined ? {} : ...`
+   spread and the `delete loadedCache.compactionEpoch` arm were both unreachable. Their
+   presence implied a reset could clear the epoch, which it cannot.
+3. **Removed the now-unused `getMessageParts` helper.** Its only call site was the
+   expression replaced by the Blocker-2 fix. No lint rule would have caught it, since
+   `noUnusedLocals` is not enabled for this package.
+
+Recorded, not coded:
+4. **Row 4 of the epoch truth table is the one direction this fix trades into.** If a
+   real compaction occurs, hydration cannot observe it (transcript fetch error, or the
+   compaction scrolled past `HYDRATION_MAX_MESSAGES`), AND a dedup cache survives, then
+   rules stay suppressed. Two things bound it. The in-process path does not rely on the
+   epoch at all: `hook.ts` handles `session.compacted` by clearing both the in-memory
+   entry and the persisted file. And in the fetch-failure sub-case hydration also returns
+   an empty path set, so transcript-based suppression is simultaneously lost. This is
+   also the pre-branch baseline behavior, so the fix declines to add a new fail-open path
+   rather than introducing a new fail-closed one.
