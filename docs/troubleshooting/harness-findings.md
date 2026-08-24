@@ -1157,3 +1157,38 @@ made the stale on-disk cache win regardless.
 **Fix status:** fixed in `08a8d55b1` - hydration now stops at the last compaction part, and
 the persisted cache carries a `compactionEpoch` stamp that invalidates it on mismatch.
 
+## 2026-08-24 - MCP-prefixed tool names bypass rules injection entirely
+
+**Severity:** blocker
+**Area:** rules injection
+**Observed in:** `onara` and `oh-my-openagent`
+
+**What happened:** Hooks gated on exact tool-name equality, so MCP-served file tools never
+matched and the injectors were silently dead for an entire session.
+
+**Evidence:**
+```
+hook.ts:36: const TRACKED_TOOLS = ["read", "write", "edit", "multiedit"]
+matched by TRACKED_TOOLS.includes(input.tool.toLowerCase())
+probe: "lean-ctx_ctx_read" matched false
+
+live DB session ses_fcc7a7320ffeqqbiGtzKPWFg5U used only
+lean-ctx_ctx_shell (38 calls) and lean-ctx_ctx_execute (6 calls),
+produced NO rules-injector state file at all
+
+second session tool mix: ctx_shell 391 / ctx_execute 101 / ctx_read 34
+against edit 41 / write 6, cutting injection opportunities ~90 percent
+```
+
+**Root cause / hypothesis:** confirmed. Exact-equality matching against a lowercase list,
+with no awareness of MCP name prefixes (`mcp__<server>__<tool>`, `lean-ctx_ctx_<tool>`).
+
+The naive fix is wrong: `"todowrite".endsWith("write")` is `true`, so a plain suffix match
+would have injected rules on every todo write. The fix needed a separator boundary, not a
+substring or suffix check.
+
+**Workaround:** none found before the code fix landed.
+
+**Fix status:** fixed in `8f3d2daa3` (shared `matchesTrackedTool` helper), `cea18ab27`
+(rules-injector), `00bb1d903` (directory injectors).
+
