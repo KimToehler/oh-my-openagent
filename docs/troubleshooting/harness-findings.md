@@ -1287,6 +1287,10 @@ Cross-checked for a compensating path: `formatFullSession` does preserve the tra
 
 **Fix status (2026-08-24):** still unfixed. Severity stays `costly`. This is the most contained fix in the log: emit the consumed partial transcript alongside the session error in `task-result-format.ts:71-82`, with an N-good-turns-then-error regression test beside `task-result-format.test.ts:23-47`. Touches an OpenCode-connected path, so it needs `opencode-qa` evidence.
 
+**Fix status (2026-08-24, fixed):** fixed locally in `36e1cf15f`. `formatTaskResult` no longer returns early on `sessionError`; the consumed transcript is emitted and the error is appended as a clearly-labelled `Terminal error:` line at `packages/omo-opencode/src/tools/background-task/task-result-format.ts:124`, so a partially-completed lane can no longer be mistaken for a clean one. Regression coverage added in `task-result-format.test.ts` (good turns with real text parts, then an errored message).
+
+Red/green verified independently by the reviewing agent rather than taken on report: reverting only the fix line drove the suite to `EXITCODE=1, 0 pass, 2 fail`; restoring it gave `EXITCODE=0, 2 pass, 0 fail`. Full area `bun test packages/omo-opencode/src/tools/background-task/` = `73 pass, 0 fail` across 15 files; `bun run typecheck` = exit 0. Evidence at `.omo/evidence/20260824-formattaskresult-transcript/`.
+
 ## 2026-08-24 — A timed-out `ctx_shell` is indistinguishable from a failed one
 
 **Severity:** papercut
@@ -1391,6 +1395,12 @@ dimensions and confirm the target is in frame before answering, and to prefer
 **Update:** (2026-08-24, verified against dev source) Still open. Neither of the two places a guard could live has one. The agent system prompt at `packages/omo-opencode/src/agents/multimodal-looker.ts:24-59` instructs attachment analysis and reporting missing information, but never requires stating actual pixel dimensions, confirming the target is within frame, or preferring `NOT VISIBLE`. The runtime prompt passes goal and attachment straight through (`packages/omo-opencode/src/tools/look-at/look-at-prompt.ts:23-31`). The tool description warns against using `look_at` for precision (`packages/omo-opencode/src/tools/look-at/constants.ts:1-3`) but adds no frame check, and the schema validates paths and goal only (`tools.ts:13-22`). A search for `dimensions`, `out of frame`, `bounds`, and `NOT VISIBLE` across the module returned nothing relevant.
 
 **Fix status (2026-08-24):** still worked around at the caller. Severity stays `costly` - the recorded hit rate was five false findings out of five, and false confidence closes visual-QA work incorrectly. Contained prompt-only fix, best applied at `multimodal-looker.ts:53-57` and mirrored in `look-at-prompt.ts:29-31`.
+
+**Fix status (2026-08-24, fixed):** fixed locally in `fa6feef70`. A frame-bounds requirement now sits in both routes: the agent system prompt (`packages/omo-opencode/src/agents/multimodal-looker.ts`) and the direct-call runtime prompt (`packages/omo-opencode/src/tools/look-at/look-at-prompt.ts`). Both require stating actual pixel dimensions before any spatial claim, confirming the target is within bounds, answering `NOT VISIBLE` when it is not, and never inferring content for an unseen region. Prompt-only; the `look_at` schema and runtime behavior are unchanged.
+
+Guard-deletion tests added in `multimodal-looker.test.ts` covering both prompts: `bun test packages/omo-opencode/src/agents/multimodal-looker.test.ts` = `5 pass, 0 fail, 16 expect() calls`; `bun run typecheck` = exit 0. Evidence at `.omo/evidence/20260824-multimodal-looker-frame-guard/`.
+
+Caveat on scope: this raises the cost of fabricating, it does not make it impossible. The original failure was five confident false findings out of five, and a prompt instruction is not a hard bound. Treat a `NOT VISIBLE` as trustworthy and a confident spatial claim as still worth a second look.
 
 ## 2026-08-24 — `review-work` and `full-code-review` default to a diff range that is empty for merged work
 
