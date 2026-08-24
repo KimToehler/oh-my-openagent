@@ -2,6 +2,10 @@ export const branchCounts = {
   title: 0,
   "parent-tool-call": 0,
   "parent-hold": 0,
+  "restart-parent": 0,
+  "restart-resume": 0,
+  "active-control": 0,
+  "absent-control": 0,
   child: 0,
   wake: 0,
   default: 0,
@@ -26,11 +30,19 @@ export function hasToolResult(inputStr) {
 export function selectBranch(inputStr) {
   const isTitle = inputStr.includes("Generate a title")
   const isSplitProbe = inputStr.includes("Run the split probe")
+  const isRestartParent = inputStr.includes("SPLIT_CHILD_TASK: restart-happy")
+  const isRestartResume = inputStr.includes("SPLIT_RESUME_ADOPT:")
+  const isActiveControl = inputStr.includes("SPLIT_ACTIVE_CONTROL:")
+  const isAbsentControl = inputStr.includes("SPLIT_ABSENT_CONTROL:")
   const isChild = inputStr.includes("SPLIT_CHILD_TASK")
   const isWake = inputStr.includes("[BACKGROUND TASK")
   const hasResult = hasToolResult(inputStr)
 
   if (isTitle) return "title"
+  if (isRestartParent) return "restart-parent"
+  if (isRestartResume) return "restart-resume"
+  if (isActiveControl) return "active-control"
+  if (isAbsentControl) return "absent-control"
   if (isChild && !isSplitProbe) return "child"
   if (isWake) return "wake"
   if (isSplitProbe && !hasResult && !latches.parentToolCallIssued) return "parent-tool-call"

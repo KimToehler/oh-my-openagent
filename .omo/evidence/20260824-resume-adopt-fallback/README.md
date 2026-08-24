@@ -77,3 +77,34 @@ Run proves corrected topology mechanics up to killing real server process and pr
 - No credentials, tokens, password, or authorization headers recorded.
 - No fabricated happy-path transcript, active-session control, or absent-session error claimed.
 - Temporary QA runner lived in `/tmp` and was removed with sandbox cleanup; it is not product or evidence source.
+
+## ATTEMPT 4 (execution run)
+
+### WHAT WAS TESTED
+
+- Ran `bash .agents/skills/opencode-qa/scripts/resume-adopt-restart-probe.sh --evidence-dir .omo/evidence/20260824-resume-adopt-fallback`.
+- Used isolated XDG state, canonicalized sandbox project path, local fake OpenAI server, local `dist/index.js`, then killed and restarted real `opencode serve` against same sandbox state.
+- Spawned child from model-side `task` call. Child ID came from sandbox DB and passed shape plus row assertions.
+
+### WHAT WAS OBSERVED
+
+- Host session count: `2661` before and `2661` after. Captures: `19-host-session-count-before.txt`, `31-host-session-count-after.txt`.
+- Server-minted child persisted across restart. Captures: `23-child-id.txt`, `24-child-row.txt`, `26-server-killed.txt`, `27-child-survived-restart.txt`.
+- HAPPY did not produce new child transcript turn: pre-restart message count `2`, post-restart `2`. Capture: `28-happy-counts.txt`.
+- REFUSAL and ABSENT model controls were issued but no dedicated control assertion was reached. Capture: `29-scenarios.txt`.
+- Cleanup receipt records spawned server and fake-model processes no longer alive: `30-cleanup-receipt.txt`.
+
+Verdicts:
+
+- HAPPY: FAIL. Deciding observable: `pre=2 post=2` in `28-happy-counts.txt`.
+- REFUSAL: NOT-REACHED. Deciding observable: no control-specific assertion implemented in this run.
+- ABSENT: NOT-REACHED. Deciding observable: no control-specific assertion implemented in this run.
+
+### WHY IT IS ENOUGH
+
+Execution proves child record exists, survives real server restart, and continuation attempt did not append a child transcript turn. It does not establish cause because fake-model continuation tool request needs deeper capture analysis.
+
+### WHAT WAS OMITTED
+
+- No credentials, passwords, auth headers, or raw request payloads recorded.
+- No claim that active or nonexistent controls passed.

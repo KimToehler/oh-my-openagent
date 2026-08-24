@@ -62,6 +62,33 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  if (branch === "restart-parent") {
+    sendSse(res, toolCallEvents(callCount, "task", `call_restart_child_${callCount}`, {
+      description: "restart adoption child",
+      prompt: "SPLIT_CHILD_TASK: reply exactly DONE",
+      subagent_type: "explore",
+      run_in_background: true,
+      load_skills: [],
+    }))
+    return
+  }
+
+  if (branch === "restart-resume" || branch === "active-control" || branch === "absent-control") {
+    const match = inputStr.match(/ses_[A-Za-z0-9]+/)
+    sendSse(res, toolCallEvents(callCount, "background_output", `call_resume_${callCount}`, {
+      task_id: match?.[0] ?? "ses_missing",
+      block: false,
+      full_session: false,
+      include_thinking: false,
+      include_tool_results: false,
+      message_limit: 1,
+      thinking_max_chars: 2000,
+      from_end: true,
+      timeout: 1000,
+    }))
+    return
+  }
+
   if (branch === "wake") {
     await sleep(3000)
     sendSse(res, textEvents(callCount, `WAKE_ACK ${callCount}`))
