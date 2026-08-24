@@ -1,0 +1,8 @@
+watching http://127.0.0.1:4096/event?directory=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-mcp-gating.XXXXXX.O5h5pUkkW6/project for 'message.part.updated' (<=20s)
+stream head (no 'message.part.updated' within 20s):
+data: {"id":"evt_0347b19f4001nQVmZGZYLxSxN6","type":"server.connected","properties":{}}
+
+data: {"id":"evt_0347b274c001E0RQ8g6OQcmrKT","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0347b27b6001JWXPs6qrDAoV4q","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+FAIL: 'message.part.updated' not observed

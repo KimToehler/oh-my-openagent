@@ -1,0 +1,4 @@
+real_db=/Users/tim/.local/share/opencode/opencode.db
+sessions_before=2614
+sessions_after=2614
+sandbox=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-mcp-gating.XXXXXX.O5h5pUkkW6

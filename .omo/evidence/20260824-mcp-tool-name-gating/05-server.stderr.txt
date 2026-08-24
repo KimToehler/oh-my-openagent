@@ -1,0 +1,30 @@
+timestamp=2026-08-24T15:54:31.669Z level=INFO run=61a80a0d message=loading path=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-mcp-gating.XXXXXX.O5h5pUkkW6/config/opencode/config.json
+timestamp=2026-08-24T15:54:31.671Z level=INFO run=61a80a0d message=loading path=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-mcp-gating.XXXXXX.O5h5pUkkW6/config/opencode/opencode.json
+timestamp=2026-08-24T15:54:31.676Z level=INFO run=61a80a0d message=loading path=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-mcp-gating.XXXXXX.O5h5pUkkW6/config/opencode/opencode.jsonc
+timestamp=2026-08-24T15:54:31.808Z level=INFO run=61a80a0d message="creating instance" directory=/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-mcp-gating.XXXXXX.O5h5pUkkW6/project
+timestamp=2026-08-24T15:54:31.809Z level=INFO run=61a80a0d message=fromDirectory directory=/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-mcp-gating.XXXXXX.O5h5pUkkW6/project
+timestamp=2026-08-24T15:54:31.813Z level=INFO run=61a80a0d message=bootstrapping directory=/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-mcp-gating.XXXXXX.O5h5pUkkW6/project
+timestamp=2026-08-24T15:54:31.815Z level=INFO run=61a80a0d message=loading path=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-mcp-gating.XXXXXX.O5h5pUkkW6/config/opencode/config.json
+timestamp=2026-08-24T15:54:31.815Z level=INFO run=61a80a0d message=loading path=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-mcp-gating.XXXXXX.O5h5pUkkW6/config/opencode/opencode.json
+timestamp=2026-08-24T15:54:31.815Z level=INFO run=61a80a0d message=loading path=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-mcp-gating.XXXXXX.O5h5pUkkW6/config/opencode/opencode.jsonc
+timestamp=2026-08-24T15:54:36.113Z level=INFO run=61a80a0d message="all LSPs are disabled"
+timestamp=2026-08-24T15:54:36.113Z level=INFO run=61a80a0d message="all formatters are disabled"
+timestamp=2026-08-24T15:54:36.114Z level=INFO run=61a80a0d message=init
+timestamp=2026-08-24T15:54:36.115Z level=INFO run=61a80a0d message="event connected"
+timestamp=2026-08-24T15:54:36.117Z level=INFO run=61a80a0d message=created id=ses_fcb84ed2affe8haDGjd4ZF5rbR slug=sunny-garden version=1.18.20 projectID=global directory=/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-mcp-gating.XXXXXX.O5h5pUkkW6/project path=private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-mcp-gating.XXXXXX.O5h5pUkkW6/project workspaceID=undefined parentID=undefined title="New session - 2026-08-24T15:54:36.117Z" agent=undefined model=undefined metadata=undefined permission=undefined cost=0 tokens.input=0 tokens.output=0 tokens.reasoning=0 tokens.cache.read=0 tokens.cache.write=0 time.created=1787586876117 time.updated=1787586876117
+timestamp=2026-08-24T15:54:36.143Z level=INFO run=61a80a0d message="fetching index" url=http://127.0.0.1:54202/index.json
+timestamp=2026-08-24T15:54:36.152Z level=INFO run=61a80a0d message=init count=3
+timestamp=2026-08-24T15:54:36.284Z level=INFO run=61a80a0d message=loop session.id=ses_fcb84ed2affe8haDGjd4ZF5rbR step=0
+timestamp=2026-08-24T15:54:36.292Z level=INFO run=61a80a0d message="shell tool using shell" shell=/bin/zsh
+timestamp=2026-08-24T15:54:36.308Z level=INFO run=61a80a0d message=stream providerID=openai modelID=gpt-5.4-nano session.id=ses_fcb84ed2affe8haDGjd4ZF5rbR small=true agent=title mode=primary
+timestamp=2026-08-24T15:54:36.314Z level=INFO run=61a80a0d message="llm runtime selected" llm.runtime=ai-sdk llm.provider=openai llm.model=gpt-5.4-nano
+timestamp=2026-08-24T15:54:37.556Z level=INFO run=61a80a0d message="watcher backend" directory=/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-mcp-gating.XXXXXX.O5h5pUkkW6/project platform=darwin backend=fs-events
+timestamp=2026-08-24T15:54:37.565Z level=INFO run=61a80a0d message="project copy refresh started" projectID=global
+timestamp=2026-08-24T15:54:37.566Z level=INFO run=61a80a0d message="project copy refresh done" projectID=global updated=[] removed=[]
+timestamp=2026-08-24T15:54:37.575Z level=INFO run=61a80a0d message="booting location services" directory=/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-mcp-gating.XXXXXX.O5h5pUkkW6/project workspaceID=undefined
+timestamp=2026-08-24T15:54:37.675Z level=INFO run=61a80a0d message=process session.id=ses_fcb84ed2affe8haDGjd4ZF5rbR messageID=msg_0347b137e001gdqcpYFYgye0Jz
+timestamp=2026-08-24T15:54:37.675Z level=INFO run=61a80a0d message=stream providerID=openai modelID=gpt-fake session.id=ses_fcb84ed2affe8haDGjd4ZF5rbR small=false agent="Sisyphus - ultraworker" mode=primary
+timestamp=2026-08-24T15:54:37.683Z level=INFO run=61a80a0d message="llm runtime selected" llm.runtime=ai-sdk llm.provider=openai llm.model=gpt-fake
+timestamp=2026-08-24T15:54:37.692Z level=INFO run=61a80a0d message=loop session.id=ses_fcb84ed2affe8haDGjd4ZF5rbR step=1
+timestamp=2026-08-24T15:54:37.692Z level=INFO run=61a80a0d message="exiting loop" session.id=ses_fcb84ed2affe8haDGjd4ZF5rbR
+timestamp=2026-08-24T15:54:37.940Z level=INFO run=61a80a0d message="event connected"

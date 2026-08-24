@@ -1,0 +1,3 @@
+watching http://127.0.0.1:4096/event?directory=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-mcp-gating.XXXXXX.O5h5pUkkW6/project for 'plugin.added' (<=20s)
+first matching event: {"type":"plugin.added"}
+PASS: observed 'plugin.added' on http://127.0.0.1:4096

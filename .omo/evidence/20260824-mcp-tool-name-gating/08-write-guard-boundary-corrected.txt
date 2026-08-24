@@ -1,0 +1,22 @@
+Corrected boundary probe output (run from the evidence directory):
+
+    $ bun run 08-write-guard-boundary-corrected.ts
+    write: BLOCKED (File already exists. Use edit tool instead.)
+    mcp__foo__write: BLOCKED (File already exists. Use edit tool instead.)
+    todowrite: NOT BLOCKED
+
+Matcher-level probe, run separately against the real shared helper
+(packages/omo-opencode/src/shared/tool-name-match.ts):
+
+    mcp__foo__write vs [write] => true
+    mcp__foo__read vs [read] => true
+    write vs [write] => true
+    overwrite vs [write] => false
+    todowrite vs [write] => false
+    mcp__foo__edit vs [write,edit,multiedit] => true
+
+Reading:
+
+- mcp__foo__write is blocked exactly as a native write is. That is the fix.
+- todowrite and overwrite are NOT matched, so the separator rule in
+  matchesTrackedTool prevents the obvious false positive.

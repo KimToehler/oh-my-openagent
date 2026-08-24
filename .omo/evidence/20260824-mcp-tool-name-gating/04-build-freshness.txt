@@ -1,0 +1,8 @@
+$ stat -f "%m %N" dist/index.js packages/omo-opencode/src/hooks/write-existing-file-guard/tool-execute-before-handler.ts packages/omo-opencode/src/hooks/comment-checker/hook.ts packages/omo-opencode/src/hooks/read-image-resizer/hook.ts packages/omo-opencode/src/hooks/atlas/write-edit-tool-policy.ts packages/omo-opencode/src/tools/delegate-task/prompt-builder.ts packages/omo-opencode/src/tools/report-blocked/tools.ts
+1787586705 dist/index.js
+1787586468 packages/omo-opencode/src/hooks/write-existing-file-guard/tool-execute-before-handler.ts
+1787586468 packages/omo-opencode/src/hooks/comment-checker/hook.ts
+1787586468 packages/omo-opencode/src/hooks/read-image-resizer/hook.ts
+1787586468 packages/omo-opencode/src/hooks/atlas/write-edit-tool-policy.ts
+1787586468 packages/omo-opencode/src/tools/delegate-task/prompt-builder.ts
+1787586468 packages/omo-opencode/src/tools/report-blocked/tools.ts
