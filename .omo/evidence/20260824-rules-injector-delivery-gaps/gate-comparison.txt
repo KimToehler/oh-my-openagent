@@ -32,3 +32,11 @@ in isolation. It is a load-dependent timeout in team-mode messaging, unrelated t
 change. The "identical failure set" phrasing above is therefore stronger than repeated
 runs support. The no-regression conclusion is unaffected: no failure in rules-injector,
 the shared helper, or the directory injectors appears in any run.
+
+FINAL GATE (after the review-blocker fixes and the null-guard restoration)
+  bun test:       15621 pass / 5 skip / 14 fail / 2021 files / 312.96s / EXIT=1
+  bun typecheck:  EXIT=0
+  NEW failures vs the pre-change baseline: 0 (comm both directions empty)
+  Failures in rules-injector, shared, or the directory injectors: NONE
+  Artifacts: gate3-final-fulltest.txt, gate3-final-typecheck.txt
+  Net: +48 passing tests over the 15573 baseline.
