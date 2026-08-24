@@ -1383,9 +1383,41 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   async resume(input: ResumeInput): Promise<BackgroundTask> {
-    const existingTask = this.findBySession(input.sessionId)
+    let existingTask = this.findBySession(input.sessionId)
     if (!existingTask) {
-      throw new Error(`Task not found for session: ${input.sessionId}`)
+      const sessionExists = await this.verifySessionExists(input.sessionId)
+      if (!sessionExists) {
+        throw new Error(
+          `Task not found after process restart: ${input.sessionId}\n\n` +
+          "Background task state is kept in process memory and may be lost when OpenCode restarts. " +
+          `Recovery: use \`session_read(session_id="${input.sessionId}")\` to inspect the server-backed transcript.`,
+        )
+      }
+
+      const liveness = await this.probeSessionLiveness(input.sessionId)
+      if (liveness === "active" || liveness === "unknown") {
+        throw new Error(
+          `Task for session ${input.sessionId} is currently running and cannot accept a continuation prompt. ` +
+          "Wait for it to complete before resuming it with task_id.",
+        )
+      }
+      if (liveness === "absent") {
+        throw new Error(
+          `Task for session ${input.sessionId} cannot accept a continuation prompt because its status registry is unavailable. ` +
+          "Wait for session status to become available before resuming it with task_id.",
+        )
+      }
+
+      existingTask = this.adoptRunningSession({
+        sessionId: input.sessionId,
+        parentSessionId: input.parentSessionId,
+        parentMessageId: input.parentMessageId,
+        description: `Resumed orphaned background session ${input.sessionId}`,
+        agent: "continue",
+        model: undefined,
+        rootSessionId: input.parentSessionId,
+        rootDescendantAlreadyReserved: false,
+      })
     }
 
     if (!existingTask.sessionId) {
