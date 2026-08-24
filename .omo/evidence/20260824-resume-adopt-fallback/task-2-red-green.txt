@@ -89,3 +89,55 @@ Test A simulates absent pre-resume ownership with successful resume and asserts 
 ## WHAT WAS OMITTED
 
 No credentials, tokens, environment dumps, or private logs recorded.
+
+## CORRECTION (orchestrator verdict: needs-fix)
+
+### Defect reproduction
+
+Committed implementation had two format defects:
+
+```text
+normal:  "...full previous context preserved.\n\nDo NOT call background_output now..."
+adopted: "...full previous context preserved.\n\n\nThis continuation adopted...model error.\nDo NOT call background_output now..."
+```
+
+Normal output gained one blank line. Adopted output had two blank lines above disclosure and none below it.
+
+### RED byte-exact tests
+
+```text
+(fail) discloses fidelity loss after adopting an orphaned server session
+Expected: preserved.\n\nThis continuation ... model error.\n\nDo NOT call
+Received: preserved.\n\n\nThis continuation ... model error.\nDo NOT call
+
+(fail) keeps normal known-task continuation output free of adopted-task disclosure
+Expected: preserved.\nDo NOT call
+Received: preserved.\n\nDo NOT call
+
+4 pass
+2 fail
+Ran 6 tests across 1 file. [96.00ms]
+```
+
+### GREEN after correction
+
+```text
+bun test packages/omo-opencode/src/tools/delegate-task/background-continuation.test.ts
+6 pass
+0 fail
+17 expect() calls
+Ran 6 tests across 1 file. [72.00ms]
+
+bun test packages/omo-opencode/src/tools/delegate-task
+506 pass
+0 fail
+1188 expect() calls
+Ran 506 tests across 43 files. [2.00s]
+
+bun run typecheck
+exit code: 0
+```
+
+### `findBySession?.` reasoning
+
+`ExecutorContext.manager` is concrete in production and always defines `findBySession`. Existing broad unit-test stubs omit it. Optional call prevents unrelated legacy tests from failing but treats such incomplete stubs as adopted because `undefined === undefined`; this is test-only behavior. Production behavior remains exact pre-resume observation. Changing every broad fixture is outside assigned file scope, so optional call remains deliberately scoped compatibility.

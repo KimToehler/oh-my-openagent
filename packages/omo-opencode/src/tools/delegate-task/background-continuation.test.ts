@@ -176,9 +176,7 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
     })
 
     //#then - caller receives adopted-task fidelity disclosure
-    expect(result).toContain("This continuation adopted an orphaned server session using agent: continue.")
-    expect(result).toContain("It has no original model, no fallback chain, no category, and no loaded skill content.")
-    expect(result).toContain("It will not auto-fall-back on a model error.")
+    expect(result).toContain("Agent continues with full previous context preserved.\n\nThis continuation adopted an orphaned server session using agent: continue.\nIt has no original model, no fallback chain, no category, and no loaded skill content.\nIt will not auto-fall-back on a model error.\n\nDo NOT call background_output now")
   })
 
   test("keeps normal known-task continuation output free of adopted-task disclosure", async () => {
@@ -215,9 +213,21 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
     })
 
     //#then - normal output keeps its existing shape
-    expect(result).toContain("Background task continued.")
-    expect(result).toContain("Agent continues with full previous context preserved.")
-    expect(result).not.toContain("This continuation adopted an orphaned server session")
+    expect(result).toBe(`Background task continued.
+
+Background Task ID: bg_known_001
+Description: known task
+Agent: oracle
+Status: running
+
+Agent continues with full previous context preserved.
+Do NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it.
+
+<task_metadata>
+session_id: ses_known_123
+background_task_id: bg_known_001
+subagent: oracle
+</task_metadata>`)
   })
 
   test("does not advertise background_output CTA in continuation return (issue #5221)", async () => {
