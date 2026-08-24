@@ -1,0 +1,16 @@
+fake-openai listening on 58204
+[2026-08-24T20:45:52.191Z] branch=restart-parent call=1
+[2026-08-24T20:45:52.277Z] branch=child call=2
+[2026-08-24T20:45:52.371Z] branch=restart-parent call=3
+[2026-08-24T20:45:52.430Z] branch=child call=4
+[2026-08-24T20:45:52.532Z] branch=restart-parent call=5
+[2026-08-24T20:45:52.614Z] branch=child call=6
+[2026-08-24T20:45:52.687Z] branch=restart-parent call=7
+[2026-08-24T20:45:52.748Z] branch=child call=8
+[2026-08-24T20:45:55.229Z] branch=restart-resume call=9
+[2026-08-24T20:45:55.296Z] branch=child call=10
+[2026-08-24T20:45:56.311Z] branch=default call=11
+[2026-08-24T20:45:56.664Z] branch=active-control call=12
+[2026-08-24T20:45:56.703Z] branch=default call=13
+[2026-08-24T20:45:57.713Z] branch=absent-control call=14
+[2026-08-24T20:45:58.713Z] FINAL_COUNTS title=0 parent-tool-call=0 parent-hold=0 restart-parent=4 restart-resume=1 active-control=1 absent-control=1 child=5 wake=0 default=2

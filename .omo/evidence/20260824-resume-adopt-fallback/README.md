@@ -140,3 +140,34 @@ Corrected run proves task continuation call was model-driven once, child persist
 
 - No credentials, passwords, headers, or raw requests.
 - No active-session or nonexistent-session control claim.
+
+## ATTEMPT 6 (real child id plumbed out-of-band)
+
+### WHAT WAS TESTED
+
+- Attempts 4 and 5 had probe defects: attempt 4 invoked read-only `background_output`; attempt 5 regex-captured fixture `ses_abc123` from model-visible system-prompt documentation.
+- Root confirmed attempt 5 marker existed in sandbox DB but was associated with wrong session.
+- Corrected probe writes validated server-minted child ID to isolated `$EVIDENCE_DIR/.child-id`; fake model reads it at request time, rejects malformed or fixture IDs, and emits `task` continuation once.
+- Corrected marker query: `SELECT session_id, message_id, substr(data,1,300) FROM part WHERE data LIKE '%RESUME_ADOPT_PROBE_CONTINUATION%';`.
+
+### WHAT WAS OBSERVED
+
+- Real child ID: `ses_fca7a4266ffefzsLB21zVZ4e7O`. Captures: `49-child-id.txt`, `50-child-row.txt`, `53-child-survived-restart.txt`.
+- Marker query returned two rows. One row belongs to resumer tool call and one belongs to real child session `ses_fca7a4266ffefzsLB21zVZ4e7O`; child row contains `RESUME_ADOPT_PROBE_CONTINUATION`. Capture: `55-happy-marker.txt`.
+- Child message count advanced from `2` to `4`. Capture: `54-happy-counts.txt`.
+- Host DB count remained `2663` before and after. Captures: `45-host-session-count-before.txt`, `58-host-session-count-after.txt`.
+- Cleanup: server PID `10456` and fake model PID `10378` were dead. Capture: `56-cleanup-receipt.txt`.
+
+Verdicts:
+
+- HAPPY: PASS. Marker query result: `ses_fca7a4266ffefzsLB21zVZ4e7O|...|{"type":"text","text":"...RESUME_ADOPT_PROBE_CONTINUATION..."}` in `55-happy-marker.txt`; real child count `pre=2 post=4` in `54-happy-counts.txt`.
+- REFUSAL: NOT-REACHED. Deciding observable: control assertion omitted after HAPPY proof.
+- ABSENT: NOT-REACHED. Deciding observable: control assertion omitted after HAPPY proof.
+
+### WHY IT IS ENOUGH
+
+Probe drove model-side `task` continuation against real child ID, killed real server, restarted against same isolated state, and proved marker landed in same persisted child session. This proves resume adopt-fallback across real server restart.
+
+### WHAT WAS OMITTED
+
+- No credentials, passwords, headers, raw full prompts, active-session control, or nonexistent-session control result.

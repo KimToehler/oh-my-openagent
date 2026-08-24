@@ -74,9 +74,16 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (branch === "restart-resume" || branch === "active-control" || branch === "absent-control") {
-    const match = inputStr.match(/ses_[A-Za-z0-9]+/)
+    const taskID = process.env.RESUME_ADOPT_CHILD_ID_FILE
+      ? fs.readFileSync(process.env.RESUME_ADOPT_CHILD_ID_FILE, "utf8").trim()
+      : ""
+    if (!/^ses_[A-Za-z0-9]{20,}$/.test(taskID) || ["ses_abc123", "ses_def456", "ses_missing"].includes(taskID)) {
+      logBranch("invalid-resume-task-id", { taskID })
+      sendSse(res, textEvents(callCount, "INVALID_RESUME_ADOPT_CHILD_ID"))
+      return
+    }
     sendSse(res, toolCallEvents(callCount, "task", `call_resume_${callCount}`, {
-      task_id: match?.[0] ?? "ses_missing",
+      task_id: taskID,
       prompt: "RESUME_ADOPT_PROBE_CONTINUATION",
       description: "resume adopt probe continuation",
       run_in_background: false,
