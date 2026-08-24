@@ -1,0 +1,25 @@
+FULL GATE COMPARISON - baseline (pre-change) vs post-change
+===========================================================
+
+BASELINE (commit 5be705366, before any of our commits)
+  bun test:       15573 pass / 5 skip / 14 fail / 2017 files / 337.39s / EXIT=1
+  bun typecheck:  EXIT=0
+
+POST-CHANGE (6 commits applied)
+  bun test:       15616 pass / 5 skip / 14 fail / 2021 files / 361.09s / EXIT=1
+  bun typecheck:  EXIT=0
+
+DELTA
+  +43 passing tests, +4 test files
+  NEW failures:              0   (set difference baseline -> now is EMPTY)
+  Incidentally fixed:        0
+  Failure set is IDENTICAL to the 14 pre-existing failures recorded at T0.
+
+Method: failure lines extracted with `grep -E "^\(fail\)"`, timing suffix stripped,
+sorted, compared with `comm`. Both directions empty.
+
+CONCLUSION: no regression introduced. The 14 remaining failures are all pre-existing
+and unrelated to rules injection, the shared helper, or the directory injectors
+(they live in agent command audit, scan-tool fixtures, module-resolution classification,
+skill-loader dedup, background-agent polling, parent-wake queue, senpi reflection flow,
+and a dependencies check).
