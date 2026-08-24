@@ -1,0 +1,4 @@
+COMMAND: sqlite3 "$(opencode db path)" "SELECT count(*) FROM session"
+2660
+
+RESULT: equals before count in 03-real-db-count-before.txt. No QA process was spawned after topology capability block.

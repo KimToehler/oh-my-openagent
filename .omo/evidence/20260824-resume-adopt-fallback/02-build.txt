@@ -1,0 +1,4 @@
+COMMAND: bun run build
+RESULT: exit 0
+
+Decisive freshness result captured separately in 02-build-freshness.txt.

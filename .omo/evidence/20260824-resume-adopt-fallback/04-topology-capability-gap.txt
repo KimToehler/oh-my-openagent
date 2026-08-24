@@ -1,0 +1,22 @@
+Capability review
+
+Read:
+- .agents/skills/opencode-qa/SKILL.md
+- .agents/skills/opencode-qa/references/events-hooks.md
+- .agents/skills/opencode-qa/references/server-api.md
+- .agents/skills/opencode-qa/references/sdk.md
+- .agents/skills/opencode-qa/scripts/blocked-escalation-probe.sh
+- .agents/skills/opencode-qa/scripts/serve-wake-split-probe.sh
+
+Supported:
+- isolated opencode serve process;
+- separate external attached client via opencode run --attach or createOpencodeClient({ baseUrl });
+- HTTP/SDK session create, prompt/promptAsync, child listing, message read, and SSE;
+- model-driven OMO task spawn inside server-hosted plugin.
+
+Missing required capability:
+- No documented HTTP or SDK route invokes OMO native registry tool task with supplied arguments.
+- No existing executable harness captures model-created child taskId then invokes OMO task({ task_id: "ses_..." }) from a fresh client/host against retained server.
+- POST /session/:id/prompt_async only sends ordinary child-session input. It bypasses BackgroundManager.resume(), so it cannot prove adopt-on-miss continuation.
+
+Conclusion: required real-restart topology cannot be executed without adding a controlled native-tool invocation driver or route. User task forbids weaker substitute.

@@ -1,0 +1,2 @@
+COMMAND: sqlite3 "$(opencode db path)" "SELECT count(*) FROM session"
+2660

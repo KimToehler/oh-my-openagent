@@ -1,0 +1,11 @@
+COMMAND: stat / Node mtime assertion
+
+dist/index.js 1787600779 2026-08-24T21:46:19Z
+packages/omo-opencode/src/features/background-agent/manager.ts 1787600528 2026-08-24T21:42:08Z
+packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts 1787600528 2026-08-24T21:42:08Z
+packages/omo-opencode/src/tools/delegate-task/background-continuation.ts 1787600528 2026-08-24T21:42:08Z
+packages/omo-opencode/src/features/background-agent/blocked-retention.test.ts 1787600528 2026-08-24T21:42:08Z
+PASS dist newer packages/omo-opencode/src/features/background-agent/manager.ts
+PASS dist newer packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts
+PASS dist newer packages/omo-opencode/src/tools/delegate-task/background-continuation.ts
+PASS dist newer packages/omo-opencode/src/features/background-agent/blocked-retention.test.ts

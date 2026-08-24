@@ -1,0 +1,10 @@
+COMMAND: pgrep -fl 'opencode serve|fake-openai|fake_openai'; lsof -nP -iTCP -sTCP:LISTEN
+
+RESULT:
+No fake provider, QA server, QA client/host, tmux asset, temporary QA directory, or QA-bound port was created. No teardown action needed.
+
+Pre-existing listeners detected and deliberately untouched:
+- opencode PID 121 on 127.0.0.1:64855
+- opencode PID 99408 on 127.0.0.1:64833
+
+No fake-provider listener matched.
