@@ -4,6 +4,9 @@ import { parseImageDimensions } from "./image-dimensions"
 import { calculateTargetDimensions, resizeImage } from "./image-resizer"
 import { log } from "../../shared"
 import { getSessionModel } from "../../shared/session-model-state"
+import { matchesTrackedTool } from "../../shared/tool-name-match"
+
+const TRACKED_TOOL_NAMES = ["read"] as const
 const SUPPORTED_IMAGE_MIMES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"])
 const TOKEN_DIVISOR = 750
 interface ResizeEntry {
@@ -11,9 +14,6 @@ interface ResizeEntry {
   originalDims: ImageDimensions | null
   resizedDims: ImageDimensions | null
   status: "resized" | "within-limits" | "resize-skipped" | "unknown-dims"
-}
-function isReadTool(toolName: string): boolean {
-  return toolName.toLowerCase() === "read"
 }
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
@@ -118,7 +118,7 @@ export function createReadImageResizerHook(_ctx: PluginInput) {
       input: { tool: string; sessionID: string; callID: string },
       output: { title: string; output: string; metadata: unknown },
     ) => {
-      if (!isReadTool(input.tool)) {
+      if (!matchesTrackedTool(input.tool, TRACKED_TOOL_NAMES)) {
         return
       }
 

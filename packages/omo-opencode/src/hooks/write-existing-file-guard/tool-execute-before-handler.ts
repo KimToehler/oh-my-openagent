@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { existsSync } from "fs"
 import { log } from "../../shared"
+import { matchesTrackedTool } from "../../shared/tool-name-match"
 import { MAX_TRACKED_PATHS_PER_SESSION } from "./hook"
 import {
   asRecord,
@@ -16,6 +17,9 @@ import {
   touchSession,
   trimSessionReadSet,
 } from "./session-read-permissions"
+
+const TRACKED_WRITE_TOOLS = ["write"] as const
+const TRACKED_READ_TOOLS = ["read"] as const
 
 function ensureSessionReadSet(params: {
   sessionID: string
@@ -109,8 +113,8 @@ export async function handleWriteExistingFileGuardToolExecuteBefore(params: {
     maxTrackedSessions,
     maxTrackedPathsPerSession = MAX_TRACKED_PATHS_PER_SESSION,
   } = params
-  const toolName = input.tool?.toLowerCase()
-  if (toolName !== "write" && toolName !== "read") {
+  const isReadTool = matchesTrackedTool(input.tool, TRACKED_READ_TOOLS)
+  if (!isReadTool && !matchesTrackedTool(input.tool, TRACKED_WRITE_TOOLS)) {
     return
   }
 
@@ -128,7 +132,7 @@ export async function handleWriteExistingFileGuardToolExecuteBefore(params: {
     return
   }
 
-  if (toolName === "read") {
+  if (isReadTool) {
     if (!existsSync(resolvedPath) || !input.sessionID) {
       return
     }

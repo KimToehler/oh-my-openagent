@@ -89,6 +89,36 @@ describe("createWriteExistingFileGuardHook", () => {
     ).rejects.toThrow(BLOCK_MESSAGE)
   })
 
+  test("#given MCP-qualified write to an unread existing file #when it executes #then blocks", async () => {
+    const existingFile = createFile("mcp-qualified-write.txt")
+
+    await expect(
+      invoke({
+        tool: "mcp__foo__write",
+        outputArgs: { filePath: existingFile, content: "new content" },
+      })
+    ).rejects.toThrow(BLOCK_MESSAGE)
+  })
+
+  test("#given MCP-qualified read #when same session writes #then registers read permission", async () => {
+    const existingFile = createFile("mcp-qualified-read.txt")
+    const sessionID = "ses_mcp_read"
+
+    await invoke({
+      tool: "mcp__foo__read",
+      sessionID,
+      outputArgs: { filePath: existingFile },
+    })
+
+    await expect(
+      invoke({
+        tool: "write",
+        sessionID,
+        outputArgs: { filePath: existingFile, content: "new content" },
+      })
+    ).resolves.toBeDefined()
+  })
+
   test("#given same-session read #when write executes #then allows once and consumes permission", async () => {
     const existingFile = createFile("consume-once.txt")
     const sessionID = "ses_consume"

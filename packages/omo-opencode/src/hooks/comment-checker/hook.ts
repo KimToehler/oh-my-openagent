@@ -16,6 +16,7 @@ import {
   takePendingCall,
 } from "./pending-calls"
 import { ensureCommentCheckerInitialization } from "./initialization-gate"
+import { matchesTrackedTool } from "../../shared/tool-name-match"
 
 import * as fs from "fs"
 import { tmpdir } from "os"
@@ -23,6 +24,8 @@ import { join } from "path"
 
 const DEBUG = process.env.COMMENT_CHECKER_DEBUG === "1"
 const DEBUG_FILE = join(tmpdir(), "comment-checker-debug.log")
+const TRACKED_TOOL_NAMES = ["write", "edit", "multiedit"] as const
+const APPLY_PATCH_TOOL_NAMES = ["apply_patch"] as const
 
 function debugLog(...args: unknown[]) {
   if (DEBUG) {
@@ -69,7 +72,7 @@ export function createCommentCheckerHooks(
       })
 
       const toolLower = input.tool.toLowerCase()
-      if (toolLower !== "write" && toolLower !== "edit" && toolLower !== "multiedit") {
+      if (!matchesTrackedTool(input.tool, TRACKED_TOOL_NAMES)) {
         debugLog("skipping non-write/edit tool:", toolLower)
         return
       }
@@ -128,7 +131,7 @@ export function createCommentCheckerHooks(
       }
 
 
-      if (toolLower === "apply_patch") {
+      if (matchesTrackedTool(input.tool, APPLY_PATCH_TOOL_NAMES)) {
         const edits = extractApplyPatchEdits(output.metadata, input.args)
         if (edits.length === 0) {
           debugLog("apply_patch had no editable files, skipping")

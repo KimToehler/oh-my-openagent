@@ -87,6 +87,41 @@ describe("comment-checker mutation tool routing", () => {
     )
   })
 
+  describe("#given MCP-qualified edit tool", () => {
+    describe("#when before and after hooks run", () => {
+      it("#then checks the pending edit", async () => {
+        // given
+        const hooks = createCommentCheckerHooks(undefined, cliRunner)
+        const input = { tool: "mcp__foo__edit", sessionID: "ses_test", callID: "call_mcp_edit" }
+
+        // when
+        await hooks["tool.execute.before"](input, {
+          args: {
+            file_path: "/repo/src/mcp-edit.ts",
+            old_string: "const mcp = 1\n",
+            new_string: "// MCP edit comment\nconst mcp = 1\n",
+          },
+        })
+        await hooks["tool.execute.after"](input, { title: "ok", output: "Success", metadata: {} })
+
+        // then
+        expect(processWithCli).toHaveBeenCalledTimes(1)
+        expect(processWithCli).toHaveBeenCalledWith(
+          input,
+          expect.objectContaining({
+            filePath: "/repo/src/mcp-edit.ts",
+            oldString: "const mcp = 1\n",
+            newString: "// MCP edit comment\nconst mcp = 1\n",
+          }),
+          expect.any(Object),
+          "/tmp/fake-comment-checker",
+          undefined,
+          expect.any(Function),
+        )
+      })
+    })
+  })
+
   it("#given multiedit tool with path #when before and after hooks run #then it checks the pending multiedit", async () => {
     // given
     const hooks = createCommentCheckerHooks(undefined, cliRunner)

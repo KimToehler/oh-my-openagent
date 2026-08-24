@@ -234,6 +234,37 @@ describe("createReadImageResizerHook", () => {
     expect(output.output).toContain("resized")
   })
 
+  describe("#given an MCP-qualified read tool", () => {
+    describe("#when it returns an oversized image", () => {
+      it("#then replaces attachment URL and appends resize metadata", async () => {
+        //#given
+        mockParseImageDimensions.mockReturnValue({ width: 3000, height: 2000 })
+        mockCalculateTargetDimensions.mockReturnValue({ width: 1568, height: 1045 })
+        mockResizeImage.mockResolvedValue({
+          resizedDataUrl: "data:image/png;base64,resized",
+          original: { width: 3000, height: 2000 },
+          resized: { width: 1568, height: 1045 },
+        })
+
+        const hook = createReadImageResizerHook(createMockContext())
+        const output: ToolOutput = {
+          title: "Read",
+          output: "original output",
+          metadata: {},
+          attachments: [{ mime: "image/png", url: "data:image/png;base64,old", filename: "big.png" }],
+        }
+
+        //#when
+        await hook["tool.execute.after"](createInput("mcp__foo__read"), output)
+
+        //#then
+        expect(output.attachments?.[0]?.url).toBe("data:image/png;base64,resized")
+        expect(output.output).toContain("[Image Resize Info]")
+        expect(output.output).toContain("resized")
+      })
+    })
+  })
+
   it("removes oversized attachment when resize fails to prevent API error", async () => {
     //#given
     mockParseImageDimensions.mockReturnValue({ width: 3000, height: 2000 })

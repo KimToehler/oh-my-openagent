@@ -20,12 +20,29 @@ import type { AtlasHookOptions, PendingTaskRef } from "./types"
 import { createAtlasHook } from "./index"
 import { createToolExecuteAfterHandler } from "./tool-execute-after"
 import { createToolExecuteBeforeHandler } from "./tool-execute-before"
+import { isWriteOrEditToolName } from "./write-edit-tool-policy"
 
 const callerAgentBySession = new Map<string, string>()
 type MockAtlasInput = Parameters<typeof createAtlasHook>[0] & {
   _promptMock: ReturnType<typeof mock>
   _sessionGetMock: ReturnType<typeof mock>
 }
+
+describe("isWriteOrEditToolName", () => {
+  test("matches MCP-qualified write but rejects unseparated suffixes", () => {
+    // given
+    const mcpQualifiedWrite = "mcp__foo__write"
+    const unseparatedSuffix = "overwrite"
+
+    // when
+    const matchesMcpQualifiedWrite = isWriteOrEditToolName(mcpQualifiedWrite)
+    const matchesUnseparatedSuffix = isWriteOrEditToolName(unseparatedSuffix)
+
+    // then
+    expect(matchesMcpQualifiedWrite).toBe(true)
+    expect(matchesUnseparatedSuffix).toBe(false)
+  })
+})
 
 describe("atlas hook", () => {
   let TEST_DIR: string
@@ -1079,6 +1096,25 @@ session_id: ses_untrusted_999
         expect(output.output).toContain("DELEGATION REQUIRED")
         expect(output.output).toContain("task")
         expect(output.output).toContain("task")
+      })
+
+      test("should append delegation reminder when orchestrator uses an MCP-qualified write outside .omo/", async () => {
+        // given
+        const hook = createTestAtlasHook(createMockPluginInput())
+        const output = {
+          title: "Write",
+          output: "File written successfully",
+          metadata: { filePath: "/path/to/code.ts" },
+        }
+
+        // when
+        await hook["tool.execute.after"](
+          { tool: "mcp__foo__write", sessionID: ORCHESTRATOR_SESSION },
+          output
+        )
+
+        // then
+        expect(output.output).toContain("DELEGATION REQUIRED")
       })
 
       test("should append delegation reminder when orchestrator edits outside .omo/", async () => {
