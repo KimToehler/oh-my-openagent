@@ -1122,3 +1122,271 @@ delegate — never iterate the bypass list.
 in the same session was still filtered. Project rule written at
 `onara/.omo/rules/lean-ctx-triage.md` documenting the delegate-don't-iterate rule and the
 full dead-end table. Shell stdout stays unfixed and has no known knob.
+
+**Update 2026-08-24:** fixed upstream, not worked around. Root cause is an ONNX
+task-profile classifier in the MCP server (`context_gate.rs:525 triage_filter_level`,
+floor 500 chars); its escape hatches landed in `0f86871aa` (2026-08-20), *after* the
+installed `v3.9.19` tag (2026-08-18) — so the shipped release predated its own fix.
+Settled with `git merge-base --is-ancestor 0f86871aa v3.9.19` → false. Rebuilt from
+source to `lean-ctx 3.9.20`; `ctx_shell raw=true` and `ctx_read mode=full` now return
+verbatim, including the dense `git log`/`git status`/test-log output that motivated the
+entry. `ctx_shell` stdout **without** `raw=true` is still filtered. The delegate rule
+above is no longer the first move — `raw=true` is.
+
+---
+
+## 2026-08-24 — `formatTaskResult` discards a lane's whole transcript when the session errors
+
+**Severity:** costly
+**Area:** background tasks
+**Observed in:** `~/git/onara`
+
+**What happened:** two long background lanes (same task id, `category="deep"`) ended with
+`Session error: Aborted` as their *entire* result — no partial report, no progress
+indication. Both had done substantial correct work and left it uncommitted. The work
+survived only because the orchestrator went looking for it by hand with `git status`.
+
+**Evidence:**
+
+```
+Task Result
+
+Task ID: bg_e5031b85
+Description: Fix review findings in modality day bodies
+Duration: 22m 30s
+Session ID: ses_fccb631beffdF9zbXUFFkofj04
+
+---
+
+Session error: Aborted
+```
+
+| Abort | Ran | Committed | Uncommitted work found afterwards |
+|---|---|---|---|
+| 1st | 22m 30s | 0 | 4 files — a complete, correct backend contract extension (`oas.yaml`, `RequestDtos.kt`, `TrainingController.kt` create **and** update paths, `TrainingControllerTest.kt`) |
+| 2nd | 38m 40s | 0 | 1 file — a valid TDD red test, verified failing correctly |
+
+The first lane's output was salvaged, independently verified (`compileKotlin` clean, 94
+tests / 0 failures, mutation-proved by reverting the threading → `failures=1` naming the
+test), and committed as `onara@47ff71394`.
+
+The completion notification for both read `- completed with 8 unfinished todos` (then 7),
+which reads as *finished*, not *crashed*.
+
+**Root cause:** confirmed, not theory.
+`packages/omo-opencode/src/tools/background-task/task-result-format.ts:67-81` — the
+`sessionError` branch returns early and drops `sortedMessages` entirely, so
+`consumeNewMessages` on the next line never runs:
+
+```ts
+const sessionError = sortedMessages
+  .filter((message) => message.info?.role === "assistant" && message.info?.error)
+  .map((message) => extractErrorMessage(message.info?.error))
+  .find((message): message is string => typeof message === "string" && message.length > 0)
+if (sessionError) {
+  return `Task Result … Session error: ${sessionError}`
+}
+```
+
+A lane that worked 38 minutes and errored on its last turn reports exactly as much as one
+that died on its first. Note the asymmetry with the neighbouring branch at `:84`, which at
+least says `(No assistant or tool response found)` — accurate, because there genuinely is
+nothing.
+
+Existing coverage does not catch it: `task-result-format.test.ts:30-47` builds an errored
+assistant message with `parts: []` — an error with *no* partial work — and asserts only
+that the output contains `"Session error"`. That passes under both current and fixed
+behaviour. The real case, error-after-N-good-turns, is untested.
+
+Separately unknown: whether a duration/token ceiling on `deep` produces the `Aborted` at
+all. Both aborts were long-running; no other lane in the session exceeded ~9 min and none
+aborted. The report gives the orchestrator nothing to distinguish a ceiling from a
+provider-side cancellation.
+
+**Workaround:** none for the data loss itself — recovery is manual `git status` in the
+lane's worktree. Downstream mitigation: split the work into two smaller parallel lanes on
+separate worktrees, and promote *"commit after every finding, never batch"* from a
+footnote to a primary instruction. Whether smaller lanes abort less is unverified.
+
+**Fix status:** unfixed. Suggested fix is to emit the partial transcript **and** the
+error rather than choosing between them, with a regression test asserting that a session
+with N good turns followed by an error still surfaces those N turns. Making the
+completion notification distinguish aborted from completed would close the secondary half.
+
+---
+
+## 2026-08-24 — A timed-out `ctx_shell` is indistinguishable from a failed one
+
+**Severity:** papercut
+**Area:** tools
+**Observed in:** `~/git/onara`
+
+**What happened:** a `git commit` whose pre-commit hook runs `detekt` (60–90s) exceeded
+the ~110s foreground cap and returned a timeout error. The agent read that as failure and
+retried the commit detached — but the first commit had already **succeeded**. Only the
+wait timed out.
+
+**Evidence:**
+
+```
+MCP error -32001: Request timed out
+```
+
+then, from the detached retry:
+
+```
+EXIT=1
+pre-commit: running detekt (backend_kt)…
+On branch review-fixes
+nothing to commit, working tree clean
+```
+
+`git log --oneline -1` confirmed the original commit (`47ff71394`) had landed. The
+detached job then sat registered until an `<unpolled-background-shell-jobs>` reminder
+fired.
+
+**Root cause / hypothesis:** hypothesis. The error text carries no signal that the
+command is still running, so "timed out" and "failed" are the same string to the agent.
+Retrying a **non-idempotent** command on that reading is the natural next move and the
+wrong one — harmless here because `git commit` is effectively idempotent, but the same
+reflex on a migration or a `push` would not be.
+
+Compounding: the detach was unnecessary. 60–90s is inside the foreground budget; the
+correct recovery was `git log`, which is what happened anyway two calls later.
+
+**Workaround:** on a `ctx_shell` timeout, check the command's *effect* (`git log`, output
+file, test-results XML) before assuming failure — never blind-retry. The
+`<unpolled-background-shell-jobs>` reminder worked correctly and explained how to clear
+the job; the gap is upstream of it.
+
+**Fix status:** needs-decision. If the command genuinely keeps running past the cap (as
+documented), returning the `shell_<id>` it detached to — instead of a bare error — would
+make recovery obvious rather than guesswork.
+
+---
+
+## 2026-08-24 — `multimodal-looker` reports high confidence on image regions outside the frame
+
+**Severity:** costly
+**Area:** subagents
+**Observed in:** `~/git/onara`
+
+**What happened:** asked to compare two UI elements across 10 screenshots, the agent
+returned "visibly different hues, **high confidence**" for every file, and clean verdicts
+on all five requested categories. The comparison was impossible: the captures are
+viewport-sized and the second element is below the fold in every one.
+
+**Evidence:**
+
+```
+sips -g pixelWidth -g pixelHeight t9-round-dark-mobile.png
+  pixelWidth: 414
+  pixelHeight: 896
+```
+
+The pages are ~1445px tall (`scrollHeight`), so the cool-down section it claimed to
+compare is simply not in the image. Re-asking about an element that *is* in frame
+produced a correct answer immediately, and volunteered `NOT VISIBLE` for one file — which
+is the signal that a real look happened.
+
+Running score for the image channel across this wave: **5 findings, 5 false, 0 true.**
+Each disproved by returning to the DOM (`scrollWidth - clientWidth === 0` on every row,
+disproving a reported "clipping") or by checking frame size. Three of the five came from
+an earlier image pass in the same wave and were disproved the same way.
+
+**Root cause / hypothesis:** hypothesis — the agent infers a plausible answer from
+context rather than reporting inability to see, and the prompt did not force it to
+establish what was in frame first. A uniformly-clean, uniformly-high-confidence report is
+itself the smell.
+
+**Workaround:** scope image questions to elements known to be in frame; check
+`sips -g pixelWidth -g pixelHeight` before trusting any spatial claim; treat every image
+finding as a hypothesis to confirm against the DOM, never as a checklist-closer. Project
+rule written at `onara/.omo/rules/visual-qa-evidence.md` splitting visual QA into a
+measured channel (`getComputedStyle` / `getBoundingClientRect`) and a looked-at channel,
+with the two-instrument division and the frame-bounds check.
+
+**Fix status:** worked around. A prompt-level fix in the agent — require it to state image
+dimensions and confirm the target is in frame before answering, and to prefer
+`NOT VISIBLE` over inference — would close it at the source.
+
+---
+
+## 2026-08-24 — `review-work` and `full-code-review` default to a diff range that is empty for merged work
+
+**Severity:** docs-gap
+**Area:** subagents
+**Observed in:** `~/git/onara`
+
+**What happened:** both skills instruct the reviewer to collect scope via
+`git diff main...HEAD` (or `HEAD~1`). The work under review had **already been merged to
+main**, so that range is empty. Run as written, both would have reviewed nothing and
+reported PASS.
+
+**Evidence:** `review-work` Phase 0 auto-collection sequence:
+
+```bash
+git diff --name-only HEAD~1  # or: git diff --name-only main...HEAD
+git diff HEAD~1              # or: git diff main...HEAD
+```
+
+`full-code-review` Inputs: *"Default scope is the working-tree + branch diff
+(`git diff main...HEAD` …)"*. On the merged branch both yield zero files. The real scope
+required an explicit wave merge-base: `git diff 136d5884c..HEAD` — 29 code files, ~1268
+diff lines.
+
+**Root cause / hypothesis:** confirmed for the scope default; the failure mode is that an
+empty diff produces a *passing* review rather than an error, so nothing signals the
+mistake. `review-work` Phase 0 already says "confirm the real scope before reviewing" —
+it just does not name the merged case, which is the one where the default silently
+degrades.
+
+**Workaround:** scope every lane explicitly to the wave's merge-base rather than the
+branch default, and state the range in each lane's prompt.
+
+**Fix status:** unfixed. Both skills would benefit from a line: *if the work is already
+merged (or you are standing on `main`), the branch-diff default yields nothing — scope to
+the wave's merge-base.* Optionally, a reviewer that finds an empty diff should refuse
+rather than pass.
+
+**Related, same session:** the two skills overlap almost entirely on code quality.
+Running both wholesale would have put ~9 agents on the same 1268-line diff; merging into
+three non-duplicative lanes (2 × `oracle` on different questions + 1 context miner) is
+what fit. The security lane was deliberately skipped and *reported as skipped* — the diff
+was UI rendering, SCSS and i18n, with no auth, input or network surface. A note in
+`review-work` that lanes may be dropped when the diff cannot exercise them, provided the
+drop is stated rather than silently counted as PASS, would make that legitimate instead of
+improvised.
+
+---
+
+## 2026-08-24 — `ctx_shell` redirect guard also blocks heredoc appends
+
+**Severity:** papercut
+**Area:** tools
+**Observed in:** `~/git/onara`
+
+**What happened:** appending a section to a Markdown file with a heredoc was rejected.
+
+**Evidence:**
+
+```
+ERROR: ctx_shell detected a file-write command (shell redirect > or >>).
+Use the native Write tool to create/modify files. ctx_shell is ONLY for reading
+command output (git status, cargo test, npm run, etc.). File writes via shell cause
+MCP protocol corruption on large payloads. Output capture to temp paths
+(/tmp, /var/tmp, $TMPDIR) is allowed.
+```
+
+Triggered by `cat >> file <<'MD' … MD`, the natural way to append a section.
+
+**Root cause / hypothesis:** confirmed from the message itself — the guard matches
+redirect **syntax**, not intent, so a heredoc append is indistinguishable from a
+large-payload file write. Correct in spirit; the temp-path carve-out shows the intent is
+narrower than the match.
+
+**Workaround:** read the file's tail, then `Edit` against a unique anchor. Arguably safer
+than the heredoc anyway, since it fails loudly when the anchor has moved.
+
+**Fix status:** worked around. Worth documenting that the rule is syntactic, so agents
+reach for `Edit` first rather than discovering the guard.
