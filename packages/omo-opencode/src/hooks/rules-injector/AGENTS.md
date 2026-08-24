@@ -18,7 +18,7 @@ tool.execute.after (read/write/edit/multiedit)
 
 ## TRACKED TOOLS
 
-`["read", "write", "edit", "multiedit"]` — triggers only on file manipulation tools.
+`["read", "write", "edit", "multiedit"]` triggers file manipulation tools by exact name or MCP-prefixed separator-boundary suffix, such as `lean-ctx_ctx_read` and `mcp__server__read`. Lookalike suffixes without a separator boundary do not match, so `todowrite` deliberately remains untracked.
 
 ## KEY FILES
 

@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 import { createDynamicTruncator } from "../../shared/dynamic-truncator";
 import { resolveSessionEventID } from "../../shared/event-session-id";
+import { matchesTrackedTool } from "../../shared/tool-name-match";
 import {
 	createSessionCacheStore,
 	createSessionRuleScanCacheStore,
@@ -69,9 +70,7 @@ export function createRulesInjectorHook(
 		input: ToolExecuteInput,
 		output: ToolExecuteOutput,
 	) => {
-		const toolName = input.tool.toLowerCase();
-
-		if (TRACKED_TOOLS.includes(toolName)) {
+		if (matchesTrackedTool(input.tool, TRACKED_TOOLS)) {
 			const filePath = getRuleInjectionFilePath(output);
 			if (!filePath) return;
 			await processFilePathForInjection(filePath, input.sessionID, output);
