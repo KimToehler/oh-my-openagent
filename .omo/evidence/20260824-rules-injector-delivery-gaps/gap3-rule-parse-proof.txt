@@ -1,0 +1,18 @@
+=== ASSERTION 1: template parses as a real rule ===
+description: "Record harness defects, footguns, and surprising behaviours in the OMO findings log as they are discovered during real work"
+globs: ["**/*"]
+body length: 3607 chars
+PASS: true
+
+=== ASSERTION 2: rule matches representative target paths ===
+  /tmp/example-project/src/index.ts -> {"applies":true,"reason":"glob: **/*"}
+  /tmp/example-project/docs/notes.md -> {"applies":true,"reason":"glob: **/*"}
+  /tmp/example-project/nested/deep/file.kt -> {"applies":true,"reason":"glob: **/*"}
+PASS: true
+
+=== ASSERTION 3: body names the findings log, not a machine-local path ===
+names docs/troubleshooting/harness-findings.md: true
+contains machine-local /Users or /home path: false
+PASS: true
+
+OVERALL: ALL ASSERTIONS PASS

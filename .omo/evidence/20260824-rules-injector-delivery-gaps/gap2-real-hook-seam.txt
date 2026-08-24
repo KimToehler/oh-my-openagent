@@ -1,0 +1,11 @@
+host_sessions_before=2546
+host_rules_files_before=0
+sandbox_rules_before=0
+rule_banner=true
+sandbox_state_exists=true
+sandbox_state_project_rule_realPath=<sandbox>/project/.omo/rules/mcp-prefixed-read.md
+sandbox_state_compactionEpoch=absent
+sandbox_removed=true
+tmux_qa_sessions_remaining=0
+host_sessions_after=2546
+host_rules_files_after=0
