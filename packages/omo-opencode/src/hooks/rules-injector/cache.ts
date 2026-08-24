@@ -5,6 +5,7 @@ import type { RuleScanCache } from "./rule-scan-cache";
 export type SessionInjectedRulesCache = {
   contentHashes: Set<string>;
   realPaths: Set<string>;
+  compactionEpoch?: string;
 };
 
 export function createSessionCacheStore(): {

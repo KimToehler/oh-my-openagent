@@ -17,5 +17,6 @@ export interface InjectedRulesData {
   sessionID: string;
   injectedHashes: string[];
   injectedRealPaths: string[];
+  compactionEpoch?: string;
   updatedAt: number;
 }

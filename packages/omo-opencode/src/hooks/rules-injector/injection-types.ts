@@ -42,6 +42,7 @@ export type ParsedRule = {
 
 export interface TranscriptHydrationHook {
 	hydrateSession(sessionID: string): Promise<ReadonlySet<string>>;
+	getCompactionEpoch?(sessionID: string): string | undefined;
 }
 
 export type RuleInjectionProcessorDeps = {

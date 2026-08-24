@@ -1,0 +1,53 @@
+=== CASE A ===
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/hooks/rules-injector/transcript-hydration.test.ts:
+197 | 
+198 | 		// when
+199 | 		const result = await store.hydrateSession("session-1");
+200 | 
+201 | 		// then
+202 | 		expect([...result]).toEqual([]);
+                            ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "AGENTS.md",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-rules-injector-gaps/packages/omo-opencode/src/hooks/rules-injector/transcript-hydration.test.ts:202:23)
+(fail) createTranscriptHydrationStore > #given banner only before compaction #when hydrateSession runs #then banner is not returned [0.71ms]
+
+ 0 pass
+ 12 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [66.00ms]
+=== CASE F ===
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/hooks/rules-injector/injector.test.ts:
+576 | 		// when
+577 | 		await processor.processFilePathForInjection(targetFile, "session-1", firstOutput);
+578 | 		await processor.processFilePathForInjection(targetFile, "session-1", secondOutput);
+579 | 
+580 | 		// then
+581 | 		expect(firstOutput.output).toContain("[Rule:");
+                                   ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "[Rule:"
+Received: ""
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-rules-injector-gaps/packages/omo-opencode/src/hooks/rules-injector/injector.test.ts:581:30)
+(fail) createRuleInjectionProcessor > #given stale persisted epoch after restart #when processing after unseen compaction #then re-injects rule exactly once [2.07ms]
+
+ 0 pass
+ 14 filtered out
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [64.00ms]

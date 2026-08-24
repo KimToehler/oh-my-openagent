@@ -1,3 +1,5 @@
+import { hasCompactionPart } from "../../shared/compaction-marker";
+
 /**
  * Pattern that matches the injector's own rule banner emitted into tool
  * outputs. The capture group is the rule's path relative to project root.
@@ -22,11 +24,13 @@ export interface TranscriptHydrationDeps {
 export interface TranscriptHydrationStore {
 	hydrateSession(sessionID: string): Promise<ReadonlySet<string>>;
 	getHydratedRelativePaths(sessionID: string): ReadonlySet<string>;
+	getCompactionEpoch(sessionID: string): string | undefined;
 	clearSession(sessionID: string): void;
 }
 
 interface SessionHydrationState {
 	relativePaths: Set<string>;
+	compactionEpoch?: string;
 	hydrated: boolean;
 	inflight?: Promise<void>;
 }
@@ -46,6 +50,10 @@ interface TranscriptHydrationClient {
  * injector before emitting a rule so a process that lost its persisted cache
  * file but whose model context still contains prior `[Rule: ...]` markers
  * does not re-inject duplicates.
+ *
+ * Known residual: the compaction summary follows the boundary and remains in
+ * the scanned window. A summary that reproduces a `[Rule: X]` banner verbatim
+ * will suppress X because that text is still visible to the model.
  */
 export function createTranscriptHydrationStore(
 	deps: TranscriptHydrationDeps,
@@ -79,9 +87,10 @@ export function createTranscriptHydrationStore(
 						deps.client,
 						sessionID,
 					);
-					for (const relativePath of fetched) {
+					for (const relativePath of fetched.relativePaths) {
 						state.relativePaths.add(relativePath);
 					}
+					state.compactionEpoch = fetched.compactionEpoch;
 				} catch (error) {
 					if (error instanceof Error) {
 						return;
@@ -101,11 +110,20 @@ export function createTranscriptHydrationStore(
 		return states.get(sessionID)?.relativePaths ?? EMPTY_SET;
 	}
 
+	function getCompactionEpoch(sessionID: string): string | undefined {
+		return states.get(sessionID)?.compactionEpoch;
+	}
+
 	function clearSession(sessionID: string): void {
 		states.delete(sessionID);
 	}
 
-	return { hydrateSession, getHydratedRelativePaths, clearSession };
+	return {
+		hydrateSession,
+		getHydratedRelativePaths,
+		getCompactionEpoch,
+		clearSession,
+	};
 }
 
 const EMPTY_SET: ReadonlySet<string> = new Set();
@@ -117,8 +135,12 @@ function normalizeRuleRelativePath(relativePath: string): string {
 async function fetchTranscriptRelativePaths(
 	client: TranscriptHydrationClient,
 	sessionID: string,
-): Promise<Set<string>> {
+): Promise<{
+	readonly relativePaths: Set<string>;
+	readonly compactionEpoch?: string;
+}> {
 	const relativePaths = new Set<string>();
+	let compactionEpoch: string | undefined;
 	const response = await client.session.messages({
 		path: { id: sessionID },
 	});
@@ -126,7 +148,12 @@ async function fetchTranscriptRelativePaths(
 	const start = Math.max(0, data.length - HYDRATION_MAX_MESSAGES);
 	let scannedChars = 0;
 	for (let index = data.length - 1; index >= start; index -= 1) {
-		const text = collectMessageText(data[index]);
+		const message = data[index];
+		if (hasCompactionPart(getMessageParts(message))) {
+			compactionEpoch = getMessageID(message);
+			break;
+		}
+		const text = collectMessageText(message);
 		scannedChars += text.length;
 		for (const match of text.matchAll(RULE_MARKER_PATTERN)) {
 			const relativePath = match[1];
@@ -138,7 +165,27 @@ async function fetchTranscriptRelativePaths(
 			break;
 		}
 	}
-	return relativePaths;
+	return compactionEpoch === undefined
+		? { relativePaths }
+		: { relativePaths, compactionEpoch };
+}
+
+function getMessageParts(value: unknown): unknown {
+	if (value === null || typeof value !== "object" || !("parts" in value)) {
+		return undefined;
+	}
+	return value.parts;
+}
+
+function getMessageID(value: unknown): string | undefined {
+	if (value === null || typeof value !== "object" || !("info" in value)) {
+		return undefined;
+	}
+	const { info } = value;
+	if (info === null || typeof info !== "object" || !("id" in info)) {
+		return undefined;
+	}
+	return typeof info.id === "string" ? info.id : undefined;
 }
 
 function collectMessageText(

@@ -16,6 +16,7 @@ function getStoragePath(sessionID: string): string {
 export function loadInjectedRules(sessionID: string): {
   contentHashes: Set<string>;
   realPaths: Set<string>;
+  compactionEpoch?: string;
 } {
   const filePath = getStoragePath(sessionID);
   if (!existsSync(filePath))
@@ -24,10 +25,16 @@ export function loadInjectedRules(sessionID: string): {
   try {
     const content = readFileSync(filePath, "utf-8");
     const data: InjectedRulesData = JSON.parse(content);
-    return {
-      contentHashes: new Set(data.injectedHashes),
-      realPaths: new Set(data.injectedRealPaths ?? []),
-    };
+    return data.compactionEpoch === undefined
+      ? {
+          contentHashes: new Set(data.injectedHashes),
+          realPaths: new Set(data.injectedRealPaths ?? []),
+        }
+      : {
+          contentHashes: new Set(data.injectedHashes),
+          realPaths: new Set(data.injectedRealPaths ?? []),
+          compactionEpoch: data.compactionEpoch,
+        };
   } catch (error) {
     if (!(error instanceof Error)) {
       throw error;
@@ -38,12 +45,19 @@ export function loadInjectedRules(sessionID: string): {
 
 export function saveInjectedRules(
   sessionID: string,
-  data: { contentHashes: Set<string>; realPaths: Set<string> }
+  data: {
+    contentHashes: Set<string>;
+    realPaths: Set<string>;
+    compactionEpoch?: string;
+  }
 ): void {
   const storageData: InjectedRulesData = {
     sessionID,
     injectedHashes: [...data.contentHashes],
     injectedRealPaths: [...data.realPaths],
+    ...(data.compactionEpoch === undefined
+      ? {}
+      : { compactionEpoch: data.compactionEpoch }),
     updatedAt: Date.now(),
   };
 

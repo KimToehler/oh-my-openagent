@@ -86,13 +86,30 @@ export function createRuleInjectionProcessor(
 		if (!resolved) return;
 
 		const projectRoot = findProjectRoot(resolved);
-		const cache = getSessionCache(sessionID);
-		const ruleScanCache = getSessionRuleScanCache?.(sessionID);
-		const home = getHomeDir();
-
 		const transcriptRelativePaths = transcriptHydration
 			? await transcriptHydration.hydrateSession(sessionID)
 			: EMPTY_TRANSCRIPT_SET;
+		const compactionEpoch = transcriptHydration?.getCompactionEpoch?.(sessionID);
+		const loadedCache = getSessionCache(sessionID);
+		const cache =
+			loadedCache.compactionEpoch === compactionEpoch
+				? loadedCache
+				: {
+						contentHashes: new Set<string>(),
+						realPaths: new Set<string>(),
+						...(compactionEpoch === undefined ? {} : { compactionEpoch }),
+					};
+		if (cache !== loadedCache) {
+			loadedCache.contentHashes = cache.contentHashes;
+			loadedCache.realPaths = cache.realPaths;
+			if (cache.compactionEpoch === undefined) {
+				delete loadedCache.compactionEpoch;
+			} else {
+				loadedCache.compactionEpoch = cache.compactionEpoch;
+			}
+		}
+		const ruleScanCache = getSessionRuleScanCache?.(sessionID);
+		const home = getHomeDir();
 		const normalizedTranscriptRelativePaths = new Set(
 			[...transcriptRelativePaths].map(normalizeRuleRelativePath),
 		);
