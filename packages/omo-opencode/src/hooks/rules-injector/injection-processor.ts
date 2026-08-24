@@ -91,14 +91,16 @@ export function createRuleInjectionProcessor(
 			: EMPTY_TRANSCRIPT_SET;
 		const compactionEpoch = transcriptHydration?.getCompactionEpoch?.(sessionID);
 		const loadedCache = getSessionCache(sessionID);
-		const cache =
-			loadedCache.compactionEpoch === compactionEpoch
-				? loadedCache
-				: {
+		const shouldReset =
+			compactionEpoch !== undefined &&
+			loadedCache.compactionEpoch !== compactionEpoch;
+		const cache = shouldReset
+			? {
 						contentHashes: new Set<string>(),
 						realPaths: new Set<string>(),
 						...(compactionEpoch === undefined ? {} : { compactionEpoch }),
-					};
+					}
+			: loadedCache;
 		if (cache !== loadedCache) {
 			loadedCache.contentHashes = cache.contentHashes;
 			loadedCache.realPaths = cache.realPaths;

@@ -584,6 +584,44 @@ describe("createRuleInjectionProcessor", () => {
 		expect(secondOutput.output).not.toContain("[Rule:");
 	});
 
+	it("#given cached compaction epoch and unknown hydrated epoch #when processing rule #then keeps dedup cache", async () => {
+		// given
+		const cached = {
+			contentHashes: new Set(["hash:rule-content\n"]),
+			realPaths: new Set([ruleRealPath]),
+			compactionEpoch: "known-epoch",
+		};
+		const processor = createRuleInjectionProcessor({
+			workspaceDirectory: projectRoot,
+			truncator: {
+				truncate: async (_sessionID: string, content: string) => ({
+					result: content,
+					truncated: false,
+				}),
+			},
+			getSessionCache: () => cached,
+			homedir: () => homeRoot,
+			shouldApplyRule: () => ({ applies: true, reason: "matched" }),
+			isDuplicateByRealPath: (realPath: string, cache: ReadonlySet<string>) =>
+				cache.has(realPath),
+			createContentHash: (content: string) => `hash:${content}`,
+			isDuplicateByContentHash: (hash: string, cache: ReadonlySet<string>) =>
+				cache.has(hash),
+			transcriptHydration: {
+				hydrateSession: async () => new Set(),
+				getCompactionEpoch: () => undefined,
+			},
+		});
+		const output = createOutput();
+
+		// when
+		await processor.processFilePathForInjection(targetFile, "session-1", output);
+
+		// then
+		expect(output.output).not.toContain("[Rule:");
+		expect(cached.compactionEpoch).toBe("known-epoch");
+	});
+
 	it("#given transcript hydration reports unrelated rule #when injecting #then rule is still injected", async () => {
 		// given
 		const sessionCaches = new Map<

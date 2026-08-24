@@ -258,13 +258,53 @@ describe("createTranscriptHydrationStore", () => {
 		expect([...result].sort()).toEqual(["first.md", "second.md"]);
 	});
 
-	it("#given bounded window exceeds message and character caps #when hydrateSession runs #then caps apply after compaction", async () => {
+	it("#given agent-only compaction boundary #when hydrateSession runs #then scan stops at boundary", async () => {
+		// given
+		const store = createTranscriptHydrationStore({
+			client: makeClient(async () => ({
+				data: [
+					{ parts: [{ output: ruleMarker("before.md") }] },
+					{ info: { id: "agent-epoch", agent: "compaction" }, parts: [] },
+					{ parts: [{ output: ruleMarker("after.md") }] },
+				],
+			})),
+		});
+
+		// when
+		const result = await store.hydrateSession("session-1");
+
+		// then
+		expect([...result]).toEqual(["after.md"]);
+		expect(store.getCompactionEpoch("session-1")).toBe("agent-epoch");
+	});
+
+	it("#given compaction inside bounded window #when hydrateSession runs #then marker and epoch come from post-compaction window", async () => {
 		// given
 		const messages = [
+			{ parts: [{ output: ruleMarker("outside-message-cap.md") }] },
+			...Array.from({ length: 3 }, () => ({ parts: [{ text: "old" }] })),
 			{ info: { id: "epoch-1" }, parts: [{ type: "compaction" }] },
-			{ parts: [{ output: ruleMarker("outside-char-cap.md") }] },
-			{ parts: [{ text: "x".repeat(1_000_001) }] },
-			...Array.from({ length: 199 }, () => ({ parts: [{ text: "recent" }] })),
+			{ parts: [{ output: ruleMarker("inside-window.md") }] },
+			...Array.from({ length: 194 }, () => ({ parts: [{ text: "recent" }] })),
+		];
+		const store = createTranscriptHydrationStore({
+			client: makeClient(async () => ({ data: messages })),
+		});
+
+		// when
+		const result = await store.hydrateSession("session-1");
+
+		// then
+		expect([...result]).toEqual(["inside-window.md"]);
+		expect(store.getCompactionEpoch("session-1")).toBe("epoch-1");
+	});
+
+	it("#given compaction outside bounded window #when hydrateSession runs #then epoch remains unknown", async () => {
+		// given
+		const messages = [
+			{ info: { id: "outside-epoch" }, parts: [{ type: "compaction" }] },
+			{ parts: [{ output: ruleMarker("outside-message-cap.md") }] },
+			...Array.from({ length: 200 }, () => ({ parts: [{ text: "recent" }] })),
 		];
 		const store = createTranscriptHydrationStore({
 			client: makeClient(async () => ({ data: messages })),
@@ -275,5 +315,26 @@ describe("createTranscriptHydrationStore", () => {
 
 		// then
 		expect([...result]).toEqual([]);
+		expect(store.getCompactionEpoch("session-1")).toBeUndefined();
+	});
+
+	it("#given compaction without message id #when hydrateSession runs #then epoch remains unknown", async () => {
+		// given
+		const store = createTranscriptHydrationStore({
+			client: makeClient(async () => ({
+				data: [
+					{ parts: [{ output: ruleMarker("before.md") }] },
+					{ info: { agent: "compaction" }, parts: [] },
+					{ parts: [{ output: ruleMarker("after.md") }] },
+				],
+			})),
+		});
+
+		// when
+		const result = await store.hydrateSession("session-1");
+
+		// then
+		expect([...result]).toEqual(["after.md"]);
+		expect(store.getCompactionEpoch("session-1")).toBeUndefined();
 	});
 });

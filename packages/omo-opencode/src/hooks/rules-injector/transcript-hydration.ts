@@ -1,4 +1,4 @@
-import { hasCompactionPart } from "../../shared/compaction-marker";
+import { isCompactionMessage } from "../../shared/compaction-marker";
 
 /**
  * Pattern that matches the injector's own rule banner emitted into tool
@@ -51,9 +51,9 @@ interface TranscriptHydrationClient {
  * file but whose model context still contains prior `[Rule: ...]` markers
  * does not re-inject duplicates.
  *
- * Known residual: the compaction summary follows the boundary and remains in
- * the scanned window. A summary that reproduces a `[Rule: X]` banner verbatim
- * will suppress X because that text is still visible to the model.
+ * Known residual: SDKs may emit only a part-level compaction marker before the
+ * summary. In that shape the summary remains in the scanned window, so a
+ * verbatim `[Rule: X]` banner in the summary can suppress X.
  */
 export function createTranscriptHydrationStore(
 	deps: TranscriptHydrationDeps,
@@ -149,7 +149,7 @@ async function fetchTranscriptRelativePaths(
 	let scannedChars = 0;
 	for (let index = data.length - 1; index >= start; index -= 1) {
 		const message = data[index];
-		if (hasCompactionPart(getMessageParts(message))) {
+		if (isCompactionMessage(message)) {
 			compactionEpoch = getMessageID(message);
 			break;
 		}
