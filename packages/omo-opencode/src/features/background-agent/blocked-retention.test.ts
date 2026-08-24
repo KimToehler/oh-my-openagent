@@ -7,6 +7,7 @@ import {
   TERMINAL_TASK_TTL_MS,
 } from "./constants"
 import { BackgroundManager } from "./manager"
+import { clearBackgroundTaskRegistryForTesting, getRegisteredBackgroundTask } from "./task-registry"
 import { pruneStaleTasksAndNotifications } from "./task-poller"
 import type { BackgroundTask } from "./types"
 
@@ -17,6 +18,7 @@ let currentTime = new Date("2026-08-09T00:00:00.000Z").getTime()
 afterEach(() => {
   managerUnderTest?.shutdown()
   managerUnderTest = undefined
+  clearBackgroundTaskRegistryForTesting()
   jest.useRealTimers()
   Date.now = originalDateNow
   currentTime = new Date("2026-08-09T00:00:00.000Z").getTime()
@@ -128,6 +130,26 @@ describe("blocked task retention", () => {
       jest.advanceTimersByTime(TASK_CLEANUP_DELAY_MS + 1)
 
       // then
+      expect(managerUnderTest.findBySession(task.sessionId ?? "")).toBeUndefined()
+    })
+
+    test("#then findBySession stays undefined after cleanup even when global registry retains task", async () => {
+      // Registry fallback belongs only in resume: registry records are detached, so poller cannot observe their mutation.
+      // given
+      jest.useFakeTimers()
+      Date.now = () => currentTime
+      managerUnderTest = createManager()
+      const sessionId = "session-registry-only"
+      const task = createTask({ id: sessionId, sessionId })
+      addTask(managerUnderTest, task)
+      scheduleRemoval(managerUnderTest, task.id)
+
+      // when
+      currentTime += TASK_CLEANUP_DELAY_MS + 1
+      jest.advanceTimersByTime(TASK_CLEANUP_DELAY_MS + 1)
+
+      // then
+      expect(getRegisteredBackgroundTask(task.id)).toBeDefined()
       expect(managerUnderTest.findBySession(task.sessionId ?? "")).toBeUndefined()
     })
   })
