@@ -1224,3 +1224,43 @@ pattern-matched a plausible existing tracked directory instead of finding the re
 **Fix status:** fixed in `afc234a0c` (root AGENTS.md pointer) and `48f0c1345` (capture rule
 committed as `docs/templates/harness-findings-rule.md.example`).
 
+## 2026-08-24 - Exact-match tool-name gating survives in other hooks
+
+**Severity:** costly
+**Area:** tools
+**Observed in:** `oh-my-openagent`, found while verifying the fix for the MCP-prefix entry
+above
+
+**What happened:** After fixing three hooks for the same bug class, a repo-wide grep showed
+exact-equality tool-name matching still present elsewhere, including in a security-relevant
+guard.
+
+**Evidence:**
+```
+packages/omo-opencode/src/hooks/write-existing-file-guard/tool-execute-before-handler.ts:113
+  if (toolName !== "write" && toolName !== "read")
+packages/omo-opencode/src/hooks/write-existing-file-guard/tool-execute-before-handler.ts:131
+  if (toolName === "read")
+packages/omo-opencode/src/hooks/comment-checker/hook.ts:72
+  if (toolLower !== "write" && toolLower !== "edit" && toolLower !== "multiedit")
+
+local exact-match helpers also present at:
+packages/omo-opencode/src/hooks/read-image-resizer/hook.ts:15
+packages/omo-opencode/src/hooks/hashline-read-enhancer/hook.ts:19
+packages/omo-opencode/src/hooks/hashline-read-enhancer/hook.ts:23
+packages/omo-opencode/src/hooks/hashline-edit-diff-enhancer/hook.ts:31
+packages/omo-opencode/src/hooks/atlas/write-edit-tool-policy.ts:3
+```
+
+**Root cause / hypothesis:** confirmed as a systemic bug class, not an isolated bug. A
+shared `matchesTrackedTool` helper now exists at
+`packages/omo-opencode/src/shared/tool-name-match.ts`, and these call sites have not been
+migrated to it.
+
+The `write-existing-file-guard` case is the concerning one of the set: a guard that
+silently stops seeing MCP-prefixed writes fails open rather than closed.
+
+**Workaround:** none. Deliberately left out of scope for the change that found it.
+
+**Fix status:** unfixed - each migration needs its own failing test first, and (per the
+prior entry) a naive suffix match would break `todowrite`.
