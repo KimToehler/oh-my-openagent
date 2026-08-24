@@ -1,0 +1,17 @@
+$ bun test packages/omo-opencode/src/agents/multimodal-looker.test.ts
+
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/agents/multimodal-looker.test.ts:
+(pass) createMultimodalLookerAgent > prompt available tool claims match the look_at runtime allowlist [1.21ms]
+(pass) createMultimodalLookerAgent > prompt denies tool use to prevent death loop on small VL models [0.11ms]
+(pass) createMultimodalLookerAgent > prompt instructs the agent never to call other tools [0.04ms]
+(pass) createMultimodalLookerAgent > prompt requires frame bounds checks before spatial claims [0.04ms]
+(pass) buildLookAtPrompt > requires frame bounds checks before spatial claims [0.08ms]
+
+ 5 pass
+ 0 fail
+ 13 expect() calls
+Ran 5 tests across 1 file. [143.00ms]
+
+EXIT 0

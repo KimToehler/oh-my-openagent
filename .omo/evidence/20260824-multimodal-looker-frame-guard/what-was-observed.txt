@@ -1,0 +1,53 @@
+WHAT WAS OBSERVED
+
+Red phase output before production prompt edit:
+
+$ bun test packages/omo-opencode/src/agents/multimodal-looker.test.ts
+
+1 pass
+4 fail
+4 expect() calls
+Ran 5 tests across 1 file. [63.00ms]
+
+The new agent-route assertion failed because createMultimodalLookerAgent prompt did not contain `actual pixel dimensions`.
+
+Green focused test output:
+
+$ bun test packages/omo-opencode/src/agents/multimodal-looker.test.ts
+
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/agents/multimodal-looker.test.ts:
+(pass) createMultimodalLookerAgent > prompt available tool claims match the look_at runtime allowlist [1.21ms]
+(pass) createMultimodalLookerAgent > prompt denies tool use to prevent death loop on small VL models [0.11ms]
+(pass) createMultimodalLookerAgent > prompt instructs the agent never to call other tools [0.04ms]
+(pass) createMultimodalLookerAgent > prompt requires frame bounds checks before spatial claims [0.04ms]
+(pass) buildLookAtPrompt > requires frame bounds checks before spatial claims [0.08ms]
+
+ 5 pass
+ 0 fail
+ 13 expect() calls
+Ran 5 tests across 1 file. [143.00ms]
+
+EXIT 0
+
+Full typecheck output:
+
+$ bun run typecheck
+
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/memory-core/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json && tsgo --noEmit -p packages/omo-native/tsconfig.json
+
+EXIT 0
+
+
+LSP diagnostics attempt:
+
+Request initialize failed with message: Could not find a valid TypeScript installation. Please ensure that the "typescript" dependency is installed in the workspace or that a valid `tsserver.path` is specified. Exiting.
+
+Captured prompt artifacts:
+- before-multimodal-looker-prompt.txt
+- after-multimodal-looker-prompt.txt
+- before-look-at-prompt.txt
+- after-look-at-prompt.txt

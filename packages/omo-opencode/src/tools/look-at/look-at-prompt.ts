@@ -24,6 +24,8 @@ export function buildLookAtPrompt(goal: string, fileParts: LookAtFilePart[]): st
 
 ${sourceClause}
 
+Before making any spatial claim about an image, state its actual pixel dimensions and confirm the requested target or region is within those bounds. If it is absent or out of frame, answer NOT VISIBLE. Never infer content for a region you cannot see.
+
 Goal: ${goal}
 
 Provide ONLY the extracted information that matches the goal.

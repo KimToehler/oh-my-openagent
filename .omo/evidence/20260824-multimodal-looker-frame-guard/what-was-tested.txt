@@ -1,0 +1,9 @@
+WHAT WAS TESTED
+
+1. Red regression test: bun test packages/omo-opencode/src/agents/multimodal-looker.test.ts before prompt changes.
+2. Green regression test: bun test packages/omo-opencode/src/agents/multimodal-looker.test.ts after prompt changes.
+3. Full static gate: bun run typecheck.
+4. TypeScript diagnostics for changed source and test files.
+
+Surface: createMultimodalLookerAgent system prompt and buildLookAtPrompt direct tool prompt.
+Behavior under test: both prompt paths require actual dimensions, bounds confirmation, NOT VISIBLE for absent/out-of-frame targets, and no inference for unseen regions.

@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test"
 import { createAgentToolAllowlist } from "../shared/permission-compat"
-import { READ_ENABLED } from "../tools/look-at/look-at-prompt"
+import { READ_ENABLED, buildLookAtPrompt } from "../tools/look-at/look-at-prompt"
 import { createMultimodalLookerAgent } from "./multimodal-looker"
 
 function extractAvailableToolClaims(prompt: string): readonly string[] {
@@ -73,5 +73,28 @@ describe("createMultimodalLookerAgent", () => {
 
     // then
     expect(prompt.toLowerCase()).toContain("never")
+  })
+
+  test("prompt requires frame bounds checks before spatial claims", () => {
+    const agent = createMultimodalLookerAgent("test-model")
+
+    // then
+    expect(agent.prompt).toContain("actual pixel dimensions")
+    expect(agent.prompt).toContain("within those bounds")
+    expect(agent.prompt).toContain("NOT VISIBLE")
+    expect(agent.prompt).toContain("Never infer content for a region you cannot see")
+  })
+})
+
+
+describe("buildLookAtPrompt", () => {
+  test("requires frame bounds checks before spatial claims", () => {
+    const prompt = buildLookAtPrompt("Inspect the bottom-right panel", [])
+
+    // then
+    expect(prompt).toContain("actual pixel dimensions")
+    expect(prompt).toContain("within those bounds")
+    expect(prompt).toContain("NOT VISIBLE")
+    expect(prompt).toContain("Never infer content for a region you cannot see")
   })
 })

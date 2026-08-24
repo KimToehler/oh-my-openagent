@@ -1,0 +1,3 @@
+WHAT WAS OMITTED
+
+No live vision-model run. This fix is prompt-only and cannot guarantee model compliance. No credentials, model payloads, screenshots, tokens, or auth headers were captured. No tool schema, argument, or runtime behavior test was changed because scope excludes those surfaces.

@@ -1,0 +1,69 @@
+diff --git a/packages/omo-opencode/src/agents/multimodal-looker.test.ts b/packages/omo-opencode/src/agents/multimodal-looker.test.ts
+index b4af4faf4..3ef00c258 100644
+--- a/packages/omo-opencode/src/agents/multimodal-looker.test.ts
++++ b/packages/omo-opencode/src/agents/multimodal-looker.test.ts
+@@ -1,6 +1,6 @@
+ import { describe, test, expect } from "bun:test"
+ import { createAgentToolAllowlist } from "../shared/permission-compat"
+-import { READ_ENABLED } from "../tools/look-at/look-at-prompt"
++import { READ_ENABLED, buildLookAtPrompt } from "../tools/look-at/look-at-prompt"
+ import { createMultimodalLookerAgent } from "./multimodal-looker"
+ 
+ function extractAvailableToolClaims(prompt: string): readonly string[] {
+@@ -74,4 +74,27 @@ describe("createMultimodalLookerAgent", () => {
+     // then
+     expect(prompt.toLowerCase()).toContain("never")
+   })
++
++  test("prompt requires frame bounds checks before spatial claims", () => {
++    const agent = createMultimodalLookerAgent("test-model")
++
++    // then
++    expect(agent.prompt).toContain("actual pixel dimensions")
++    expect(agent.prompt).toContain("within those bounds")
++    expect(agent.prompt).toContain("NOT VISIBLE")
++    expect(agent.prompt).toContain("Never infer content for a region you cannot see")
++  })
++})
++
++
++describe("buildLookAtPrompt", () => {
++  test("requires frame bounds checks before spatial claims", () => {
++    const prompt = buildLookAtPrompt("Inspect the bottom-right panel", [])
++
++    // then
++    expect(prompt).toContain("actual pixel dimensions")
++    expect(prompt).toContain("within those bounds")
++    expect(prompt).toContain("NOT VISIBLE")
++    expect(prompt).toContain("Never infer content for a region you cannot see")
++  })
+ })
+diff --git a/packages/omo-opencode/src/agents/multimodal-looker.ts b/packages/omo-opencode/src/agents/multimodal-looker.ts
+index f5e71f87a..7ebaef1f0 100644
+--- a/packages/omo-opencode/src/agents/multimodal-looker.ts
++++ b/packages/omo-opencode/src/agents/multimodal-looker.ts
+@@ -56,7 +56,10 @@ Response rules:
+ - Match the language of the request
+ - Be thorough on the goal, concise on everything else
+ 
+-Your output goes straight to the main agent for continued work.`,
++Your output goes straight to the main agent for continued work.
++
++Before making any spatial claim about an image, state its actual pixel dimensions and confirm the requested target or region is within those bounds. If it is absent or out of frame, answer NOT VISIBLE. Never infer content for a region you cannot see.
++`,
+   }
+ }
+ createMultimodalLookerAgent.mode = MODE
+diff --git a/packages/omo-opencode/src/tools/look-at/look-at-prompt.ts b/packages/omo-opencode/src/tools/look-at/look-at-prompt.ts
+index bddc054ab..76efd6bb7 100644
+--- a/packages/omo-opencode/src/tools/look-at/look-at-prompt.ts
++++ b/packages/omo-opencode/src/tools/look-at/look-at-prompt.ts
+@@ -24,6 +24,8 @@ export function buildLookAtPrompt(goal: string, fileParts: LookAtFilePart[]): st
+ 
+ ${sourceClause}
+ 
++Before making any spatial claim about an image, state its actual pixel dimensions and confirm the requested target or region is within those bounds. If it is absent or out of frame, answer NOT VISIBLE. Never infer content for a region you cannot see.
++
+ Goal: ${goal}
+ 
+ Provide ONLY the extracted information that matches the goal.

@@ -1,0 +1,3 @@
+WHY IT IS ENOUGH
+
+Regression tests assert both runtime prompt builders contain all four anti-fabrication requirements. The focused suite exercises agent and direct look_at routes independently. Full typecheck proves changed TypeScript remains valid across workspace. Diagnostics cover changed files. Prompt-only change leaves tool schema, arguments, and runtime behavior untouched.
