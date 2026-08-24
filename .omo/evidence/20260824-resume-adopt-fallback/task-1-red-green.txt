@@ -1,0 +1,312 @@
+TASK 1 RED-GREEN EVIDENCE
+
+RED RUN
+Command: bun test packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts
+Result: exit 1, 0 pass, 6 fail. All failures reported Task not found for session from manager.ts:1388.
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:
+1383 |   }
+1384 | 
+1385 |   async resume(input: ResumeInput): Promise<BackgroundTask> {
+1386 |     const existingTask = this.findBySession(input.sessionId)
+1387 |     if (!existingTask) {
+1388 |       throw new Error(`Task not found for session: ${input.sessionId}`)
+                       ^
+error: Task not found for session: child-session
+      at resume (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.ts:1388:17)
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:81:27)
+(fail) BackgroundManager resume adopt-on-miss > #given a terminal child session missing from memory #when resume adopts it #then exact continuation metadata and task identity are preserved [1.68ms]
+102 | 
+103 |     // when
+104 |     const result = resume(manager)
+105 | 
+106 |     // then
+107 |     await expect(result).rejects.toThrow("currently running and cannot accept a continuation prompt")
+                                       ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "currently running and cannot accept a continuation prompt"
+Received message: "Task not found for session: child-session"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:107:34)
+(fail) BackgroundManager resume adopt-on-miss > #given an active child session missing from memory #when resume is requested #then it refuses without dispatching a prompt [0.52ms]
+115 | 
+116 |     // when
+117 |     const result = resume(manager)
+118 | 
+119 |     // then
+120 |     await expect(result).rejects.toThrow("currently running and cannot accept a continuation prompt")
+                                       ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "currently running and cannot accept a continuation prompt"
+Received message: "Task not found for session: child-session"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:120:34)
+(fail) BackgroundManager resume adopt-on-miss > #given unknown child liveness missing from memory #when resume is requested #then it refuses without dispatching a prompt [0.19ms]
+128 | 
+129 |     // when
+130 |     const result = resume(manager)
+131 | 
+132 |     // then
+133 |     await expect(result).rejects.toThrow(/process restart/i)
+                                       ^
+error: expect(received).toThrow(expected)
+
+Expected pattern: /process restart/i
+Received message: "Task not found for session: child-session"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:133:34)
+(fail) BackgroundManager resume adopt-on-miss > #given no durable child session after restart #when resume is requested #then it reports restart recovery guidance [0.17ms]
+140 | 
+141 |     // when
+142 |     const result = resume(manager)
+143 | 
+144 |     // then
+145 |     await expect(result).rejects.toThrow(/status registry unavailable/i)
+                                       ^
+error: expect(received).toThrow(expected)
+
+Expected pattern: /status registry unavailable/i
+Received message: "Task not found for session: child-session"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:145:34)
+(fail) BackgroundManager resume adopt-on-miss > #given an existing child omitted from the status registry #when resume is requested #then it refuses without dispatching a prompt [0.16ms]
+1383 |   }
+1384 | 
+1385 |   async resume(input: ResumeInput): Promise<BackgroundTask> {
+1386 |     const existingTask = this.findBySession(input.sessionId)
+1387 |     if (!existingTask) {
+1388 |       throw new Error(`Task not found for session: ${input.sessionId}`)
+                       ^
+error: Task not found for session: nested-child
+      at resume (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.ts:1388:17)
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:157:27)
+(fail) BackgroundManager resume adopt-on-miss > #given nested-parent terminal adoption #when resumed task completes #then root descendant registers and unregisters exactly once [0.22ms]
+
+ 0 pass
+ 6 fail
+ 4 expect() calls
+Ran 6 tests across 1 file. [111.00ms]
+
+GREEN RUN
+Command: bun test packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts
+Result: exit 0, 6 pass, 0 fail, 14 expect() calls.
+bun test v1.4.0 (1381054db)
+
+ 6 pass
+ 0 fail
+ 14 expect() calls
+Ran 6 tests across 1 file. [90.00ms]
+
+GREEN FULL BACKGROUND-AGENT RUN
+Command: bun test packages/omo-opencode/src/features/background-agent
+Result: exit 1, 895 pass, 4 unrelated pre-existing failures in manager.polling.test.ts and parent-wake-pending-queue.test.ts. Focused rerun reproduced same four failures.
+Received: "error"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:472:27)
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when valid output is absent #then keeps task running [0.24ms]
+486 | 
+487 |       //#when
+488 |       await manager["pollRunningTasks"]()
+489 | 
+490 |       //#then
+491 |       expect(task.status).toBe("running")
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: "running"
+Received: "error"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:491:27)
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when first observation is inside grace window #then stamps and waits [0.18ms]
+
+packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts:
+186 |       await drainAsyncTimerWork()
+187 |     }
+188 | 
+189 |     // then
+190 |     expect(promptAsyncCalls).toHaveLength(2)
+191 |     expect(latestWake.coalesceRequeueCount).toBeLessThanOrEqual(MAX_COALESCE_REQUEUE_ATTEMPTS)
+                                                  ^
+error: Expected and actual values must be numbers or bigints
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts:191:45)
+(fail) ParentWakePendingQueue scheduleFlush > #given an existing default timer and an already-delivered wake #when real queue cadence drives coalesce retries #then the wake reaches a second real dispatch before the cap [0.39ms]
+
+ 895 pass
+ 4 fail
+ 2350 expect() calls
+Ran 899 tests across 80 files. [31.39s]
+
+FAILURE CONTROL
+Command: GIT_MASTER=1 git stash push -- packages/omo-opencode/src/features/background-agent/manager.ts; bun test packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts; GIT_MASTER=1 git stash pop
+Result: test exit 1, stash pop exit 0, 0 pass, 6 fail. Failures returned Task not found for session.
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:
+1383 |   }
+1384 | 
+1385 |   async resume(input: ResumeInput): Promise<BackgroundTask> {
+1386 |     const existingTask = this.findBySession(input.sessionId)
+1387 |     if (!existingTask) {
+1388 |       throw new Error(`Task not found for session: ${input.sessionId}`)
+                       ^
+error: Task not found for session: child-session
+      at resume (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.ts:1388:17)
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:81:27)
+(fail) BackgroundManager resume adopt-on-miss > #given a terminal child session missing from memory #when resume adopts it #then exact continuation metadata and task identity are preserved [2.72ms]
+102 | 
+103 |     // when
+104 |     const result = resume(manager)
+105 | 
+106 |     // then
+107 |     await expect(result).rejects.toThrow("currently running and cannot accept a continuation prompt")
+                                       ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "currently running and cannot accept a continuation prompt"
+Received message: "Task not found for session: child-session"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:107:34)
+(fail) BackgroundManager resume adopt-on-miss > #given an active child session missing from memory #when resume is requested #then it refuses without dispatching a prompt [1.30ms]
+115 | 
+116 |     // when
+117 |     const result = resume(manager)
+118 | 
+119 |     // then
+120 |     await expect(result).rejects.toThrow("currently running and cannot accept a continuation prompt")
+                                       ^
+error: expect(received).toThrow(expected)
+
+Expected substring: "currently running and cannot accept a continuation prompt"
+Received message: "Task not found for session: child-session"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:120:34)
+(fail) BackgroundManager resume adopt-on-miss > #given unknown child liveness missing from memory #when resume is requested #then it refuses without dispatching a prompt [0.25ms]
+128 | 
+129 |     // when
+130 |     const result = resume(manager)
+131 | 
+132 |     // then
+133 |     await expect(result).rejects.toThrow(/process restart/i)
+                                       ^
+error: expect(received).toThrow(expected)
+
+Expected pattern: /process restart/i
+Received message: "Task not found for session: child-session"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:133:34)
+(fail) BackgroundManager resume adopt-on-miss > #given no durable child session after restart #when resume is requested #then it reports restart recovery guidance [0.22ms]
+140 | 
+141 |     // when
+142 |     const result = resume(manager)
+143 | 
+144 |     // then
+145 |     await expect(result).rejects.toThrow(/status registry is unavailable/i)
+                                       ^
+error: expect(received).toThrow(expected)
+
+Expected pattern: /status registry is unavailable/i
+Received message: "Task not found for session: child-session"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:145:34)
+(fail) BackgroundManager resume adopt-on-miss > #given an existing child omitted from the status registry #when resume is requested #then it refuses without dispatching a prompt [0.20ms]
+1383 |   }
+1384 | 
+1385 |   async resume(input: ResumeInput): Promise<BackgroundTask> {
+1386 |     const existingTask = this.findBySession(input.sessionId)
+1387 |     if (!existingTask) {
+1388 |       throw new Error(`Task not found for session: ${input.sessionId}`)
+                       ^
+error: Task not found for session: nested-child
+      at resume (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.ts:1388:17)
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.local-ignore/wt-resume-adopt-lane-1/packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:157:27)
+(fail) BackgroundManager resume adopt-on-miss > #given nested-parent terminal adoption #when resumed task completes #then root descendant registers and unregisters exactly once [0.21ms]
+
+ 0 pass
+ 6 fail
+ 4 expect() calls
+Ran 6 tests across 1 file. [126.00ms]
+
+TYPECHECK
+Command: bun run typecheck
+Exit code: 2
+Observed unrelated packages/team-core errors: missing @oh-my-opencode/utils and resulting unknown response types.
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/memory-core/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json && tsgo --noEmit -p packages/omo-native/tsconfig.json
+packages/team-core/src/team-state-store/reservation-reconciliation.ts(1,26): error TS2307: Cannot find module '@oh-my-opencode/utils' or its corresponding type declarations.
+packages/team-core/src/team-state-store/reservation-reconciliation.ts(13,43): error TS18046: 'response' is of type 'unknown'.
+packages/team-core/src/team-state-store/reservation-reconciliation.ts(14,12): error TS18046: 'response' is of type 'unknown'.
+packages/team-core/src/team-state-store/reservation-reconciliation.ts(30,26): error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'unknown' is not assignable to parameter of type '{}'.
+
+WHAT WAS TESTED
+Six resume-on-miss cases: terminal adoption metadata and object identity, active refusal, unknown refusal, restart-specific absent-session guidance, absent status-registry refusal, and one root descendant registration plus one terminal cleanup unregister.
+
+WHAT WAS OBSERVED
+New focused source test executed 6 tests and passed all 6 after implementation. Removing only manager.ts implementation restored all 6 Task not found failures. Full directory suite executed 899 tests: 895 passed; four unrelated polling/timer tests failed and reproduced independently. Typecheck reached packages/team-core and failed on unrelated workspace resolution/type errors.
+
+WHY IT IS ENOUGH
+RED and stash failure control prove tests exercise new resume miss branch. GREEN proves terminal-only adoption and prompt-free refusal paths. Exact adoption input assertion covers continue agent, undefined model, derived description, current parent root, and reservation flag. Identity assertion proves returned task is map-owned object. Completion assertion proves root ownership balances once.
+
+WHAT WAS OMITTED
+No credentials, tokens, environment dumps, or secret-bearing logs captured.
+
+ADVERSARIAL CLASSES
+stale_state: Tests run directly from TypeScript source with Bun; no cached or generated build artifact participates.
+misleading_success_output: Bun reported 6 pass, 0 fail, 14 expect() calls for manager.resume-adopt.test.ts. Test names are the six source declarations in that file; Bun success mode does not print passing names.
+dirty_worktree: Before commit, git status --porcelain showed only manager.ts and manager.resume-adopt.test.ts before this evidence file was added. Typecheck-generated unrelated dist changes were restored.
+malformed_input: Not applicable; ResumeInput is an internal typed boundary and todo changes no parsing.
+prompt_injection: Not applicable; tests use inert fixed prompt text and change no prompt construction from external content.
+cancel/resume: Not applicable; todo targets post-restart missing records, while existing resume and cancellation tests remain in full suite.
+hung_commands: Not applicable; focused tests completed in under one second and suite completed in 31.39 seconds.
+flaky_tests: Not applicable to six new tests; no sleeps, wall-clock assertions, or shared persistent state.
+repeated_interruptions: Not applicable; fallback performs one verify, one liveness probe, and one adoption per explicit resume call.
+
+## CORRECTION 2 (spec contradiction resolved by user decision)
+
+WHAT WAS TESTED
+- RED first: `bun test packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts` against committed manager.ts with new unstubbed status-map tests.
+- GREEN: same focused source command after correction, including idle orphan output, no-output refusal, acquire rollback, and positive `promptAsync` control.
+- Directory: `bun test packages/omo-opencode/src/features/background-agent`.
+- Static: `bun run typecheck` plus LSP diagnostics attempts on both changed TypeScript files.
+
+WHAT WAS OBSERVED
+RED output: 5 pass, 3 fail, 14 expect calls. Unstubbed idle orphan failed at manager.ts:1405 with `Task for session child-session cannot accept a continuation prompt because its status registry is unavailable. Wait for session status to become available before resuming it with task_id.` No-output and acquire-failure tests also failed at that obsolete refusal, proving adoption was unreachable.
+GREEN output and test-name execution proof: `#given an idle existing orphan with assistant output omitted from the real status registry #when resume is requested #then it adopts and dispatches one prompt`; `#given an existing orphan without agent output omitted from the status registry #when resume is requested #then it refuses with transcript guidance`; `#given idle orphan adoption followed by concurrency acquire failure #when resume rejects #then adoption and descendant registration roll back`. Bun reported `8 pass`, `0 fail`, `21 expect() calls`, `Ran 8 tests across 1 file`.
+Descendant-balance output: focused GREEN includes acquire rollback assertions for pre-resume count equality and empty tasks map. Existing nested-parent completion test also passed, proving one register and one unregister on success completion.
+Directory suite: `897 pass`, `4 fail`, `2357 expect() calls`, 901 tests across 80 files, exit 1. Exact allowed failures: three `manager.polling.test.ts` cases under `#given idle output with incomplete todos` (`session remains active`, `valid output is absent`, `first observation is inside grace window`) and `parent-wake-pending-queue.test.ts` numeric matcher case. No new failures.
+Typecheck: first correction run exposed local optional-root typing at manager.ts:1490, fixed before final gate. Final `bun run typecheck` exit code 0, including `packages/team-core`; prior evidence's team-core claim is superseded. LSP diagnostics could not initialize because configured LSP could not find a TypeScript installation, so successful repo-native `tsgo` gate is static verification evidence.
+
+Exact error text changes
+- Removed: `Task for session ${input.sessionId} cannot accept a continuation prompt because its status registry is unavailable. Wait for session status to become available before resuming it with task_id.`
+- Added: `Task for session ${input.sessionId} exists but shows no agent output to continue from. Use \`session_read(session_id="${input.sessionId}")\` to inspect the server-backed transcript.`
+- Active and unknown wording unchanged: `Task for session ${input.sessionId} is currently running and cannot accept a continuation prompt. Wait for it to complete before resuming it with task_id.`
+- Missing durable row wording unchanged: `Task not found after process restart: ${input.sessionId}` followed by process-memory explanation and `Recovery: use \`session_read(session_id="${input.sessionId}")\` to inspect the server-backed transcript.`
+
+Existing-test adjustments
+- Replaced old absent-registry refusal test because user decision legitimately changes absent policy. New no-output test preserves refusal coverage with accurate transcript guidance.
+- Added output-capable client fixture and positive `promptAsync` assertion. Tool-role output avoids prompt gate treating latest assistant text as an active turn.
+- Added prompt-gate and live-route test cleanup plus unique test directories to isolate dispatch state. No assertion weakened.
+
+Second-probe reasoning
+Adopted task skips running-record second probe. Miss branch already verified row existence and passed one liveness policy decision. Immediate re-probe adds no safety, creates time-of-check divergence, and treats fresh `consecutiveMissedPolls` as evidence against adoption. Existing in-memory running tasks retain full second-probe reconciliation. This removes adopt-then-second-probe-divergence structurally, so no divergence rollback test applies. Acquire remains first fallible operation after adoption and has explicit transactional rollback: unregister root descendant, remove phantom task, rethrow.
+
+WHY IT IS ENOUGH
+Unstubbed `session.status()` returning `{}` reproduces real idle-map semantics. Transcript true and false cases prove both absent branches. Positive prompt assertion makes refusal assertions non-vacuous. Acquire failure proves rollback returns counter to exact prior value and removes adopted task. Skipping redundant probe eliminates second-probe phantom path by construction. Full directory suite matches exactly four authorized baseline failures. Final typecheck exits 0.
+
+WHAT WAS OMITTED
+No credentials, tokens, auth headers, private environment dumps, or secret-bearing logs. Full successful typecheck command list summarized by exit code; exact failure suite retained in `/tmp/resume-adopt-bg-suite.txt` during work only.
+
+ADVERSARIAL CLASSES
+- stale_state: Bun command targets `manager.resume-adopt.test.ts` TypeScript source directly; stack trace cites current source manager.ts and test lines, not dist.
+- misleading_success_output: Test-name lines above identify new tests; Bun reports 8 tests and 21 assertions, not zero tests.
+- dirty_worktree: Before commit, `git status --porcelain` shows only scoped manager.ts, manager.resume-adopt.test.ts, and this evidence file.
+- malformed input: Not applicable; typed ResumeInput parsing unchanged.
+- prompt injection: Not applicable; fixed inert test prompt and existing prompt construction unchanged.
+- cancel/resume: Not applicable; correction changes restart-orphan resume miss branch, not cancellation contract.
+- hung commands: Not applicable; focused suite completed in 142 ms, directory suite in 31.31 s, typecheck completed within foreground cap.
+- flaky tests: Not applicable; no retry, random behavior assertion, or wall-clock threshold. UUID only isolates directories.
+- repeated interruptions: Not applicable; one explicit resume performs one first probe and no redundant adopted-task probe.

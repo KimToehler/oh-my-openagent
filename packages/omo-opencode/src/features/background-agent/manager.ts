@@ -1383,9 +1383,43 @@ The fallback retry session is now created and can be inspected directly.
   }
 
   async resume(input: ResumeInput): Promise<BackgroundTask> {
-    const existingTask = this.findBySession(input.sessionId)
+    let existingTask = this.findBySession(input.sessionId)
+    let adoptedTask: BackgroundTask | undefined
     if (!existingTask) {
-      throw new Error(`Task not found for session: ${input.sessionId}`)
+      const sessionExists = await this.verifySessionExists(input.sessionId)
+      if (!sessionExists) {
+        throw new Error(
+          `Task not found after process restart: ${input.sessionId}\n\n` +
+          "Background task state is kept in process memory and may be lost when OpenCode restarts. " +
+          `Recovery: use \`session_read(session_id="${input.sessionId}")\` to inspect the server-backed transcript.`,
+        )
+      }
+
+      const liveness = await this.probeSessionLiveness(input.sessionId)
+      if (liveness === "active" || liveness === "unknown") {
+        throw new Error(
+          `Task for session ${input.sessionId} is currently running and cannot accept a continuation prompt. ` +
+          "Wait for it to complete before resuming it with task_id.",
+        )
+      }
+      if (liveness === "absent" && !(await this.validateSessionHasOutput(input.sessionId))) {
+        throw new Error(
+          `Task for session ${input.sessionId} exists but shows no agent output to continue from. ` +
+          `Use \`session_read(session_id="${input.sessionId}")\` to inspect the server-backed transcript.`,
+        )
+      }
+
+      existingTask = this.adoptRunningSession({
+        sessionId: input.sessionId,
+        parentSessionId: input.parentSessionId,
+        parentMessageId: input.parentMessageId,
+        description: `Resumed orphaned background session ${input.sessionId}`,
+        agent: "continue",
+        model: undefined,
+        rootSessionId: input.parentSessionId,
+        rootDescendantAlreadyReserved: false,
+      })
+      adoptedTask = existingTask
     }
 
     if (!existingTask.sessionId) {
@@ -1393,7 +1427,7 @@ The fallback retry session is now created and can be inspected directly.
     }
 
     let reconciledStaleRun = false
-    if (existingTask.status === "running") {
+    if (existingTask.status === "running" && !adoptedTask) {
       // A `running` record is not proof of a live child: when a subagent session
       // dies, nothing reconciles the in-memory status, so the task would reject
       // continuations forever and force a cancel-then-resume dance. Probe real
@@ -1452,6 +1486,10 @@ The fallback retry session is now created and can be inspected directly.
     } catch (error) {
       this.resumingBlockedTaskIds.delete(existingTask.id)
       if (reconciledStaleRun) this.completingTaskIds.delete(existingTask.id)
+      if (adoptedTask) {
+        this.unregisterRootDescendant(input.parentSessionId)
+        this.removeTask(adoptedTask)
+      }
       throw error
     }
     existingTask.concurrencyKey = concurrencyKey
