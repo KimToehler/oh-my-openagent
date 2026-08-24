@@ -445,6 +445,8 @@ The cross-check did find a partial mitigation the original entry did not credit:
 
 **Fix status (2026-08-24):** partially fixed - result retrieval has a transcript fallback; task-record persistence does not exist. Severity stays `costly`: restart still breaks `task_id`-based control, and a missing transcript pairing is unrecoverable.
 
+**Update:** (2026-08-24, second pass, verified against `dev` source) Unchanged, and now located precisely. The registry is not under `tools/background-task/` as earlier updates implied - it is `packages/omo-opencode/src/features/background-agent/task-registry.ts:22-29`, where `globalThis[REGISTRY_KEY]` holds `activeTasks` and `completedTasks` as plain `Map`s. A repo-wide search for `persist` / `hydrate` / `restore` / `writeFile` in that directory found no production persistence path, and `git log` on the registry file shows no persistence commit. The continuation half is confirmed harder than the retrieval half: `resume()` calls `findBySession()` first and throws `Task not found for session` at `manager.ts:1385-1389`, so the transcript fallback recovers output only and never rehydrates `BackgroundManager`. Smallest fix stays as scoped: durable store plus startup rehydration in `task-registry.ts`, loaded before `getTask()` (`manager.ts:1140-1142`) and `resume()`.
+
 ## 2026-08-17 — Completion summary replays every historical park as a current failure
 
 **Severity:** costly
@@ -608,6 +610,8 @@ entry noted in `docs/reference/blocked-escalation-follow-up.md:19-25`.
 
 **Fix status (2026-08-24):** still unfixed, severity confirmed `docs-gap`. Contained fix: add the distinction to the tool description, mirror it in `prompt-builder.ts`, and add the owed row to `docs/reference/features.md`.
 
+**Update:** (2026-08-24, second pass, verified against `dev` source) One third of the scoped fix has quietly landed and the rest has not. The owed reference row now exists at `docs/reference/features.md:681`, and it already describes the parking semantics correctly. The two wording sites do not: the tool description at `packages/omo-opencode/src/tools/report-blocked/tools.ts:14-16` and the subagent prompt at `packages/omo-opencode/src/tools/delegate-task/prompt-builder.ts:16-18` both say only that the tool parks the task until the parent resumes it, with nothing distinguishing *blocked on parent input* from *waiting on a detached job*. Remaining fix is now two wording edits, not three.
+
 ## 2026-08-17 — Mid-batch background completions starve a busy parent; delivery bounded, retention not
 
 **Severity:** blocker
@@ -734,6 +738,8 @@ Residual `shouldReply`-only `wakeStillOwed` ordering weakness remains open at `c
 *Retention: still open.* Task cleanup still counts only `pendingParentWake?.shouldReply`, `dispatchedParentWake?.shouldReply`, or an in-flight dispatch toward `wakeStillOwed` at `manager.ts:2545-2553`. A pending noReply wake does not pin its completed task; cleanup is bounded only by `TASK_TTL_MS`. Retention coverage at `task-completion-retention-guard.test.ts:304-539` tests the shouldReply cases, not this one.
 
 **Fix status (2026-08-24):** delivery fixed and pinned; retention still open at `manager.ts:2545-2553`. Severity revised `blocker` -> `costly`: unbounded parent starvation is gone, and the remainder is an in-memory lookup window, not a delivery failure.
+
+**Update:** (2026-08-24, second pass, verified against `dev` source) Retention confirmed still open, read directly rather than taken from a verifier. `wakeStillOwed` at `manager.ts:2547-2552` is the disjunction of `pendingParentWake?.shouldReply === true`, `dispatchedParentWake?.shouldReply === true`, and `hasInFlightParentWakeDispatch(...)` - a pending `noReply` wake contributes nothing, so the guarded reschedule at `manager.ts:2553-2556` does not fire for it and the task is removed on the ordinary `TASK_TTL_MS` path. Cross-checked for a compensating sibling mechanism: no `RETAIN` / `MAX_RETAINED` / `evict` exists in `features/background-agent/`; `prune` appears only in stale-task pruning (`manager.ts:3184`, `task-poller.ts:33`), and the `create-background-output.ts` transcript fallback is cross-runtime recovery, not retention. The failing test that would express it: complete a task holding only a pending `noReply` wake, fire the cleanup timer before `TASK_TTL_MS`, assert `getTask(taskId)` is still defined - beside the existing `shouldReply`-only cases at `task-completion-retention-guard.test.ts:304-539`.
 
 ## 2026-08-17 — Findings log had no review path; three entries were stale within hours
 
@@ -1116,6 +1122,8 @@ Mitigating: `not-busy-is-not-gone.test.ts:6-20,41-48` pins the invariant that an
 
 **Fix status (2026-08-24):** still unfixed, still deliberately. Severity stays `costly`, confidence moderate - end-to-end harm remains unproven, and any fix should now be scoped as a sweep of all fifteen sites rather than a two-line change.
 
+**Update:** (2026-08-24, second pass, verified against `dev` source) Still unfixed, and the fifteen-site count is now exact rather than approximate: 14 unscoped calls inside `packages/omo-opencode/src/`, plus `packages/utils/src/session-idle-settle.ts:60` outside it. One correction worth recording - six of those calls pass `path: undefined` and could be mistaken for scoped ones; they are not (`tmux-subagent/polling-manager.ts:70,142`, `session-ready-waiter.ts:20`, `polling.ts:76,113`, `tmux-subagent/manager.ts:716`). The three genuinely scoped calls all live in the CLI and pass `query: { directory }` (`cli/run/completion.ts:87-89`, `poll-for-completion.ts:230-232`, `prompt-start.ts:38-40`), which is the pattern a sweep would apply. No central directory-binding wrapper exists to shortcut it: `features/background-agent/opencode-client.ts:1-3` is a bare type alias. Harm remains theoretical - the only in-repo demonstration is `not-busy-is-not-gone.test.ts:41-48`, which models an empty status map against a live session row and asserts the task survives.
+
 
 ## 2026-08-23 — lean-ctx triage silently eats dense output; every per-call bypass is a dead end
 
@@ -1456,6 +1464,8 @@ Ownership differs and matters: `review-work` is tracked in this repo at `package
 
 **Fix status (2026-08-24):** still unfixed in both. Severity stays `docs-gap`. One line in each - if the range is empty because the work is already merged, ask for an explicit commit range - closes it.
 
+**Update:** (2026-08-24, second pass, verified against `dev` source) Still unfixed in both, with the exact lines to change now identified. `review-work` sets its range at `packages/shared-skills/skills/review-work/SKILL.md:85-86` (`git diff --name-only HEAD~1 or against the appropriate base`), with the concrete commands at `:99-103`; that file is tracked here and fixable in this repo. `full-code-review` sets its default at `/Users/tim/.agents/skills/full-code-review/SKILL.md:20-23` (`git diff main...HEAD` plus `git diff HEAD`), repeated at `:38-40`, and is user-global - outside this repository, so only the `review-work` half is actionable here. Neither mentions an empty range or already-merged work anywhere.
+
 ## 2026-08-24 — `ctx_shell` redirect guard also blocks heredoc appends
 
 **Severity:** papercut
@@ -1655,3 +1665,5 @@ Latent, not active: `hashline-edit-diff-enhancer/hook.ts:31-33,60,75` uses exact
 Cross-checked and classified as **false positives** - these gate OMO-internal tool names that cannot arrive MCP-qualified, where exact matching is correct and a prefix match would wrongly catch unrelated MCP tools: `team-tool-gating/hook.ts:98-133`, `prometheus-md-only/hook.ts:27,40`, `question-label-truncator/hook.ts:58`, `interactive-bash-session/hook.ts:54`, `empty-task-response-detector.ts:18`, `sisyphus-junior-notepad/hook.ts:16`, `non-interactive-env/non-interactive-env-hook.ts:74`, `bash-file-read-guard.ts:23`, `delegate-task-retry/hook.ts:12`, `session-notification.ts:74,153`, `todo-continuation-enforcer/pending-question-detection.ts:21,29`. `edit-error-recovery/hook.ts:45` could not be classified from source alone.
 
 **Fix status (2026-08-24):** still unfixed, now scoped: five hooks to migrate, each needing its own failing MCP-qualified-name test first. Severity stays `costly`, led by the `write-existing-file-guard` fail-open.
+
+**Update:** (2026-08-24, second pass, verified against `dev` source) Still unfixed, and the fail-open is now traced line by line rather than asserted. `matchesTrackedTool` (`packages/omo-opencode/src/shared/tool-name-match.ts:3-21`) lowercases both sides, accepts exact equality, and accepts a tracked-name suffix only when the preceding character is one of `_ - . : /` - so `mcp__foo__write` matches `write` while `todowrite` does not. Its production callers are still only the three injectors: `rules-injector/hook.ts:73`, `directory-readme-injector/hook.ts:44`, `directory-agents-injector/hook.ts:50`. On the guard side, `mcp__foo__write` fails both exact comparisons at `write-existing-file-guard/tool-execute-before-handler.ts:113` and returns at `:114`, before the path and permission checks at `:117-141` - the fail-open is confirmed, not inferred. Test coverage is the sharpest signal: `mcp__` appears in exactly two hook test files, `directory-readme-injector/hook.test.ts` and `directory-agents-injector/hook.test.ts`, both already-migrated injectors. None of the five hooks awaiting migration has an MCP-qualified-name test, which is why each needs its own failing test first.
