@@ -23,3 +23,12 @@ and unrelated to rules injection, the shared helper, or the directory injectors
 (they live in agent command audit, scan-tool fixtures, module-resolution classification,
 skill-loader dedup, background-agent polling, parent-wake queue, senpi reflection flow,
 and a dependencies check).
+
+CORRECTION (added after an independent QA re-run): the baseline failure count is 14
+plus or minus one flake, not a fixed constant. A separate full-suite run observed 15
+failures, the extra being `createTeamSendMessageTool > live delivery uses the registered
+agent alias`, which times out at the 5000ms cap under full-suite load and passes 3 of 3
+in isolation. It is a load-dependent timeout in team-mode messaging, unrelated to this
+change. The "identical failure set" phrasing above is therefore stronger than repeated
+runs support. The no-regression conclusion is unaffected: no failure in rules-injector,
+the shared helper, or the directory injectors appears in any run.
