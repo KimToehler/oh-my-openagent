@@ -42,7 +42,43 @@ describe("formatTaskResult", () => {
 
     const output = await formatTaskResult(task, client)
 
-    expect(output).toContain("Session error")
+    expect(output).toContain("Terminal error")
     expect(output).toContain("Forbidden: Selected provider is forbidden")
+  })
+
+
+  test("preserves completed assistant turns when a later assistant message has a session error", async () => {
+    const client: BackgroundOutputClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            {
+              info: { role: "assistant", time: { created: 1 } },
+              parts: [{ type: "text", text: "First useful result" }],
+            },
+            {
+              info: { role: "assistant", time: { created: 2 } },
+              parts: [{ type: "text", text: "Second useful result" }],
+            },
+            {
+              info: {
+                role: "assistant",
+                time: { created: 3 },
+                error: { data: { message: "Provider failed after progress" } },
+              },
+              parts: [],
+            },
+          ],
+        }),
+      },
+    }
+
+    // given
+    const output = await formatTaskResult(createTask({ sessionId: "ses-2" }), client)
+
+    // then
+    expect(output).toContain("First useful result")
+    expect(output).toContain("Second useful result")
+    expect(output).toContain("Terminal error: Provider failed after progress")
   })
 })

@@ -68,19 +68,6 @@ Session ID: ${task.sessionId}
     .filter((message) => message.info?.role === "assistant" && message.info?.error)
     .map((message) => extractErrorMessage(message.info?.error))
     .find((message): message is string => typeof message === "string" && message.length > 0)
-  if (sessionError) {
-    return `Task Result
-
-Task ID: ${task.id}
-Description: ${task.description}
-Duration: ${formatDuration(task.startedAt ?? new Date(), task.completedAt)}
-Session ID: ${task.sessionId}
-
----
-
-Session error: ${sessionError}`
-  }
-
   const newMessages = consumeNewMessages(task.sessionId, sortedMessages)
   if (newMessages.length === 0) {
     const duration = formatDuration(task.startedAt ?? new Date(), task.completedAt)
@@ -134,5 +121,5 @@ Session ID: ${task.sessionId}
 
 ---
 
-${textContent || "(No text output)"}`
+${textContent || "(No text output)"}${sessionError ? `\n\nTerminal error: ${sessionError}` : ""}`
 }
