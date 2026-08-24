@@ -13,8 +13,12 @@ Additional requirements for this planning request:
 - Include a clear atomic commit strategy.`
 
 const TDD_LINE = "- Use TDD-oriented planning."
+const EVIDENCE_REPORTING = `<evidence-reporting>
+When you report a test, mutation-test, build, or QA result, PASTE the actual tool output verbatim: the command you ran, the real pass/fail lines, the test/assertion counts, and the full failure text. Do not describe, paraphrase, or summarize it.
+A summarized result is not evidence and will be treated as unverified, because an honest summary and a fabricated one are indistinguishable at review. If output is long, paste the decisive lines verbatim and give the artifact path for the rest.
+</evidence-reporting>`
 const BACKGROUND_BLOCKED_REPORTING = `<background-subagent-tools>
-If blocked and parent input is required, call report_blocked with both reason and needs. This alerts parent and parks this background task until parent resumes it.
+If blocked and parent input is required, call report_blocked with both reason and needs. Use this only for genuine blocks: missing credentials, a decision only the parent can make, missing API, or clarification. Do not use this for waiting on a long-running or detached job - poll instead. This alerts parent and parks this background task until parent resumes it.
 </background-subagent-tools>`
 
 function buildPlanAgentPromptAppend(tddEnabled: boolean): string {
@@ -97,11 +101,11 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
 
 export function buildTaskPrompt(prompt: string, agentName: string | undefined, tddEnabled?: boolean): string {
   if (!isPlanAgent(agentName)) {
-    return prompt
+    return `${EVIDENCE_REPORTING}\n\n${prompt}`
   }
 
   const effectiveTdd = tddEnabled ?? true
-  return `${prompt}${buildPlanAgentPromptAppend(effectiveTdd)}`
+  return `${EVIDENCE_REPORTING}\n\n${prompt}${buildPlanAgentPromptAppend(effectiveTdd)}`
 }
 
 export function buildBackgroundTaskPrompt(prompt: string, agentName: string | undefined, tddEnabled?: boolean): string {

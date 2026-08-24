@@ -107,6 +107,8 @@ git diff HEAD~1  # or: git diff main...HEAD
 # Check docker-compose.yml -> services
 ```
 
+**CRITICAL:** If the collected range (CHANGED_FILES or DIFF) is empty, the work is likely already merged or you are standing on the wrong branch. Do NOT review an empty range - stop and ask the user for an explicit commit range (e.g. the merge commit's `^1..HEAD` or a specific `commit-a..commit-b` range).
+
 For GOAL, CONSTRAINTS, BACKGROUND - review the full conversation history. The user's original message almost always contains the goal. Constraints often emerge during discussion. If anything critical is ambiguous, ask ONE focused question - not a checklist.
 
 ---

@@ -14,7 +14,7 @@ const { describe, test, expect } = require("bun:test") as {
   }
 }
 
-import { buildBackgroundTaskPrompt, buildSystemContent } from "./prompt-builder"
+import { buildBackgroundTaskPrompt, buildSystemContent, buildTaskPrompt } from "./prompt-builder"
 import type { AvailableSkill, AvailableCategory } from "../../agents/dynamic-agent-prompt-builder"
 
 describe("prompt-builder", () => {
@@ -128,6 +128,52 @@ describe("prompt-builder", () => {
         const result = buildBackgroundTaskPrompt(skillContent, "explore")
 
         // then
+        expect(result).toContain("report_blocked")
+      })
+    })
+  })
+
+  describe("buildTaskPrompt evidence reporting", () => {
+    describe("#given a non-plan subagent prompt", () => {
+      test("#when the task prompt is built #then it demands verbatim tool output", () => {
+        // given
+        const prompt = "Run the unit tests for the parser"
+
+        // when
+        const result = buildTaskPrompt(prompt, "explore")
+
+        // then
+        expect(result).toContain("<evidence-reporting>")
+        expect(result).toContain("PASTE the actual tool output verbatim")
+        expect(result).toContain("A summarized result is not evidence and will be treated as unverified")
+        expect(result).toContain(prompt)
+      })
+    })
+
+    describe("#given a plan agent prompt", () => {
+      test("#when the task prompt is built #then evidence reporting rides alongside the plan guidance", () => {
+        // given
+        const prompt = "Create a work plan"
+
+        // when
+        const result = buildTaskPrompt(prompt, "plan")
+
+        // then
+        expect(result).toContain("<evidence-reporting>")
+        expect(result).toContain("Answer in English.")
+      })
+    })
+
+    describe("#given a background subagent prompt", () => {
+      test("#when the background prompt is built #then evidence reporting is carried through", () => {
+        // given
+        const prompt = "Run the mutation suite"
+
+        // when
+        const result = buildBackgroundTaskPrompt(prompt, "explore")
+
+        // then
+        expect(result).toContain("<evidence-reporting>")
         expect(result).toContain("report_blocked")
       })
     })

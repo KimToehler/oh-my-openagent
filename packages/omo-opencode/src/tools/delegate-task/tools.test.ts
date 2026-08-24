@@ -3762,7 +3762,8 @@ describe("sisyphus-task", () => {
       const result = buildTaskPrompt(prompt, "explore")
 
       // then
-      expect(result).toBe(prompt)
+      expect(result).toContain(prompt)
+      expect(result).not.toContain("Answer in English.")
     })
 
     test("excludes TDD line when tddEnabled is false", () => {

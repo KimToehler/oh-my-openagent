@@ -11,7 +11,9 @@ function formatBlockedReason(reason: string, needs: string): string {
 
 export function createReportBlockedTool(manager: ReportBlockedManager): ToolDefinition {
   return tool({
-    description: `Report that this background subagent cannot continue without parent input.
+    description: `Report that this background subagent is blocked waiting for parent input.
+
+Use this only when the agent needs a decision, credential, missing API, or clarification that only the parent can supply. Do NOT use this for a long-running or detached job that is still executing - a job that is still running is not a blocker, poll it instead.
 
 This notifies the parent, then parks the current background task until the parent resumes it. Only background subagents can use this tool.`,
     args: {
