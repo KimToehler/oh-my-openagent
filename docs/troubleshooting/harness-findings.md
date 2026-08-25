@@ -470,6 +470,8 @@ Proof, and its limits:
 
 Severity: no longer `costly` for the case this entry centers on. `task_id`-based continuation now survives a restart for a spawned session with transcript output. The `pending`-never-spawned case remains unrecoverable by design, per the escalation trigger above.
 
+**Update (2026-08-24, doc correction):** the update above at line 442 cites the AGENTS.md claim at `packages/omo-opencode/src/features/background-agent/AGENTS.md:52-53`, but that file has since grown and the bullet now lives at line 65. The bullet itself was also stale, still calling restart-orphaning "unaddressed" after the `resume()` adopt-on-miss fallback shipped. It has now been corrected to describe the shipped adopt-on-miss behavior (liveness policy, `manager.ts:1386-1423` citation) while keeping the parts that are still true: the in-memory task record is still lost, an adopted task loses model/fallback-chain/category/skill-content fidelity, and a `pending`-never-spawned task still has no session to adopt.
+
 ## 2026-08-17 — Completion summary replays every historical park as a current failure
 
 **Severity:** costly
