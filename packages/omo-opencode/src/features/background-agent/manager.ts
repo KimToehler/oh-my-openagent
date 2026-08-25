@@ -1587,8 +1587,11 @@ The fallback retry session is now created and can be inspected directly.
       settleMs: 0,
       queueBehavior: "defer",
       // An adopted orphan was killed mid-turn, so its transcript ends in an unterminated
-      // assistant turn. Liveness above already proved nothing is running, which makes the
-      // tool-state shape check a false positive here. Ordinary resumes keep it enabled.
+      // assistant turn that the tool-state shape check reads as still-running. Adoption is
+      // already gated on liveness (terminal, or absent with real output), and the gate keeps
+      // its own checkStatus probe, so that shape check is a false positive on this path only.
+      // Ordinary resumes keep it enabled. Note absent means "not in the status registry",
+      // not "proven idle", so checkStatus remains the load-bearing liveness signal here.
       ...(adoptedTask ? { checkToolState: false } : {}),
       input: {
         path: { id: existingTask.sessionId },

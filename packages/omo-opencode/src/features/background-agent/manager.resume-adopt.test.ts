@@ -8,6 +8,7 @@ import {
   getSessionAgent,
   subagentSessions,
 } from "../claude-code-session-state"
+import { setPromptReservation } from "../../shared/prompt-async-gate/reservations"
 import { readContinuationMarker } from "../run-continuation-state"
 import { BackgroundManager } from "./manager"
 import type { AdoptRunningSessionInput, BackgroundTask } from "./types"
@@ -335,6 +336,50 @@ describe("BackgroundManager resume adopt-on-miss", () => {
     expect(register).toHaveBeenCalledWith("nested-parent")
     expect(unregister).toHaveBeenCalledTimes(1)
     expect(unregister).toHaveBeenCalledWith("nested-parent")
+  })
+
+  test("#given an adopted orphan whose session is reserved by another source #when the gate skips the dispatch #then adoption rolls back and reports failure", async () => {
+    // given
+    const { manager, promptAsync } = createManager(completedTranscript)
+    stubMissChecks(manager, true, "terminal")
+    const beforeCount = getRootDescendantCount(manager, "current-parent")
+    setPromptReservation("child-session", {
+      source: "someone-else",
+      dedupeKey: undefined,
+      reservedAt: Date.now(),
+      token: Symbol("someone-else"),
+    })
+
+    // when
+    const result = resume(manager)
+
+    // then
+    await expect(result).rejects.toThrow("continuation prompt was not dispatched")
+    expect(promptAsync).not.toHaveBeenCalled()
+    expect(getTasks(manager).size).toBe(0)
+    expect(getRootDescendantCount(manager, "current-parent")).toBe(beforeCount)
+    expect(subagentSessions.has("child-session")).toBe(false)
+    expect(getSessionAgent("child-session")).toBeUndefined()
+  })
+
+  test("#given a skipped adopted resume #when the same orphan is resumed again #then it is not wedged as running", async () => {
+    // given
+    const { manager } = createManager(completedTranscript)
+    stubMissChecks(manager, true, "terminal")
+    setPromptReservation("child-session", {
+      source: "someone-else",
+      dedupeKey: undefined,
+      reservedAt: Date.now(),
+      token: Symbol("someone-else"),
+    })
+    await expect(resume(manager)).rejects.toThrow("continuation prompt was not dispatched")
+
+    // when
+    const secondResult = resume(manager)
+
+    // then
+    await expect(secondResult).rejects.toThrow("continuation prompt was not dispatched")
+    await expect(secondResult).rejects.not.toThrow("is currently running")
   })
 
   test("#given a task id identical to the parent session #when resume is requested #then it refuses without adopting the parent as its own subagent", async () => {

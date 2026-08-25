@@ -42,6 +42,9 @@ cleanup() {
   { printf 'server_pid=%s alive=' "$SERVER_PID"; kill -0 "$SERVER_PID" 2>/dev/null && printf yes || printf no
     printf '\nfake_pid=%s alive=' "$FAKE_PID"; kill -0 "$FAKE_PID" 2>/dev/null && printf yes || printf no
     printf '\n'; } > "$EVIDENCE_DIR/90-cleanup-receipt.txt"
+  # bash keeps only the LAST EXIT trap, so registering this one replaced common.sh's
+  # `trap oqa_cleanup EXIT`. Call it explicitly or the ~215MB XDG sandbox is never removed.
+  oqa_cleanup
 }
 trap cleanup EXIT
 
