@@ -1903,3 +1903,105 @@ packages/omo-opencode/src/features/background-agent/manager.ts:1713
 **Fix status (2026-08-25, fixed):** coverage restored with a trigger that does not depend on `checkToolState`. The replacement holds a prompt reservation on the child session via `setPromptReservation`, so the gate returns `reserved` and the rollback runs for a reason orthogonal to the tool-state check. Two tests: rollback hygiene (throw, `tasks.size === 0`, root-descendant count restored, `subagentSessions` cleared, session agent cleared) and the no-wedge retry (a second `resume()` must not throw `is currently running`). Both are killed by the same mutation, so the branch is pinned again.
 
 **Rule worth keeping:** when a change inverts an existing test, check what else that test asserted. A test named for behavior X often carries incidental coverage of path Y, and repurposing it deletes Y silently. Before rewriting an assertion, mutate the production branch it covered and confirm something else still goes red.
+
+---
+
+## 2026-08-25 — A `report_blocked` park is invisible to a *busy* parent, which then reports the dead lane as "in flight"
+
+**Severity:** blocker
+**Area:** background tasks
+**Observed in:** `~/git/onara`, orchestrating `.omo/plans/composed-days-modality-unification.md`
+
+**What happened:** background lane `bg_b200ac39` called `report_blocked` three times. The
+first two delivered a `[BACKGROUND TASK BLOCKED]` reminder and the parent resumed the child
+normally. The **third** park delivered nothing. The task went terminal (`cancelled`) and the
+parent, having received no reminder, twice told the user the lane was "in flight". The user
+caught it, not the agent:
+
+> "are we waiting for something or do you need me for a decision?"
+> "did you check the actual output? i dont think anything is really still running"
+
+The child's work happened to survive (it had committed `3279ca35b` before parking), so the
+damage was a stalled orchestrator. A park *before* a commit would have stranded uncommitted
+work in a lane the parent believed was alive.
+
+This is distinct from the 2026-08-17 `report_blocked` entry above. That one is about
+**misuse** (agents parking on waits). This one is about a **correctly-used** park whose
+notification is never delivered.
+
+**Evidence:** `background_output` on the supposedly-running lane:
+```
+| Task ID | `bg_b200ac39` |
+| Status  | **cancelled**  |
+| Duration| 29m 35s        |
+```
+No result payload — a status table plus the original prompt.
+
+**Root cause** (read from `dev` source, not hypothesis for the mechanism; the delivery
+timing is inferred from the two working parks):
+
+`report_blocked` parks by cancelling with notification suppressed —
+`packages/omo-opencode/src/tools/report-blocked/tools.ts:41-47`:
+```ts
+await manager.notifyBlockedTask(task.id)
+const parked = await manager.cancelTask(task.id, {
+  source: "report_blocked", reason: blockedReason,
+  abortSession: true, skipNotification: true,
+})
+```
+`skipNotification: true` takes the early return at `manager.ts:2822-2827`, which calls
+neither `markForNotification` nor `enqueueNotificationForParent`. The suppression is
+deliberate and correct — `tools.test.ts:481` pins it as deadlock prevention — so the *entire*
+burden of informing the parent falls on the preceding `notifyBlockedTask` wake.
+
+That wake is queued **before** `cancelTask` sets `task.status = "cancelled"`
+(`manager.ts:2683`/`:2786`). At queue time the task is still `running`, so
+`isTaskFailure` (`manager.ts:3079`) is false and `allComplete` is false → the wake is born
+with **`shouldReply === false`** (`manager.ts:2705`). A `shouldReply === false` wake has **no
+defer ceiling**: `shouldForceDispatchAfterActiveDefer`
+(`parent-wake-flush-runner.ts:256-258`) forces only `shouldReply` wakes. A continuously busy
+parent — i.e. an orchestrator mid-plan — reschedules it forever.
+
+This is **D2 from `HANDOVER-background-task-notification-bug.md`**, whose annotation narrows
+D2 to "self-heals whenever the batch reaches `allComplete`". **That narrowing does not hold
+for a park:** the task goes terminal via the one path that queues no second wake, so there is
+never an `allComplete` wake to merge with and drag the pending one over the force-dispatch
+line. The 300s bounded re-admission added for D2 deposits `noReply` only, so it cannot
+surface this either.
+
+Why the first two parks worked: timing. Both landed while the parent was briefly idle, so
+the plain-dispatch path (`parent-wake-flush-runner.ts:143`) was reachable. **Delivery of a
+terminal state depends on whether the parent happens to be busy.**
+
+**Secondary finding:** `background_output` on a `cancelled` task returns a Markdown status
+table, not an error. It is not shaped like the `[ERROR]` / `Task not found` responses a
+caller is primed to notice, so an orchestrator scanning for a DoneClaim reads past it.
+Compare `formatTaskNotFoundMessage` (`create-background-output.ts:81-98`), which is explicit
+about both the failure and the recovery action.
+
+**Workaround:** none that is reliable from inside the parent. After any `report_blocked`
+round-trip, call `background_output` explicitly rather than trusting that a missing reminder
+means "still running". The child *session* survives the park, so
+`task(task_id="ses_...")` still recovers the lane.
+
+**Fix status:** unfixed. Three candidate fixes, cheapest last:
+1. Make the park's wake forcing — set the terminal status *before* `notifyBlockedTask`
+   queues, or pass `shouldReply: true` for blocked wakes. Reuses the existing force-dispatch
+   path. The "don't interrupt a busy parent" constraint pinned by
+   `parent-wake-active-defer-ceiling.test.ts:145` is not violated: a terminal park is not
+   gratuitous, the parent is by construction waiting on a child that stopped existing.
+2. Have `cancelTask`'s suppressed branch verify a wake was actually *dispatched* before
+   returning `true`, imitating the owed-wake check `scheduleTaskRemoval` gained for D1
+   (`manager.ts:2405-2440`).
+3. Prefix terminal-without-result states (`cancelled`, `interrupt`, `error`) in
+   `background_output` with an explicit marker naming the state and the recovery action.
+   Does not fix delivery, but converts a silent stall into a loud one.
+
+**Do not** simply drop `skipNotification: true` — it prevents a self-deadlock
+(`tools.test.ts:481`); removing it trades a silent stall for a hang.
+
+**No existing test** covers "a park notification reaches a *busy* parent".
+`parent-wake-midbatch-starvation.test.ts` is the closest shape and its fake-timer rig is the
+one to reuse. The probe worth pinning first is the cheapest: assert the `shouldReply` value
+of the wake queued by `notifyBlockedTask` — it is `false` today, and that is the mechanical
+root cause.
