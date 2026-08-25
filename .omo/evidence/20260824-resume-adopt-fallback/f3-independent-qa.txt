@@ -1,0 +1,63 @@
+# F3 independent restart-adoption QA
+
+## Fresh run
+
+Command:
+
+```sh
+bash .agents/skills/opencode-qa/scripts/resume-adopt-restart-probe.sh --evidence-dir .omo/evidence/20260824-resume-adopt-fallback/f3-independent
+```
+
+Exit output:
+
+```text
+PROBE_EXIT=0
+```
+
+All captures below came from this fresh run under `f3-independent/`.
+
+| Claim | Verdict | Deciding observable |
+|---|---|---|
+| 1. Real model-driven task child; ID from sandbox DB | CONFIRMED | `49-child-id.txt`: `ses_fc8509a58ffe3wxNpe6PQlGZsK`; `50-child-row.txt` returns same ID from sandbox DB. ID differs from prohibited `ses_abc123`, `ses_def456`, and `ses_missing`. `46-fake-openai.log` shows `branch=restart-parent` then `branch=child`, proving model-driven task sequence. |
+| 2. Server 1 killed | CONFIRMED | `52-server-killed.txt`: `server-one-killed=79409`. |
+| 3. Fresh server, same isolated state, child row survives | CONFIRMED | `47-isolated-xdg-root.txt` identifies isolated XDG data root. `53-server-started.txt`: `server-two-started=79471`. `54-child-survived-restart.txt` returns child ID. PIDs differ: server 1 `79409`, server 2 `79471`. |
+| 4. Orphan adopted; child gets new turn | CONFIRMED | `51-pre-restart-message-count.txt`: `2`; `55-happy-counts.txt`: `pre=2 post=4`. `56-happy-marker.txt` has marker on `session_id=ses_fc8509a58ffe3wxNpe6PQlGZsK`, same real child, plus verbatim result `Task continued and completed in 1s.` |
+| 5. Host DB unchanged | CONFIRMED | `45-host-session-count-before.txt`: `2671`; `59-host-session-count-after.txt`: `2671`. |
+
+## Cross-process proof
+
+- Killed server 1 PID: `79409`
+- Fresh server 2 PID: `79471`
+- PIDs differ. Server 2 started after server 1 died, so server 1 BackgroundManager record was ineligible for reuse.
+
+## Fresh captured marker
+
+`56-happy-marker.txt` contains:
+
+```text
+ses_fc8509653ffeMhZmd0rsd7CiKj|msg_037af6a96001bGbB7tav19ks1G|{"type":"tool","tool":"task","callID":"call_resume_5","state":{"status":"completed","input":{"task_id":"ses_fc8509a58ffe3wxNpe6PQlGZsK","prompt":"RESUME_ADOPT_PROBE_CONTINUATION","description":"resume adopt probe continuation","run_in_background":false,"load_skills":[]},"output":"Task continued and completed in 1s.\n\n---\n\nDONE\n\n<task_metadata>\nsession_id: ses_fc8509a58ffe3wxNpe6PQlGZsK\ntask_id: ses_fc8509a58ffe3wxNpe6PQlGZsK\nsubagent: explore\n</task_metadata>\n\nto continue: task(task_id=\"ses_fc8509a58ffe3wxNpe6PQlGZsK\", load_skills=[], run_in_background=false, prompt=\"...\")","metadata":{"truncated":false,"prompt":"RESUME_ADOPT_PROBE_CONTINUATION","agent":"explore","load_skills":[],"description":"resume adopt probe continuation","run_in_background":false,"taskId":"ses_fc8509a58ffe3wxNpe6PQlGZsK","sessionId":"ses_fc8509a58ffe3wxNpe6PQlGZsK","sync":true,"model":{"providerID":"openai","modelID":"gpt-fake"}},"title":"resume adopt probe continuation"}}
+```
+
+## Probe-control discipline
+
+- HAPPY positive path reached and passed: `58-scenarios.txt` says `HAPPY=PASS (pre=2 post=4)`.
+- REFUSAL negative assertion: `NOT-REACHED`. No positive control exists because probe does not assert refusal behavior. No verdict.
+- ABSENT negative assertion: `NOT-REACHED`. No positive control exists because probe does not assert absent behavior. No verdict.
+- No empty-query trap. Marker file is non-empty and contains two DB rows. Child association checked through marker `session_id` and child message count.
+
+## Cleanup
+
+`56-cleanup-receipt.txt`:
+
+```text
+server_pid=79471 alive=no
+fake_pid=79399 alive=no
+```
+
+Independent `pgrep -af 'opencode serve|fake-openai-server.mjs'` returned only shell command PID, no matching child process.
+
+## Minimal probe repair
+
+Probe initially truncated marker payload to 300 characters. That hid required `Task continued and completed in 1s.` text from evidence despite real success. Repaired probe evidence query to select full `data`. Added separate server 2 PID receipt. No product source changed.
+
+Verdict: confirmed.

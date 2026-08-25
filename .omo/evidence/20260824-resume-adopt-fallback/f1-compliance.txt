@@ -1,0 +1,306 @@
+F1 PLAN COMPLIANCE AUDIT - resume-adopt-fallback
+Auditor: F1 (read-only). Date: 2026-08-25. Repo: /Users/tim/git/oh-my-openagent, branch dev.
+Plan: .omo/plans/resume-adopt-fallback.md
+Diff range audited: e8197c7cb..HEAD (HEAD = d460a4150 at audit start)
+
+VERDICT: confirmed (2 NOTEs, 0 BLOCKERs)
+
+==========================================================
+WHAT WAS TESTED
+==========================================================
+1. findBySession byte-identity vs pre-change form.
+2. Absence of disk persistence of task records in the diff.
+3. package.json / lockfile untouched.
+4. Absence of `as any` / @ts-ignore / @ts-expect-error in added lines.
+5. Absence of em/en dashes in every file touched.
+6. No existing test deleted or weakened; the two pre-existing
+   blocked-retention.test.ts assertions intact.
+7. adoptRunningSession signature and body byte-identity.
+8. Every plan Must-have walked item by item.
+Gates re-run independently: focused tests, background-agent directory suite,
+bun run typecheck, bun run build.
+
+==========================================================
+WHAT WAS OBSERVED (verbatim command output)
+==========================================================
+
+--- 1. findBySession byte-identical ---
+$ F=packages/omo-opencode/src/features/background-agent/manager.ts
+$ sed -n '1237,1247p' $F > /tmp/head_fbs.txt
+$ git show e8197c7cb:$F | sed -n '1237,1247p' > /tmp/base_fbs.txt
+$ cmp -s /tmp/head_fbs.txt /tmp/base_fbs.txt && echo BYTE_IDENTICAL
+VERDICT_FINDBYSESSION=BYTE_IDENTICAL
+HASH a6a6bb9642dc2f0aab99142da761203898c5b6ad574e120265b776508490e10f  /tmp/head_fbs.txt
+HASH a6a6bb9642dc2f0aab99142da761203898c5b6ad574e120265b776508490e10f  /tmp/base_fbs.txt
+
+Corroborating: every hunk in the manager.ts diff is far below that range.
+$ git diff e8197c7cb..HEAD -- .../manager.ts | grep -n '^@@'
+5:@@ -1383,9 +1383,43 @@
+51:@@ -1393,7 +1427,7 @@
+60:@@ -1452,6 +1486,10 @@
+No hunk touches 1237-1247. manager.ts:1237-1247 UNCHANGED.
+
+--- 2. no disk persistence added ---
+$ git diff e8197c7cb..HEAD -- packages/ | grep '^+' | grep -E \
+  'writeFile|readFile|writeFileSync|readFileSync|sqlite|Database|mkdir|~/\.omo|homedir'
+NONE
+No JSON state file, no SQLite, no ~/.omo or .omo task-record write, no
+rehydrate-on-startup hook anywhere in the production diff. The only .omo/
+writes in the range are QA artifacts under .omo/evidence/, which are evidence
+files, not task records.
+
+--- 3. no new dependency ---
+$ git diff --name-only e8197c7cb..HEAD -- '*package.json' 'bun.lock*'
+(empty) - package.json and lockfiles untouched by the entire range.
+
+--- 4. no as any / ts-ignore / ts-expect-error ---
+$ git diff e8197c7cb..HEAD | grep '^+' | grep -E 'as any|@ts-ignore|@ts-expect-error'
+NONE
+Test-file type escapes present are the accepted repo pattern:
+manager.resume-adopt.test.ts:30 `as unknown as PluginInput["client"]`,
+:45,:46,:75,:203,:204 `as never` on spyOn of private methods.
+`as unknown as` appears in 32 existing *.test.ts files under
+packages/omo-opencode/src, so this matches established practice.
+
+--- 5. no em dashes or en dashes in any file touched ---
+$ git diff e8197c7cb..HEAD | grep '^+' | grep -E '—|–'
+NONE
+Whole-file scan of every touched source/script file (grep -c '[—–]'):
+0  packages/omo-opencode/src/features/background-agent/manager.ts
+0  packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts
+0  packages/omo-opencode/src/features/background-agent/blocked-retention.test.ts
+0  packages/omo-opencode/src/tools/delegate-task/background-continuation.ts
+0  packages/omo-opencode/src/tools/delegate-task/background-continuation.test.ts
+0  .agents/skills/opencode-qa/scripts/resume-adopt-restart-probe.sh
+0  .agents/skills/opencode-qa/scripts/lib/fake-openai-server.mjs
+0  .agents/skills/opencode-qa/scripts/lib/fake-openai-branches.mjs
+$ git show d460a415 | grep '^+' | grep -c '[—–]'
+0   (harness-findings.md addition is dash-clean)
+
+--- 6. no test deleted or weakened ---
+Whole-range deletions outside evidence files, all four intentional:
+490:-    const existingTask = this.findBySession(input.sessionId)
+494:-      throw new Error(`Task not found for session: ${input.sessionId}`)
+536:-    if (existingTask.status === "running") {
+705:-Agent continues with full previous context preserved.
+Zero deleted lines in any test file:
+$ git diff e8197c7cb..HEAD -- .../background-continuation.test.ts | grep '^-' | grep -v '^---'
+NO_DELETIONS_IN_TEST_FILE
+Test counts only grew:
+blocked-retention.test.ts        BASE=5 tests HEAD=6 tests (expect() 5 -> 7)
+background-continuation.test.ts  BASE=4 tests HEAD=6 tests, existed at base
+The two pinned pre-existing assertions are intact at HEAD, shifted +2 lines by
+the added import and the added clearBackgroundTaskRegistryForTesting() in
+afterEach:
+  blocked-retention.test.ts:116  expect(managerUnderTest.findBySession(task.sessionId ?? "")).toBeUndefined()
+  blocked-retention.test.ts:133  expect(managerUnderTest.findBySession(task.sessionId ?? "")).toBeUndefined()
+Both are byte-identical to the base text at base lines 114 and 131.
+The new pin at :153 is additive.
+
+--- 7. adoptRunningSession unchanged ---
+$ sed -n '689,733p' $F > /tmp/head_ars.txt
+$ git show e8197c7cb:$F | sed -n '689,733p' > /tmp/base_ars.txt
+$ cmp -s /tmp/head_ars.txt /tmp/base_ars.txt
+VERDICT_ADOPTRUNNINGSESSION=BYTE_IDENTICAL
+Signature at HEAD manager.ts:689
+  adoptRunningSession(input: AdoptRunningSessionInput): BackgroundTask {
+Both production callers still compile against it unchanged:
+  tools/delegate-task/sync-continuation.ts:202 (rootDescendantAlreadyReserved: false)
+  tools/delegate-task/sync-task.ts:143         (rootDescendantAlreadyReserved: true)
+The new call at manager.ts:1412 copies the sync-continuation.ts call shape
+exactly, including rootDescendantAlreadyReserved: false.
+
+--- 8. gates re-run by F1 ---
+$ bun test .../manager.resume-adopt.test.ts .../blocked-retention.test.ts \
+    .../background-continuation.test.ts
+bun test v1.4.0 (1381054db)
+ 20 pass
+ 0 fail
+ 45 expect() calls
+Ran 20 tests across 3 files. [81.00ms]
+
+$ bun test packages/omo-opencode/src/features/background-agent
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when session remains active #then keeps task running [0.25ms]
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when valid output is absent #then keeps task running [0.16ms]
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when first observation is inside grace window #then stamps and waits [0.14ms]
+(fail) ParentWakePendingQueue scheduleFlush > #given an existing default timer and an already-delivered wake #when real queue cadence drives coalesce retries #then the wake reaches a second real dispatch before the cap [0.34ms]
+ 898 pass
+ 4 fail
+Ran 902 tests across 80 files. [31.26s]
+Exactly the four accepted pre-existing baseline failures. No new failure.
+
+$ bun run typecheck
+TYPECHECK_EXIT=0
+
+$ bun run build
+BUILD_EXIT=0
+build: all steps completed
+
+--- rollback balance check (not requested, checked anyway) ---
+The new failure rollback at manager.ts:1489-1492 calls unregisterRootDescendant
+then removeTask. removeTask (manager.ts:455-462) does NOT itself call
+unregisterRootDescendant, so there is exactly one unregister per one register.
+adoptRunningSession registers exactly once here because its idempotent
+early-return (manager.ts:690-694) scans this.tasks by sessionId, the same map
+findBySession scans, so a findBySession miss guarantees that early return
+cannot fire. Accounting is balanced.
+
+==========================================================
+MUST-HAVE TABLE
+==========================================================
+MH1 resume() adopts on miss instead of throwing unconditionally
+    DELIVERED - manager.ts:1386-1424. Miss branch now: verifySessionExists
+    (:1389), probeSessionLiveness (:1398), refuse active/unknown (:1399-1404),
+    absent gated by validateSessionHasOutput (:1405-1410), adopt (:1412-1421).
+    `const existingTask` changed to `let` at :1386 as specified. Second probe
+    suppressed for adopted tasks at :1430 (`&& !adoptedTask`). No duplicated
+    resume tail.
+MH2 genuinely-absent case keeps a hard error naming restart + transcript route
+    DELIVERED - manager.ts:1390-1395: "Task not found after process restart:
+    ${sessionId}" plus "Background task state is kept in process memory and may
+    be lost when OpenCode restarts." plus
+    "Recovery: use `session_read(session_id=...)`".
+MH3 tool output discloses adopted-task fidelity loss
+    DELIVERED - background-continuation.ts:42-45 builds adoptionDisclosure
+    naming agent: continue, no original model, no fallback chain, no category,
+    no loaded skill content, no auto-fallback. Appended at :72 only when
+    wasUnownedAtResumeStart (computed at :28 before manager.resume). Ordinary
+    continuation output byte-identical, pinned by tests in
+    background-continuation.test.ts (BASE=4 -> HEAD=6 tests).
+MH4 findBySession unchanged and pinned by a regression test
+    DELIVERED - byte-identity proven above. Pin at
+    blocked-retention.test.ts:135-153, asserting getRegisteredBackgroundTask
+    is defined while findBySession returns undefined. Mutation-proof recorded
+    in task-3-mutation-check.txt: unmutated 6 pass / 0 fail, mutated 5 pass /
+    1 fail with the new test as the single failure. The pin has teeth.
+MH5 real-restart QA evidence under .omo/evidence/20260824-resume-adopt-fallback/
+    DELIVERED - README.md carries WHAT WAS TESTED / OBSERVED / WHY IT IS ENOUGH
+    / WHAT WAS OMITTED for every attempt. Cross-process proof: server 1 killed
+    (52-server-killed.txt), child survived (53-child-survived-restart.txt),
+    message count pre=2 post=4 (54-happy-counts.txt), continuation marker
+    landed in the real child transcript (55-happy-marker.txt, child
+    ses_fca7a4266ffefzsLB21zVZ4e7O, tool output "Task continued and ...").
+    Isolation proven: host DB session count 2663 before
+    (45-host-session-count-before.txt) and 2663 after
+    (58-host-session-count-after.txt), unchanged.
+MH6 harness finding updated append-only
+    DELIVERED - d460a4150, +23 lines, that file and nothing else, matching the
+    capture rule. Append-only confirmed: whole-range diff of
+    harness-findings.md contains zero deleted lines, so the original 381-448
+    entry is intact. New "Fix status (2026-08-24, fixed):" block documents the
+    liveness policy, both rejected designs, the escalation trigger, and
+    explicitly records the unproven active/absent live paths.
+
+==========================================================
+MUST-NOT-HAVE TABLE
+==========================================================
+MNH1 no change to findBySession
+     RESPECTED - manager.ts:1237-1247 byte-identical, sha256 match above.
+MNH2 no disk persistence of any kind
+     RESPECTED - no persistence primitive in the production diff.
+MNH3 no owner-id / lease / heartbeat / cross-runtime lock
+     RESPECTED - no such construct added; the whole manager.ts delta is the
+     44-line resume() change shown above.
+MNH4 no change to adoptRunningSession signature or semantics
+     RESPECTED - manager.ts:689-733 byte-identical; both existing callers
+     (sync-continuation.ts:202, sync-task.ts:143) unmodified.
+MNH5 no persistence/reconstruction of concurrencyKey, attemptCount, fallback
+     position, blockedAt/blockedReason, parent-wake bookkeeping,
+     completingTaskIds, progress.countedToolPartIDs
+     RESPECTED - the adopted record is built by the untouched
+     adoptRunningSession, which sets only id, sessionId, rootSessionId,
+     parentSessionId, parentMessageId, description, prompt, agent, model,
+     status, startedAt, progress{toolCalls,lastUpdate}. Nothing on the
+     forbidden list is reconstructed.
+MNH6 no handling of pending-never-spawned
+     RESPECTED - the miss branch is gated on verifySessionExists, so a task
+     with no sessionId can never enter it; recorded as escalation trigger in
+     the findings entry.
+MNH7 no PR and no new branch
+     RESPECTED in effect, with a deviation on form - see NOTE 2.
+     No PR exists (gh pr list search "resume-adopt" returns none for this work)
+     and nothing was pushed (git ls-remote origin | grep resume-adopt =
+     NOT_PUSHED). Three local worktree lane branches were used and merged.
+MNH8 no as any / @ts-ignore / @ts-expect-error; no deleted or weakened test
+     RESPECTED - scans above clean; test counts and expect() counts only grew;
+     zero deletions in any test file.
+MNH9 no em dashes or en dashes in any file touched
+     RESPECTED - zero in the added lines and zero in every touched file.
+
+==========================================================
+BLOCKERS
+==========================================================
+None.
+
+==========================================================
+NOTES (not blockers)
+==========================================================
+NOTE 1 - `absent` liveness policy deviates from the plan text, deliberately,
+  but the plan file was never updated to say so.
+  Plan .omo/plans/resume-adopt-fallback.md:78 still reads "adopt ONLY on
+  `terminal`. Treat `active`, `unknown`, AND `absent` as refusal." The shipped
+  code at manager.ts:1405-1410 adopts an `absent` session when
+  validateSessionHasOutput (manager.ts:2444) confirms real transcript output,
+  refusing only when there is no output. This is a justified correction, not
+  drift: a real `opencode serve` omits idle sessions from session.status(), so
+  a genuinely idle orphan reports `absent`, and the plan's rule would have made
+  the dominant real-world case permanently unresumable. It is recorded as
+  "CORRECTION 2 (spec contradiction resolved by user decision)" in
+  task-1-red-green.txt:268-298 and documented in the shipped findings entry.
+  One pre-existing new-in-this-work test was replaced as part of that policy
+  change (the status-registry-unavailable refusal test, added earlier in the
+  same work at 2934be9e0, superseded at c40e4fa26); no test that predates this
+  work was touched, so MNH8 is not violated. Residual: the plan file on disk
+  now contradicts the shipped code and the Must-have MH1 wording, which will
+  mislead anyone reading the plan later. Suggest a one-line plan amendment.
+NOTE 2 - Local lane branches were created despite "NO new branch".
+  git branch shows wt/resume-adopt-lane-1, -2, -3 and wt/resume-adopt-attempt3,
+  merged into dev via 06a9ae151, 9f78c5347, 91c367080. The user-facing intent
+  of that guardrail (no PR, nothing pushed, work lands on local dev) is met:
+  nothing is on origin and no PR exists. The branches were the mechanism for
+  the plan's own parallel Wave 1, and the root AGENTS.md worktree mandate
+  points the same way. Recording it because the plan's literal wording was not
+  followed.
+NOTE 3 - Live QA covers the HAPPY path only.
+  57-scenarios.txt: HAPPY=PASS (pre=2 post=4), REFUSAL=NOT-REACHED,
+  ABSENT=NOT-REACHED. Both unproven paths are covered by unit tests in
+  manager.resume-adopt.test.ts and the gap is disclosed in the findings entry
+  and the evidence README. Pre-accepted by the audit brief; recorded, not
+  counted against the verdict.
+NOTE 4 - `manager.findBySession?.()` optional call at
+  background-continuation.ts:28. I agree with the decision. ExecutorContext
+  declares `manager: BackgroundManager` (executor-types.ts:7), a concrete class
+  that always defines findBySession, so in production the optional call can
+  never short-circuit and behavior is exactly the intended pre-resume
+  observation. It only tolerates incomplete legacy test stubs. Rationale is
+  recorded at task-2-red-green.txt:141-143. Does not break production behavior.
+  Minor cost: an incomplete stub is silently treated as adopted, which could
+  mask a future test regression.
+
+==========================================================
+WHY IT IS ENOUGH
+==========================================================
+The two load-bearing Must-NOT-haves are proven by byte-level comparison against
+the pre-change blob, not by reading the diff: findBySession and
+adoptRunningSession both hash-match e8197c7cb. Persistence, dependency, type
+escape, dash, and test-deletion guardrails are proven by scanning the added
+lines of the entire commit range rather than a sampled subset. Every Must-have
+is anchored to a file:line in the shipped source. Gates were re-run
+independently by this auditor rather than trusting the executor's captured
+output, and the directory suite failure set matches the accepted baseline
+exactly, with no new failure.
+
+==========================================================
+WHAT WAS OMITTED
+==========================================================
+- No full-repo `bun test` run; that is F4's assignment. F1 ran the
+  background-agent directory suite plus the three focused files.
+- No independent live-harness re-run; that is F3's assignment. F1 read todo 4's
+  artifacts rather than reproducing them.
+- No style/LOC/AI-filler review beyond the plan's explicit guardrails; that is
+  F2's assignment. Noted in passing: background-continuation.test.ts is 280
+  lines and manager.resume-adopt.test.ts is 218, both over the 200 LOC soft
+  limit, both test files. F2 owns that call.
+- No secrets appear in the artifacts inspected. The probe uses a literal fake
+  provider key against a local mock server; no real credential, token, or auth
+  header was read or copied into this file.

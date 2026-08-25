@@ -1,0 +1,58 @@
+AdversarialVerify verdict: needs-fix
+
+BLOCKER
+packages/omo-opencode/src/features/background-agent/manager.ts:1489-1492 rollback is incomplete. adoptRunningSession() adds session to subagentSessions, calls setSessionAgent(), records taskHistory, starts polling, and updates parent marker at lines 718-730. Acquire-failure catch only unregisters root descendant and calls removeTask(). removeTask() at lines 455-462 removes manager task/index state but does not undo subagentSessions, session-agent metadata, taskHistory, polling, or parent marker. Result: failed resume leaves adopted-session metadata and history behind. New rollback test at manager.resume-adopt.test.ts:183-197 asserts descendant count, tasks size, and prompt dispatch only, so it cannot catch these leaks.
+
+NOTE
+- manager.ts:1388-1422 branch order is readable: durable existence, liveness refusal, absent transcript validation, adoption.
+- manager.ts:1405-1409 absent/no-output message is truthful and points to session_read.
+- manager.ts:1390-1395 restart message correctly points to session_read(session_id=...).
+- manager.ts:1430 !adoptedTask guard correctly avoids duplicate liveness probe because adoption immediately follows authoritative miss-path probe and no await occurs between probe and adoption.
+- manager.resume-adopt.test.ts:94-217 covers terminal adoption metadata, active/unknown refusal, missing session, absent with/without output, acquire failure, and nested descendant lifecycle. Assertions are behavior-bearing, but rollback coverage is incomplete as noted above.
+- background-continuation.ts:28-44 disclosure is easy to follow and tests pin adopted versus known-task output.
+- Scoped anti-pattern scan found no forbidden as any, @ts-ignore, @ts-expect-error, empty catch, dash characters, listed filler words, or Arrange-Act-Assert comments. No catch-all file or index.ts business logic added.
+- manager.ts is pre-existing oversized file; this change adds one cohesive branch and does not justify unrelated refactor.
+
+GATE OUTPUTS
+
+COMMAND: bun run typecheck
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/memory-core/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json && tsgo --noEmit -p packages/omo-native/tsconfig.json
+EXIT_CODE=0
+Full output: /tmp/f2-typecheck.log
+
+COMMAND: bun run build
+> @code-yeongyu/codex-ulw-loop@5.0.0-beta.7 build
+> tsc -p tsconfig.build.json
+Bundled 38 modules in 5ms
+build: all steps completed
+EXIT_CODE=0
+Full output: /tmp/f2-build.log
+
+COMMAND: bun test packages/omo-opencode/src/features/background-agent packages/omo-opencode/src/tools/delegate-task
+bun test v1.4.0 (1381054db)
+
+Expected: "running"
+Received: "cancelled"
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when session remains active #then keeps task running [0.31ms]
+
+Expected: "running"
+Received: "error"
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when valid output is absent #then keeps task running [0.20ms]
+
+Expected: "running"
+Received: "error"
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when first observation is inside grace window #then stamps and waits [0.15ms]
+
+error: Expected and actual values must be numbers or bigints
+(fail) ParentWakePendingQueue scheduleFlush > #given an existing default timer and an already-delivered wake #when real queue cadence drives coalesce retries #then the wake reaches a second real dispatch before the cap [0.41ms]
+
+ 1404 pass
+ 4 fail
+ 3548 expect() calls
+Ran 1408 tests across 123 files. [34.82s]
+EXIT_CODE=1
+Full output: /tmp/f2-tests.log
+
+Four failures exactly match user-declared accepted clean-dev failures. No additional scoped-test failures.

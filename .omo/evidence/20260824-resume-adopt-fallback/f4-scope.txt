@@ -1,0 +1,160 @@
+F4 SCOPE + FULL-SUITE AUDIT (read-only)
+Repo: /Users/tim/git/oh-my-openagent  branch: dev  base: e8197c7cb  HEAD: 866c45f55
+Date: 2026-08-25
+
+VERDICT: confirmed
+
+=====================================================================
+1. SCOPE CHECK -- git diff --stat e8197c7cb..HEAD
+=====================================================================
+77 files changed, 1747 insertions(+), 4 deletions(-)
+
+Non-evidence files (git diff --name-only, evidence dir filtered out):
+  .agents/skills/opencode-qa/scripts/lib/fake-openai-branches.mjs        IN SCOPE
+  .agents/skills/opencode-qa/scripts/lib/fake-openai-server.mjs          IN SCOPE
+  .agents/skills/opencode-qa/scripts/resume-adopt-restart-probe.sh       IN SCOPE
+  docs/troubleshooting/harness-findings.md                               IN SCOPE
+  packages/omo-opencode/src/features/background-agent/blocked-retention.test.ts    IN SCOPE
+  packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts IN SCOPE
+  packages/omo-opencode/src/features/background-agent/manager.ts                   IN SCOPE
+  packages/omo-opencode/src/tools/delegate-task/background-continuation.test.ts    IN SCOPE
+  packages/omo-opencode/src/tools/delegate-task/background-continuation.ts         IN SCOPE
+
+Remaining 68 files are all under .omo/evidence/20260824-resume-adopt-fallback/  IN SCOPE
+(.child-id, 01..58 numbered artifacts, README.md, task-1-red-green.txt,
+ task-2-red-green.txt, task-3-mutation-check.txt)
+
+OUT-OF-SCOPE FILES: none.
+.omo/plans/resume-adopt-fallback.md absent from git output as expected (gitignored/untracked).
+
+Config-file probe (package.json, bun.lock, packages/*/package.json, assets/*.json, *.jsonc):
+  $ git diff --name-only e8197c7cb..HEAD -- package.json bun.lock 'packages/*/package.json' 'assets/*.json' '*.jsonc'
+  ---configcheck-done---     (zero hits: UNTOUCHED)
+
+=====================================================================
+2. WORKING TREE
+=====================================================================
+$ git status --porcelain -- packages/omo-opencode/
+  ---opencode-dirty-done---   (zero lines: nothing under packages/omo-opencode/ dirty or staged)
+
+$ git status --porcelain   (full)
+ M packages/omo-codex/plugin/components/codegraph/dist/cli.js
+ M packages/omo-codex/plugin/components/codegraph/dist/serve.js
+ M packages/omo-codex/scripts/install-dist/install-local.mjs
+ M packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs
+ M packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+ M packages/omo-senpi/plugin/extensions/omo-member.js
+ M packages/omo-senpi/plugin/extensions/omo-memory-mcp.js
+ M packages/omo-senpi/plugin/extensions/omo-task.js
+ M packages/omo-senpi/plugin/extensions/omo.js
+plus untracked .local-ignore/, prior .omo/evidence/* dirs, .opencode/command/harness-findings-review.md,
+.omo-evidence-green-temp.txt
+=> matches the KNOWN pre-existing dirty set (omo-codex / omo-senpi build artifacts). Nothing staged.
+
+=====================================================================
+3. PER-COMMIT AUDIT (git show --stat)
+=====================================================================
+06a9ae151 Merge wt/resume-adopt-lane-1 -> task-1-red-green.txt, manager.resume-adopt.test.ts, manager.ts (3 files)
+9f78c5347 Merge wt/resume-adopt-lane-2 -> task-2-red-green.txt, background-continuation.test.ts, background-continuation.ts (3 files)
+91c367080 Merge wt/resume-adopt-lane-3 -> task-3-mutation-check.txt, blocked-retention.test.ts (2 files)
+8526bde4e restart probe                -> probe scripts + fake-openai libs + evidence 19..31 + README (18 files)
+62dcb26d6 probe correction             -> probe scripts + fake-openai libs + evidence 32..44 + README
+b24a2ec3e probe across restart         -> fake-openai-server.mjs + probe + evidence .child-id, 45..58 + README
+d460a4150 findings                     -> docs/troubleshooting/harness-findings.md (1 file, +23)
+866c45f55 adoption rollback            -> task-1-red-green.txt, manager.resume-adopt.test.ts, manager.ts (3 files)
+4c5616dce findings (worktree-plans)    -> docs/troubleshooting/harness-findings.md (1 file, +41)
+b482e81dc blocked QA attempt evidence  -> evidence 07..17 only
+4e26242dd opencode-qa run evidence     -> evidence 01..06 + README only
+c40e4fa26 / 2934be9e0 (lane-1 leaves)  -> task-1-red-green.txt, manager.resume-adopt.test.ts, manager.ts
+c1f9243a6 / a6fb257c9 (lane-2 leaves)  -> task-2-red-green.txt, background-continuation.{test.,}ts
+c90bc12fd (lane-3 leaf)                -> task-3-mutation-check.txt, blocked-retention.test.ts
+=> No commit touches anything unrelated. Note the requested sha "d460a415" is d460a4150 (full: d460a4150).
+   The worktree-plans findings entry commit is 4c5616dce.
+
+Merge policy: git log --oneline --graph e8197c7cb..HEAD shows three real merge commits
+(06a9ae151, 9f78c5347, 91c367080) with second-parent lane history intact -- merges, not squashes.
+
+=====================================================================
+4. NOTHING PUSHED / NO PR
+=====================================================================
+$ git ls-remote origin 'refs/heads/wt/resume-adopt*'
+  (no output)  LSREMOTE_EXIT:0
+$ git branch --list 'wt/resume-adopt*'
+  + wt/resume-adopt-attempt3
+  + wt/resume-adopt-lane-1
+  + wt/resume-adopt-lane-2
+  + wt/resume-adopt-lane-3
+$ gh pr list --state all --search "resume-adopt" --limit 10
+  -> only unrelated historical PRs (5817, 6829, 5204, 7058, 5912, 1638); no PR for this work.
+All four lane branches exist locally only. Local commits only, as the plan required.
+
+=====================================================================
+5. FULL SUITE -- $ bun test  (log: /tmp/f4-bun-test.log)
+=====================================================================
+bun test v1.4.0 (1381054db)
+ 15644 pass
+ 5 skip
+ 14 fail
+ 1 snapshots, 136703 expect() calls
+Ran 15663 tests across 2022 files. [345.70s]
+EXIT:1
+
+FAILURE SET (14), each classified:
+ 1. agent command string audit > ... every hit is categorized                    PRE-EXISTING (verified at base, see below)
+ 2. scan tool: pinned real-binary fixtures > ... 0.43.0 OMO pin                  PRE-EXISTING (known list: ast-grep-mcp/scan.test.ts)
+ 3. isModuleResolutionFailure > ... real Bun dynamic-import failure              PRE-EXISTING (known list: shared/module-resolution-failure.test.ts)
+ 4. resolveSkillContentAsync > ... ulw-plan path-backed                          PRE-EXISTING (known list)
+ 5. skill loader dedup > prioritizes project Claude ulw-plan                     PRE-EXISTING (known list)
+ 6. skill loader dedup > prioritizes project Agents ulw-plan                     PRE-EXISTING (known list)
+ 7. skill loader dedup > literal shared/ulw-plan plain name                      PRE-EXISTING (known list)
+ 8. BackgroundManager pollRunningTasks > idle+incomplete todos > session active  PRE-EXISTING (known list)
+ 9. BackgroundManager pollRunningTasks > idle+incomplete todos > output absent   PRE-EXISTING (known list)
+10. BackgroundManager pollRunningTasks > idle+incomplete todos > grace window    PRE-EXISTING (known list)
+11. ParentWakePendingQueue scheduleFlush > second real dispatch before cap       PRE-EXISTING (known list)
+12. reflection completion flow > pending offline completion                      PRE-EXISTING (omo-senpi; verified at base)
+13. reflection completion flow > throwing reflection UI                          PRE-EXISTING (omo-senpi; verified at base)
+14. dependencies check > findCommentCheckerPackageBinary > non-Error ResolveMessage  PRE-EXISTING (verified at base)
+
+NEW FAILURES: none.
+
+--- Empirical base verification for the 3 failures outside the stated known list ---
+Method: git worktree add -f --detach /tmp/f4-base-e8197c7cb e8197c7cb, symlink node_modules
+(root + per-package) from the main checkout, run the specific files.
+
+(a) script/agent-command-string-audit.test.ts at e8197c7cb:
+64 |     expect(collectHits()).toEqual(categorized.sort())
+error: expect(received).toEqual(expected)
+@@ -3,4 +3,4 @@
+    ".github/workflows/publish.yml:915: /bin/omo",
+-   "AGENTS.md:412: omo doctor",
+-   "CLAUDE.md:412: omo doctor",
++   "AGENTS.md:273: omo doctor",
++   "CLAUDE.md:273: omo doctor",
+    "packages/omo-codex/README.md:52: omo get-local-version",
+  at /private/tmp/f4-base-e8197c7cb/script/agent-command-string-audit.test.ts:64:27  (fail)
+ 0 pass / 1 fail
+=> byte-identical diff to the HEAD run (AGENTS.md:412 vs :273). Caused by a local untracked
+   AGENTS.md edit predating the work, NOT by it (AGENTS.md is not in diff e8197c7cb..HEAD).
+
+(b) packages/omo-senpi/src/components/memory/worker/completion.test.ts at e8197c7cb:
+(fail) reflection completion flow > #given a pending offline completion ... [1.14ms]
+(fail) reflection completion flow > #given a throwing reflection UI ... [0.87ms]
+ 8 pass / 2 fail  -- same two cases, same assertions (api.entries length 0 vs 1).
+   Covered by the "omo-senpi/*" pre-existing class.
+
+(c) packages/omo-opencode/src/cli/doctor/checks/dependencies.test.ts at e8197c7cb:
+112 |       expect(resolveMessage instanceof Error).toBe(false)
+error: expect(received).toBe(expected)   Expected: false   Received: true
+  at /private/tmp/f4-base-e8197c7cb/.../dependencies.test.ts:112:47  (fail)
+=> identical to the HEAD run. Bun 1.4.0 runtime behavior, unrelated to this work
+   (dependencies.test.ts is not in the diff).
+
+Temp worktree removed afterwards: git worktree remove --force /tmp/f4-base-e8197c7cb
+
+=====================================================================
+CONCLUSION
+=====================================================================
+Scope: clean. Working tree: clean for packages/omo-opencode/; only the known omo-codex/omo-senpi dirt.
+Config/lockfile/schema: untouched. Merges, not squashes. Nothing pushed, no PR.
+Full suite: 14 failures, all pre-existing (11 from the stated list, 3 verified empirically at e8197c7cb).
+NEW failures: 0.  VERDICT: confirmed.
