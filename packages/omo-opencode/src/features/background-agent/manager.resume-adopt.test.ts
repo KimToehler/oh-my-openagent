@@ -2,6 +2,11 @@ import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { resetLiveServerRouteForTesting } from "../../shared/live-server-route"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
+import {
+  _resetForTesting as resetClaudeCodeSessionState,
+  getSessionAgent,
+  subagentSessions,
+} from "../claude-code-session-state"
 import { BackgroundManager } from "./manager"
 import type { AdoptRunningSessionInput, BackgroundTask } from "./types"
 
@@ -89,6 +94,7 @@ afterEach(() => {
   while (managers.length > 0) managers.pop()?.shutdown()
   releaseAllPromptAsyncReservationsForTesting()
   resetLiveServerRouteForTesting()
+  resetClaudeCodeSessionState()
 })
 
 describe("BackgroundManager resume adopt-on-miss", () => {
@@ -193,6 +199,8 @@ describe("BackgroundManager resume adopt-on-miss", () => {
     await expect(result).rejects.toThrow("forced acquire failure")
     expect(getRootDescendantCount(manager, "current-parent")).toBe(beforeCount)
     expect(getTasks(manager).size).toBe(0)
+    expect(subagentSessions.has("child-session")).toBe(false)
+    expect(getSessionAgent("child-session")).toBeUndefined()
     expect(promptAsync).not.toHaveBeenCalled()
   })
 

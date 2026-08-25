@@ -1487,6 +1487,8 @@ The fallback retry session is now created and can be inspected directly.
       this.resumingBlockedTaskIds.delete(existingTask.id)
       if (reconciledStaleRun) this.completingTaskIds.delete(existingTask.id)
       if (adoptedTask) {
+        clearSessionAgent(input.sessionId)
+        subagentSessions.delete(input.sessionId)
         this.unregisterRootDescendant(input.parentSessionId)
         this.removeTask(adoptedTask)
       }
