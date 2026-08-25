@@ -1,0 +1,3 @@
+text|{"type":"text","text":"<background-subagent-tools>\nIf blocked and parent input is required, call report_blocked with both reason and needs.
+step-start|{"type":"step-start"}
+tool|{"type":"tool","tool":"bash","callID":"call_hang_2","state":{"metadata":{"output":""},"status":"running","input":{"command":"i=0; while [ $i

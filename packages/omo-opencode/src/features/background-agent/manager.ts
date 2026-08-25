@@ -1396,6 +1396,12 @@ The fallback retry session is now created and can be inspected directly.
     let existingTask = this.findBySession(input.sessionId)
     let adoptedTask: BackgroundTask | undefined
     if (!existingTask) {
+      if (input.sessionId === input.parentSessionId) {
+        throw new Error(
+          `Session ${input.sessionId} cannot resume itself. ` +
+          "The task_id must identify a background child session, not the session issuing the request.",
+        )
+      }
       const sessionExists = await this.verifySessionExists(input.sessionId)
       if (!sessionExists) {
         throw new Error(
@@ -1580,6 +1586,13 @@ The fallback retry session is now created and can be inspected directly.
       source: "background-agent-resume",
       settleMs: 0,
       queueBehavior: "defer",
+      // An adopted orphan was killed mid-turn, so its transcript ends in an unterminated
+      // assistant turn that the tool-state shape check reads as still-running. Adoption is
+      // already gated on liveness (terminal, or absent with real output), and the gate keeps
+      // its own checkStatus probe, so that shape check is a false positive on this path only.
+      // Ordinary resumes keep it enabled. Note absent means "not in the status registry",
+      // not "proven idle", so checkStatus remains the load-bearing liveness signal here.
+      ...(adoptedTask ? { checkToolState: false } : {}),
       input: {
         path: { id: existingTask.sessionId },
         body: {

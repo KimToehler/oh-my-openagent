@@ -1872,3 +1872,34 @@ Two different stdio flavours, same `1801.0s`, same `exit_code=0`. The timer is i
 **Diagnostic rule worth keeping:** when tools go missing mid-session, do not guess spellings. One grep settles it - `grep 'MCP connection closed' ~/.local/share/opencode/log/opencode.log`.
 
 **Fix status (2026-08-25, revised):** root cause identified, unfixed, and split across two owners. (a) *Upstream, Open Design:* the server self-exits at 1801s idle; the exact timer was not located in the shipped bundle, so the ask is to make the idle TTL configurable or disable it for stdio. (b) *Upstream, opencode:* `onclose` drops tool registrations permanently with no respawn-on-use and no distinct error - upstream has an open PR for **remote** reconnect ([anomalyco/opencode#43558](https://github.com/anomalyco/opencode/pull/43558)) and an open idle-disconnect issue ([#43444](https://github.com/anomalyco/opencode/issues/43444)), but nothing for local stdio. Nothing is actionable inside this repository. Severity revised `costly` -> `papercut`: recovery is an in-session `/mcps` toggle rather than a restart, and the log grep identifies it in one command - but the misleading error stays expensive for whoever has not read this entry.
+
+## 2026-08-25 - An inverted test silently deleted the only coverage of a still-reachable rollback path
+
+**Severity:** costly
+**Area:** tools
+**Observed in:** oh-my-openagent, `review-work` gate on the resume adopt-fallback follow-up
+
+**What happened:** A follow-up fix let `BackgroundManager.resume()` dispatch a continuation prompt for an orphan killed mid-turn, by passing `checkToolState: false` on the adopt path only. Two shipped tests pinned the opposite behavior, so they were rewritten to assert the new one. That much was correct. But those two tests were also the only coverage of the skipped-dispatch rollback at `manager.ts:1706-1714` (`restoreTaskAfterSkippedResume` + `rollbackAdoptedSession` + `completingTaskIds.delete` + throw). Rewriting them left that branch reachable in production and asserted by nothing. It is exactly the P1 false-success defect a review found one day earlier and commit `29d878800` fixed: `resume()` reporting success with zero prompts dispatched, leaving a phantom running task that wedges every retry.
+
+`checkToolState: false` removes only one of four skip reasons. `reserved` (`session-idle-dispatch.ts:44-53`), `active` from the still-enabled `checkStatus` probe (`:86`), and `unavailable` all still reach the same rollback.
+
+**Evidence:** deleting the `throw` at `manager.ts:1713` is killed on baseline `dev` but survives on the branch:
+```
+# baseline dev (d69fda7f2), mutation applied
+ 10 pass
+ 2 fail
+# branch, same mutation applied
+ 13 pass
+ 0 fail
+```
+Repo-wide, the only remaining reference to the error string was the production line itself:
+```
+$ grep -rn "continuation prompt was not dispatched" --include=*.ts packages/
+packages/omo-opencode/src/features/background-agent/manager.ts:1713
+```
+
+**Why the gates missed it:** the unit suite went green (13/13), typecheck passed, and a live probe proved the intended new behavior against a negative control. Every gate measured what the change *added*; none measured what it *removed*. Three independent review lanes converged on it, which is what caught it.
+
+**Fix status (2026-08-25, fixed):** coverage restored with a trigger that does not depend on `checkToolState`. The replacement holds a prompt reservation on the child session via `setPromptReservation`, so the gate returns `reserved` and the rollback runs for a reason orthogonal to the tool-state check. Two tests: rollback hygiene (throw, `tasks.size === 0`, root-descendant count restored, `subagentSessions` cleared, session agent cleared) and the no-wedge retry (a second `resume()` must not throw `is currently running`). Both are killed by the same mutation, so the branch is pinned again.
+
+**Rule worth keeping:** when a change inverts an existing test, check what else that test asserted. A test named for behavior X often carries incidental coverage of path Y, and repurposing it deletes Y silently. Before rewriting an assertion, mutate the production branch it covered and confirm something else still goes red.

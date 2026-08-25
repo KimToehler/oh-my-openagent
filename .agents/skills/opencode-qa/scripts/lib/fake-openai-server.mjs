@@ -73,6 +73,47 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  if (branch === "restart-parent-midturn") {
+    sendSse(res, toolCallEvents(callCount, "task", `call_midturn_child_${callCount}`, {
+      description: "midturn adoption child",
+      prompt: "SPLIT_CHILD_TASK: hang-midturn",
+      subagent_type: "explore",
+      run_in_background: true,
+      load_skills: [],
+    }))
+    return
+  }
+
+  // Hangs long enough that the probe's SIGKILL lands while this tool call is still
+  // running, which is what leaves the assistant turn unterminated on disk.
+  if (branch === "child-midturn") {
+    sendSse(res, toolCallEvents(callCount, "bash", `call_hang_${callCount}`, {
+      command: "i=0; while [ $i -lt 120 ]; do i=$((i+1)); sleep 1; done",
+      description: "hang so the restart kills this child mid-turn",
+    }))
+    return
+  }
+
+  // run_in_background MUST be true: false routes to executeSyncContinuation ->
+  // adoptRunningSession and never calls manager.resume(), the function under test.
+  if (branch === "midturn-resume") {
+    const idFile = process.env.MIDTURN_ADOPT_CHILD_ID_FILE
+    const taskID = idFile ? fs.readFileSync(idFile, "utf8").trim() : ""
+    if (!/^ses_[A-Za-z0-9]{20,}$/.test(taskID)) {
+      logBranch("invalid-midturn-task-id", { taskID })
+      sendSse(res, textEvents(callCount, "INVALID_MIDTURN_ADOPT_CHILD_ID"))
+      return
+    }
+    sendSse(res, toolCallEvents(callCount, "task", `call_midturn_resume_${callCount}`, {
+      task_id: taskID,
+      prompt: "RESUME_ADOPT_PROBE_CONTINUATION",
+      description: "midturn resume adopt probe continuation",
+      run_in_background: true,
+      load_skills: [],
+    }))
+    return
+  }
+
   if (branch === "restart-resume" || branch === "active-control" || branch === "absent-control") {
     const taskID = process.env.RESUME_ADOPT_CHILD_ID_FILE
       ? fs.readFileSync(process.env.RESUME_ADOPT_CHILD_ID_FILE, "utf8").trim()

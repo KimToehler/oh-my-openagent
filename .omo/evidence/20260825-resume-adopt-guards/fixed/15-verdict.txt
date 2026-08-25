@@ -1,0 +1,2 @@
+MODE=fixed (expect gate to DISPATCH)
+VERDICT=PASS

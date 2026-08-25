@@ -1,0 +1,4 @@
+resume_path_reached=1
+resume_dispatched=0
+resume_skipped_tool_state=1
+midpre=2 midpost=2 unterminated=1
