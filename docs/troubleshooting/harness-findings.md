@@ -447,6 +447,29 @@ The cross-check did find a partial mitigation the original entry did not credit:
 
 **Update:** (2026-08-24, second pass, verified against `dev` source) Unchanged, and now located precisely. The registry is not under `tools/background-task/` as earlier updates implied - it is `packages/omo-opencode/src/features/background-agent/task-registry.ts:22-29`, where `globalThis[REGISTRY_KEY]` holds `activeTasks` and `completedTasks` as plain `Map`s. A repo-wide search for `persist` / `hydrate` / `restore` / `writeFile` in that directory found no production persistence path, and `git log` on the registry file shows no persistence commit. The continuation half is confirmed harder than the retrieval half: `resume()` calls `findBySession()` first and throws `Task not found for session` at `manager.ts:1385-1389`, so the transcript fallback recovers output only and never rehydrates `BackgroundManager`. Smallest fix stays as scoped: durable store plus startup rehydration in `task-registry.ts`, loaded before `getTask()` (`manager.ts:1140-1142`) and `resume()`.
 
+**Fix status (2026-08-24, fixed):** a guarded adopt-on-miss fallback shipped in `BackgroundManager.resume()` at `packages/omo-opencode/src/features/background-agent/manager.ts:1385-1500`. On a `findBySession` miss it no longer throws `Task not found for session` immediately - it verifies the session row exists, probes liveness, and adopts the live child session into this manager via the pre-existing production method `adoptRunningSession` (`manager.ts:689-733`). This closes exactly the gap the update above identified: `resume()` now rehydrates `BackgroundManager`, not only the transcript.
+
+Liveness policy, checked before adoption is allowed:
+- `active` - refuse. A task another runtime is actively driving must not be double-adopted.
+- `unknown` - refuse. Ambiguous state is treated as unsafe rather than guessed at.
+- `terminal` - adopt.
+- `absent` - adopt only if `validateSessionHasOutput` (`manager.ts:2406`) confirms the transcript already has real assistant/tool output, otherwise refuse. `absent` must be adoptable because a real `opencode serve` omits idle sessions from `session.status()` - a genuinely idle orphan reports `absent`, not `terminal`. Refusing `absent` outright would have left the dominant real-world case (a lane that went quiet, then the runtime that owned it restarted) permanently unresumable.
+
+Two findings reshaped the fix and are worth keeping on record:
+
+1. A registry/archive fallback inside `findBySession` was considered and rejected as unsafe. The `globalThis` registry returns a detached clone (`task-registry.ts:116-125`, cloning at `:124`), while `resume()` mutates its record in place (`manager.ts:1447-1483`) and the poller iterates only `this.tasks` (`manager.ts:3412`). A registry fallback would let `resume()` acquire a concurrency slot and dispatch a prompt against an object nothing polls: the task would never complete and the slot would never release. This trap is now pinned by a regression test in `blocked-retention.test.ts`.
+2. Durable disk persistence was considered and rejected too. It would restore the record but not the poller, concurrency slot, timers, or client handle, and a shared file would remove the per-runtime partition that currently keeps two runtimes from double-driving one child session. Making that safe needs an owner-id and heartbeat lease, judged disproportionate to the gap it would close.
+
+Escalation trigger for revisiting persistence: only if a task that dies while still `pending` - never spawned, so it has no `sessionId` and no server-side anchor to adopt - proves to be the common case. Adoption cannot help that case; the smaller and safer artifact there would be a pending-only queue snapshot, not a general-purpose registry restore.
+
+Proof, and its limits:
+- Unit tests: `manager.resume-adopt.test.ts`, 8 tests, including one that drives the real unstubbed liveness probe against an empty status map (the realistic idle-orphan shape).
+- Live-harness QA: proven across a real `opencode serve` restart. Server 1 (PID 10388) was killed; the continuation was served by a different process (PID 10456), so that process's task map could not have contained the record and `findBySession` necessarily missed. The child session gained a genuine new turn (message count 2 -> 4) and the continuation tool call reported `Task continued and completed in 1s.` Evidence: `.omo/evidence/20260824-resume-adopt-fallback/`.
+- Not proven on the live harness: the `active`-session refusal and `absent`-session error paths. Both are covered by unit tests but were not reached in the live QA run.
+- Adoption is proven structurally here (a cross-process continuation could only have succeeded through the adopt branch), not by a persisted adoption marker - the adopted task's description lives in memory and is never written to a session part.
+
+Severity: no longer `costly` for the case this entry centers on. `task_id`-based continuation now survives a restart for a spawned session with transcript output. The `pending`-never-spawned case remains unrecoverable by design, per the escalation trigger above.
+
 ## 2026-08-17 — Completion summary replays every historical park as a current failure
 
 **Severity:** costly
