@@ -209,34 +209,35 @@ describe("BackgroundManager resume adopt-on-miss", () => {
     expect(promptAsync).toHaveBeenCalledTimes(1)
   })
 
-  test("#given an unterminated orphan assistant turn #when resume prompt is skipped #then adoption rolls back and reports failure", async () => {
+  test("#given an unterminated orphan assistant turn #when resume adopts it #then the continuation prompt still dispatches", async () => {
     // given
     const { manager, promptAsync } = createManager(unterminatedTranscript)
-    const beforeCount = getRootDescendantCount(manager, "current-parent")
+    stubMissChecks(manager, true, "terminal")
+
+    // when
+    const resumed = await resume(manager)
+    await flushResumeDispatch()
+
+    // then
+    expect(promptAsync).toHaveBeenCalledTimes(1)
+    expect(getTasks(manager).size).toBe(1)
+    expect(subagentSessions.has("child-session")).toBe(true)
+    expect(resumed.sessionId).toBe("child-session")
+  })
+
+  test("#given an unterminated orphan turn #when liveness probes active #then resume refuses without adopting or dispatching", async () => {
+    // given
+    const { manager, promptAsync } = createManager(unterminatedTranscript)
+    stubMissChecks(manager, true, "active")
 
     // when
     const result = resume(manager)
 
     // then
-    await expect(result).rejects.toThrow("continuation prompt was not dispatched")
+    await expect(result).rejects.toThrow("is currently running")
     expect(promptAsync).not.toHaveBeenCalled()
     expect(getTasks(manager).size).toBe(0)
-    expect(getRootDescendantCount(manager, "current-parent")).toBe(beforeCount)
     expect(subagentSessions.has("child-session")).toBe(false)
-    expect(getSessionAgent("child-session")).toBeUndefined()
-  })
-
-  test("#given a skipped adopted resume #when the same orphan is resumed immediately #then it is not wedged as running", async () => {
-    // given
-    const { manager } = createManager(unterminatedTranscript)
-    await expect(resume(manager)).rejects.toThrow("continuation prompt was not dispatched")
-
-    // when
-    const secondResult = resume(manager)
-
-    // then
-    await expect(secondResult).rejects.toThrow("continuation prompt was not dispatched")
-    await expect(secondResult).rejects.not.toThrow("is currently running")
   })
 
   test("#given orphan adoption suspended on concurrency acquire #when completion races #then claim blocks completion until resume starts and is then released", async () => {

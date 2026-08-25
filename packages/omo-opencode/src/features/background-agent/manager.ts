@@ -1586,6 +1586,10 @@ The fallback retry session is now created and can be inspected directly.
       source: "background-agent-resume",
       settleMs: 0,
       queueBehavior: "defer",
+      // An adopted orphan was killed mid-turn, so its transcript ends in an unterminated
+      // assistant turn. Liveness above already proved nothing is running, which makes the
+      // tool-state shape check a false positive here. Ordinary resumes keep it enabled.
+      ...(adoptedTask ? { checkToolState: false } : {}),
       input: {
         path: { id: existingTask.sessionId },
         body: {
