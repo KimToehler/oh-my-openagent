@@ -1735,3 +1735,44 @@ todowrite:       NOT BLOCKED
 **Workaround:** re-ran the probe with `realpathSync` on the session root and added `write` and `todowrite` controls. Retraction and corrected artifacts recorded in `.omo/evidence/20260824-mcp-tool-name-gating/` (`08-write-guard-boundary-corrected.txt`, plus a CORRECTION section prepended to the evidence README).
 
 **Fix status:** worked around per-probe. A durable fix would put the positive-and-negative-control requirement into the `opencode-qa` skill, which currently gives no guidance on constructing a negative-assertion probe.
+
+## 2026-08-24 - Gitignored .omo/plans is invisible inside task worktrees
+
+**Severity:** costly
+**Area:** worktrees / plugin config
+**Observed in:** oh-my-openagent, `start-work` and `work-with-pr` sessions dispatching workers into task-owned git worktrees
+
+**What happened:** `start-work` and `work-with-pr` dispatch workers into task-owned git worktrees and instruct them to read the work plan from `.omo/plans/<plan>.md` inside that worktree. That file is never there.
+
+**Root cause, verified:**
+```
+$ git check-ignore -v .omo/plans/resume-adopt-fallback.md
+.gitignore:59:plans/	.omo/plans/resume-adopt-fallback.md
+
+$ sed -n '55,62p' .gitignore
+.debugging
+.debug-journal*.md
+session-ses_*.md
+pr-*.md
+plans/
+.ulw/
+.claude/*
+!.claude/skills
+```
+`.gitignore:59` is a bare `plans/` pattern. A bare directory pattern in gitignore matches at any depth, so it matches `.omo/plans/` as well as a top-level `plans/`. The directory is therefore untracked, and `git worktree add` only materializes tracked content.
+
+**Why it is not obvious:** `.omo/evidence/` IS visible inside worktrees because `.gitignore` carries explicit un-ignore rules `!.omo/evidence/` and `!.omo/evidence/**`. `.omo/plans/` has no such rule. An agent sees its evidence directory work fine and reasonably assumes plans behaves the same way.
+
+**Observed impact, both variants:** four workers were dispatched into worktrees in one session with instructions to read the plan.
+- One correctly reported BLOCKED with the exact error (`sed: no such file or directory`) instead of guessing. That is the correct behavior.
+- Three others proceeded silently without reading the instructed input. Their output happened to be correct only because each dispatch prompt restated the specification exhaustively. This silent variant is the dangerous one: a worker that guesses instead of blocking produces work that looks compliant but was never grounded in the plan.
+
+**Workaround used this session:** the orchestrator copied the plan into each lane worktree at `.omo/plans/`. Because the path is gitignored, the copy cannot be staged or committed, so it cannot pollute a lane commit and the worktree stays clean.
+
+**Candidate durable fixes (not yet chosen):**
+1. Narrow `.gitignore:59` from bare `plans/` to `/plans/` so it anchors at the repo root and stops matching `.omo/plans/` at depth, then track `.omo/plans/` the way `.omo/evidence/` already is via its un-ignore rules.
+2. Or make the `start-work` / `work-with-pr` dispatch step copy the selected plan into each task worktree explicitly.
+
+**Generalization worth keeping:** a bare directory name in `.gitignore` matches at every depth, so `plans/`, `build/`, `dist/`, and similar bare patterns silently capture same-named directories nested anywhere in the tree.
+
+**Fix status:** unfixed. Two candidate fixes proposed above, neither applied.
