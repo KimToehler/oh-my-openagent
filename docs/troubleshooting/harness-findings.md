@@ -1776,3 +1776,49 @@ plans/
 **Generalization worth keeping:** a bare directory name in `.gitignore` matches at every depth, so `plans/`, `build/`, `dist/`, and similar bare patterns silently capture same-named directories nested anywhere in the tree.
 
 **Fix status:** unfixed. Two candidate fixes proposed above, neither applied.
+
+---
+
+## 2026-08-25 — A stdio MCP server is reaped after exactly 30 min idle and never respawns; its tools then report as *nonexistent*
+
+**Severity:** costly
+**Area:** tools
+**Observed in:** `~/git/onara` — `port-design` skill, Open Design (`open-design`) MCP
+
+**What happened:** mid-task, every `open-design_*` call began failing with `Model tried to call unavailable tool`, and the server's tools were absent from the advertised tool list. The MCP was correctly registered and enabled; opencode had silently dropped the connection 30 minutes after the last call and did not reconnect on demand. Because the failure surfaces as *tool does not exist* rather than *server disconnected*, it reads as a naming problem — I guessed at four different tool-name spellings before checking the log. Only a user-initiated opencode restart restored it, and the same reap then recurred.
+
+**Evidence:** the interval is exactly 30:00 after the last call, to the second, across six occurrences:
+
+```
+close=2026-08-22T21:42  last_call=2026-08-22T21:12:17.475Z
+close=2026-08-23T12:54  last_call=2026-08-23T12:24:06.269Z
+close=2026-08-24T09:05  last_call=2026-08-24T08:35:46.528Z
+close=2026-08-25T06:51  last_call=2026-08-25T06:21:18.594Z
+```
+```
+timestamp=2026-08-25T06:21:18.594Z level=INFO  message=evaluated permission=open-design_get_project ... action=allow
+timestamp=2026-08-25T06:51:18.916Z level=WARN  message="MCP connection closed" server=open-design
+```
+
+The server is not at fault — a fresh handshake against the same wrapper answers immediately:
+
+```
+$ /Users/tim/.config/opencode/bin/open-design-mcp   # {"method":"initialize",...} on stdin
+{"result":{"protocolVersion":"2024-11-05","capabilities":{"tools":{},"resources":{}},
+ "serverInfo":{"name":"open-design","version":"0.2.0"}, ...
+```
+
+Nor is the backing app: the Open Design daemon (PID 2660) and its IPC sockets
+(`/tmp/open-design/ipc/release-stable/{daemon,desktop,web}.sock`) have been up since Aug 23. Only the stdio bridge process is gone (`ps aux | grep -c '[o]pen-design-mcp'` → `0`).
+
+**Not a blanket idle-reap.** Two other MCP servers in the same session survived far longer idle periods — `playwright-mcp` (PID 22613, up since 08:20) and `lean-ctx serve` (PID 29790, up since Aug 24). Whatever triggers this is specific to `open-design`, so the reap is likely a *reaction* to something that server's process does rather than a scheduled sweep. Closure counts in this log: `chrome-devtools` 8, `open-design` 7, `playwright` 1.
+
+**Root cause / hypothesis:** *hypothesis, not diagnosis — not yet traced to source.* Two candidates I could not separate without reading opencode's MCP client: (a) the wrapper `exec`s an Electron helper with `ELECTRON_RUN_AS_NODE=1` (`~/.config/opencode/bin/open-design-mcp`), which may close or EOF its stdio pipe when idle in a way a plain node server does not; (b) opencode treats a transport-level EOF/stderr event as a permanent disconnect and drops the server's tool registration without attempting a respawn. The exact-to-the-second 30:00 interval argues for a timer somewhere, but a timer alone does not explain why two sibling stdio servers were unaffected.
+
+**Two distinct defects, worth separating:**
+1. *Reaped while idle* — arguably intentional resource management, though 30 min is short for a design-tool bridge whose backing app stays resident for days.
+2. *No respawn on next use, and a misleading error* — this is the expensive half. A stdio server is cheap to restart (the handshake above is sub-second). Reporting the tools as nonexistent, rather than surfacing "server disconnected", sends the agent down a tool-naming rabbit hole. Four wasted calls here; the same trap previously cost a whole phase in this repo, when I read the *global* `enabled: false` and concluded the server was disabled while a project-scope `.opencode/opencode.json` had it enabled all along.
+
+**Workaround:** restart opencode (user-initiated — an agent cannot respawn a stdio MCP it does not own). Where the MCP is only needed for *reads*, prefer the on-disk path: `$OD` is a real git checkout, so `cat`/`sed`/`awk` substitute for `get_file` entirely, and the `port-design` skill already mandates that for unrelated reasons. Only genuinely two-way operations (`start_run`, `get_run`, `write_file`) actually require the bridge.
+
+**Fix status:** unfixed. Suggest, in priority order: (1) on a tool call to a registered-but-disconnected MCP, respawn and retry once before failing; (2) failing that, error with `server disconnected` naming the server, never as an unknown tool; (3) reconsider the idle TTL for stdio servers whose restart cost is a sub-second handshake.
