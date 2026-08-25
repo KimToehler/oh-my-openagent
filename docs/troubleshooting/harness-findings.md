@@ -1825,6 +1825,12 @@ Nor is the backing app: the Open Design daemon (PID 2660) and its IPC sockets
 
 **Fix status:** unfixed. Suggest, in priority order: (1) on a tool call to a registered-but-disconnected MCP, respawn and retry once before failing; (2) failing that, error with `server disconnected` naming the server, never as an unknown tool; (3) reconsider the idle TTL for stdio servers whose restart cost is a sub-second handshake.
 
+**Update (same day):** a full opencode restart is **not** required. Toggling the server's `enabled` flag in the project's `.opencode/opencode.json` (true → false → true) respawns the stdio bridge in place, and the tools return immediately — verified by an `open-design_get_project` call succeeding right after the toggle, with `list_agents` and `start_run` working thereafter. That is a much cheaper recovery than restarting the session and losing conversational context, and it is something the user can do without killing in-flight work.
+
+**Update (same day, 2):** the reap is not specific to `open-design` after all — `playwright` was reaped identically later in the same session (its tools vanished from the advertised list mid-task, while `lean-ctx` stayed up). So the earlier "only this one server is affected" observation was a sampling artifact of which servers happened to be idle 30 minutes. The `chrome-devtools` 8 / `open-design` 7 / `playwright` 1 closure counts in this log are better read as *how often each server sat idle*, not as evidence that one server is uniquely fragile.
+
+**Update (same day, 3):** the misleading-error half has a concrete cost measurement now. When `playwright` was reaped, the recovery that worked was **re-loading the owning skill** (`skill(name="playwright")`) and then invoking through `skill_mcp(mcp_name="playwright", ...)`, which routes via the skill's own MCP registration rather than the reaped top-level one. Worth knowing as a second workaround where a skill owns the server. Without it, the failure presents as `Model tried to call unavailable tool 'playwright_browser_navigate'` — indistinguishable from a tool that never existed, which is what sends an agent guessing at name spellings instead of checking the connection.
+
 **Update:** (2026-08-25, verified against installed opencode `1.18.20` and `~/git/opencode` `dev`@`38e10eb140`; reproduced experimentally)
 
 *Diagnosis was half right. Hypothesis (b) is retracted: opencode does not reap the server. The **server self-exits**, and opencode is the victim.*
