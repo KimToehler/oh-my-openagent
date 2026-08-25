@@ -3,6 +3,9 @@ export const branchCounts = {
   "parent-tool-call": 0,
   "parent-hold": 0,
   "restart-parent": 0,
+  "restart-parent-midturn": 0,
+  "child-midturn": 0,
+  "midturn-resume": 0,
   "restart-resume": 0,
   "active-control": 0,
   "absent-control": 0,
@@ -17,6 +20,7 @@ export const latches = {
   restartResumeIssued: false,
   activeControlIssued: false,
   absentControlIssued: false,
+  midturnResumeIssued: false,
 }
 
 export function hasToolResult(inputStr) {
@@ -34,6 +38,9 @@ export function selectBranch(inputStr) {
   const isTitle = inputStr.includes("Generate a title")
   const isSplitProbe = inputStr.includes("Run the split probe")
   const isRestartParent = inputStr.includes("SPLIT_CHILD_TASK: restart-happy")
+  const isMidturnParent = inputStr.includes("SPLIT_CHILD_TASK: restart-midturn")
+  const isMidturnChild = inputStr.includes("SPLIT_CHILD_TASK: hang-midturn")
+  const isMidturnResume = inputStr.includes("SPLIT_MIDTURN_ADOPT:")
   const isRestartResume = inputStr.includes("SPLIT_RESUME_ADOPT:")
   const isActiveControl = inputStr.includes("SPLIT_ACTIVE_CONTROL:")
   const isAbsentControl = inputStr.includes("SPLIT_ABSENT_CONTROL:")
@@ -43,6 +50,12 @@ export function selectBranch(inputStr) {
 
   if (isTitle) return "title"
   if (isRestartParent) return "restart-parent"
+  if (isMidturnParent) return "restart-parent-midturn"
+  if (isMidturnChild) return "child-midturn"
+  if (isMidturnResume && !latches.midturnResumeIssued) {
+    latches.midturnResumeIssued = true
+    return "midturn-resume"
+  }
   if (isRestartResume && !latches.restartResumeIssued) {
     latches.restartResumeIssued = true
     return "restart-resume"
