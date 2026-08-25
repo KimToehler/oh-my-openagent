@@ -528,6 +528,16 @@ export class BackgroundManager {
     }
   }
 
+  private rollbackAdoptedSession(task: BackgroundTask, parentSessionId: string): void {
+    const sessionId = task.sessionId
+    if (!sessionId) throw new Error(`Adopted task ${task.id} has no session ID`)
+    clearSessionAgent(sessionId)
+    subagentSessions.delete(sessionId)
+    this.unregisterRootDescendant(parentSessionId)
+    this.removeTask(task)
+    this.updateBackgroundTaskMarker(parentSessionId)
+  }
+
   private restoreTaskAfterSkippedResume(
     task: BackgroundTask,
     snapshot: ResumeTaskSnapshot,
@@ -1488,11 +1498,7 @@ The fallback retry session is now created and can be inspected directly.
       this.resumingBlockedTaskIds.delete(existingTask.id)
       if (reconciledStaleRun || adoptedTask) this.completingTaskIds.delete(existingTask.id)
       if (adoptedTask) {
-        clearSessionAgent(input.sessionId)
-        subagentSessions.delete(input.sessionId)
-        this.unregisterRootDescendant(input.parentSessionId)
-        this.removeTask(adoptedTask)
-        this.updateBackgroundTaskMarker(input.parentSessionId)
+        this.rollbackAdoptedSession(adoptedTask, input.parentSessionId)
       }
       throw error
     }
@@ -1567,7 +1573,7 @@ The fallback retry session is now created and can be inspected directly.
       applySessionPromptParams(existingTask.sessionId!, existingTask.model)
     }
 
-    dispatchInternalPrompt({
+    const resumeDispatch = dispatchInternalPrompt({
       mode: "async",
       client: this.client,
       sessionID: existingTask.sessionId,
@@ -1596,7 +1602,8 @@ The fallback retry session is now created and can be inspected directly.
         },
         query: { directory: this.directory },
       },
-    }).then((promptResult) => {
+    })
+    const handleResumeDispatch = (promptResult: PromptAsyncGateResult): void => {
       if (promptResult.status === "failed") {
         if (isAmbiguousPostDispatchPromptFailure(promptResult)) {
           log("[background-agent] resume prompt may have been accepted before ambiguous failure; continuing to poll", {
@@ -1645,7 +1652,8 @@ Task ${existingTask.id} resumed with parent answer.
           this.completionTimers.delete(existingTask.id)
         }
       }
-    }).catch(async (error) => {
+    }
+    const handleResumeError = async (error: unknown): Promise<void> => {
       log("[background-agent] resume prompt error:", error)
       const errorInfo = {
         name: extractErrorName(error),
@@ -1683,9 +1691,24 @@ Task ${existingTask.id} resumed with parent answer.
       this.enqueueNotificationForParent(existingTask.parentSessionId, () => this.notifyParentSession(existingTask)).catch(err => {
         log("[background-agent] Failed to notify on resume error:", err)
       })
-    }).finally(() => {
+    }
+
+    if (adoptedTask) {
+      const promptResult = await resumeDispatch
+      if (promptResult.status !== "dispatched" && promptResult.status !== "queued" && promptResult.status !== "failed") {
+        this.restoreTaskAfterSkippedResume(existingTask, resumeSnapshot, promptResult.status)
+        this.rollbackAdoptedSession(adoptedTask, input.parentSessionId)
+        this.resumingBlockedTaskIds.delete(existingTask.id)
+        this.completingTaskIds.delete(existingTask.id)
+        throw new Error(`Task ${existingTask.id} continuation prompt was not dispatched (${promptResult.status}).`)
+      }
+      handleResumeDispatch(promptResult)
       this.resumingBlockedTaskIds.delete(existingTask.id)
-    })
+    } else {
+      resumeDispatch.then(handleResumeDispatch).catch(handleResumeError).finally(() => {
+        this.resumingBlockedTaskIds.delete(existingTask.id)
+      })
+    }
 
     if (reconciledStaleRun || adoptedTask) this.completingTaskIds.delete(existingTask.id)
 

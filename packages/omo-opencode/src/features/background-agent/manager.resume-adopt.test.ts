@@ -14,12 +14,23 @@ import type { AdoptRunningSessionInput, BackgroundTask } from "./types"
 
 const managers: BackgroundManager[] = []
 const managerDirectories: string[] = []
+const completedTranscript = [
+  {
+    info: { role: "assistant", time: { completed: 1 }, finish: "stop" },
+    parts: [{ type: "text", text: "work completed" }],
+  },
+]
+const unterminatedTranscript = [
+  {
+    info: { role: "assistant", time: {} },
+    parts: [{ type: "text", text: "work interrupted" }],
+  },
+]
 
-function createManager(hasOutput = false): { readonly manager: BackgroundManager; readonly promptAsync: ReturnType<typeof mock> } {
+function createManager(
+  messages: readonly Record<string, unknown>[] = [],
+): { readonly manager: BackgroundManager; readonly promptAsync: ReturnType<typeof mock> } {
   const promptAsync = mock(async () => ({ data: undefined }))
-  const messages = hasOutput
-    ? [{ info: { role: "tool" }, parts: [{ type: "text", text: "work completed" }] }]
-    : []
   const client = {
     session: {
       abort: async () => ({ data: true }),
@@ -187,7 +198,7 @@ describe("BackgroundManager resume adopt-on-miss", () => {
 
   test("#given an idle existing orphan with assistant output omitted from the real status registry #when resume is requested #then it adopts and dispatches one prompt", async () => {
     // given
-    const { manager, promptAsync } = createManager(true)
+    const { manager, promptAsync } = createManager(completedTranscript)
 
     // when
     const resumed = await resume(manager)
@@ -198,9 +209,39 @@ describe("BackgroundManager resume adopt-on-miss", () => {
     expect(promptAsync).toHaveBeenCalledTimes(1)
   })
 
+  test("#given an unterminated orphan assistant turn #when resume prompt is skipped #then adoption rolls back and reports failure", async () => {
+    // given
+    const { manager, promptAsync } = createManager(unterminatedTranscript)
+    const beforeCount = getRootDescendantCount(manager, "current-parent")
+
+    // when
+    const result = resume(manager)
+
+    // then
+    await expect(result).rejects.toThrow("continuation prompt was not dispatched")
+    expect(promptAsync).not.toHaveBeenCalled()
+    expect(getTasks(manager).size).toBe(0)
+    expect(getRootDescendantCount(manager, "current-parent")).toBe(beforeCount)
+    expect(subagentSessions.has("child-session")).toBe(false)
+    expect(getSessionAgent("child-session")).toBeUndefined()
+  })
+
+  test("#given a skipped adopted resume #when the same orphan is resumed immediately #then it is not wedged as running", async () => {
+    // given
+    const { manager } = createManager(unterminatedTranscript)
+    await expect(resume(manager)).rejects.toThrow("continuation prompt was not dispatched")
+
+    // when
+    const secondResult = resume(manager)
+
+    // then
+    await expect(secondResult).rejects.toThrow("continuation prompt was not dispatched")
+    await expect(secondResult).rejects.not.toThrow("is currently running")
+  })
+
   test("#given orphan adoption suspended on concurrency acquire #when completion races #then claim blocks completion until resume starts and is then released", async () => {
     // given
-    const { manager } = createManager(true)
+    const { manager } = createManager(completedTranscript)
     const acquire = suspendConcurrencyAcquire(manager)
 
     // when
@@ -234,7 +275,7 @@ describe("BackgroundManager resume adopt-on-miss", () => {
 
   test("#given idle orphan adoption followed by concurrency acquire failure #when resume rejects #then adoption and descendant registration roll back", async () => {
     // given
-    const { manager, promptAsync } = createManager(true)
+    const { manager, promptAsync } = createManager(completedTranscript)
     failConcurrencyAcquire(manager)
     const beforeCount = getRootDescendantCount(manager, "current-parent")
 
@@ -253,7 +294,7 @@ describe("BackgroundManager resume adopt-on-miss", () => {
 
   test("#given a known task followed by concurrency acquire failure #when resume rejects #then no active continuation marker is written", async () => {
     // given
-    const { manager } = createManager(true)
+    const { manager } = createManager(completedTranscript)
     const knownTask: BackgroundTask = {
       id: "known-task",
       sessionId: "child-session",

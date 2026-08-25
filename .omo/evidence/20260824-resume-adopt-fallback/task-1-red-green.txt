@@ -695,3 +695,67 @@ $ tsgo --noEmit -p script/tsconfig.json
 $ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/memory-core/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json && tsgo --noEmit -p packages/omo-native/tsconfig.json
 ```
 Exit code: 0
+
+
+## RW2 BLOCKER FIX (false success on skipped dispatch after adoption)
+
+### RED
+`bun test packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts`
+```text
+bun test v1.4.0 (1381054db)
+Expected promise that rejects
+Received promise that resolved: Promise { <resolved> }
+(fail) BackgroundManager resume adopt-on-miss > #given an unterminated orphan assistant turn #when resume prompt is skipped #then adoption rolls back and reports failure [0.92ms]
+(fail) BackgroundManager resume adopt-on-miss > #given a skipped adopted resume #when the same orphan is resumed immediately #then it is not wedged as running [0.55ms]
+
+ 10 pass
+ 2 fail
+ 33 expect() calls
+Ran 12 tests across 1 file. [79.00ms]
+```
+Promise resolved with zero prompts before cleanup assertions, proving false success plus phantom task and session metadata residue. Immediate retry remained wedged as running.
+
+### GREEN and positive control
+`bun test packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts`
+```text
+bun test v1.4.0 (1381054db)
+
+ 12 pass
+ 0 fail
+ 40 expect() calls
+Ran 12 tests across 1 file. [76.00ms]
+```
+Positive control uses cleanly terminated assistant transcript, asserts exactly one `promptAsync` call, and asserts adopted task remains registered.
+
+### Defect 3 approach
+Chose option (a), adoption only. Adopted resumes await gate result before `resume()` returns. Skipped status restores transient state, invokes full adoption rollback, then throws `continuation prompt was not dispatched`. Caller cannot report success with zero prompts. Non-adopted resumes retain detached behavior.
+
+Extracted `rollbackAdoptedSession` performs `clearSessionAgent`, `subagentSessions.delete`, `unregisterRootDescendant`, `removeTask`, and `updateBackgroundTaskMarker` in required order. Concurrency-acquire failure and skipped-dispatch adoption paths both call it.
+
+`latestAssistantTurnBlocksInternalPrompt` remains unchanged because shared stale-turn resumability policy is outside scope. Patch handles its non-dispatched result honestly and transactionally.
+
+### Full scoped suite
+`bun test packages/omo-opencode/src/features/background-agent packages/omo-opencode/src/tools/delegate-task`
+```text
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when session remains active #then keeps task running [0.89ms]
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when valid output is absent #then keeps task running [0.66ms]
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when first observation is inside grace window #then stamps and waits [0.59ms]
+(fail) ParentWakePendingQueue scheduleFlush > #given an existing default timer and an already-delivered wake #when real queue cadence drives coalesce retries #then the wake reaches a second real dispatch before the cap [0.59ms]
+
+ 1408 pass
+ 4 fail
+ 3566 expect() calls
+Ran 1412 tests across 123 files. [33.44s]
+EXIT_CODE=1
+```
+Only four authorized baseline failures remain. Four added tests raise pass count from supplied 1404 baseline to 1408.
+
+### Typecheck
+`bun run typecheck`
+```text
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/memory-core/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json && tsgo --noEmit -p packages/omo-native/tsconfig.json
+EXIT_CODE=0
+```
+LSP diagnostics could not initialize because workspace lacks valid `typescript` installation for tsserver. Repository-native `tsgo` typecheck passed with exit 0.
