@@ -62,7 +62,7 @@ Todo terminalization is not guaranteed by any producer: nothing obliges a subage
 
 Two known limits on the bound:
 - **Status unavailable**: when the session status map (`allStatuses`) comes back `undefined` for a poll cycle, the loop continues before reaching the todo gate (`manager.ts:3335`, `if (allStatuses === undefined) { continue }`). On that cycle the gate's stamp is never set, so the bound cannot start counting for the task, while age-based task pruning keeps running on its own independent schedule.
-- **Plugin-restart orphan**: the poll loop and all in-memory task state live in the running plugin process. If the runtime restarts, that state is gone, the task never reaches a terminal status, and no bound (this one or any other) can fire for it. This is a separate, unaddressed failure mode from the todo gate.
+- **Plugin-restart orphan**: the poll loop and all in-memory task state live in the running plugin process. If the runtime restarts, that state is gone, and the task record itself (status, attempt history, fallback chain, concurrency slot) cannot be recovered. Continuation is recoverable, though: on a `findBySession` miss, `resume()` now adopts the live child session instead of failing outright (`manager.ts:1386-1423`). Liveness policy: `active`/`unknown` refuse, `terminal` adopts, `absent` adopts only if `validateSessionHasOutput` confirms the transcript already holds real assistant/tool output. An adopted task carries no original model, fallback chain, category, or skill content, and a task that dies while still `pending` (never spawned, so it has no `sessionId`) has no session to adopt.
 
 ## CONCURRENCY MODEL
 
