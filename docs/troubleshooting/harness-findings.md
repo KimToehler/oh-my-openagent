@@ -1824,3 +1824,45 @@ Nor is the backing app: the Open Design daemon (PID 2660) and its IPC sockets
 **Workaround:** restart opencode (user-initiated — an agent cannot respawn a stdio MCP it does not own). Where the MCP is only needed for *reads*, prefer the on-disk path: `$OD` is a real git checkout, so `cat`/`sed`/`awk` substitute for `get_file` entirely, and the `port-design` skill already mandates that for unrelated reasons. Only genuinely two-way operations (`start_run`, `get_run`, `write_file`) actually require the bridge.
 
 **Fix status:** unfixed. Suggest, in priority order: (1) on a tool call to a registered-but-disconnected MCP, respawn and retry once before failing; (2) failing that, error with `server disconnected` naming the server, never as an unknown tool; (3) reconsider the idle TTL for stdio servers whose restart cost is a sub-second handshake.
+
+**Update:** (2026-08-25, verified against installed opencode `1.18.20` and `~/git/opencode` `dev`@`38e10eb140`; reproduced experimentally)
+
+*Diagnosis was half right. Hypothesis (b) is retracted: opencode does not reap the server. The **server self-exits**, and opencode is the victim.*
+
+**Proven by experiment, not by reading.** A standalone probe spawned `/Users/tim/.config/opencode/bin/open-design-mcp` directly with **no opencode process anywhere in the picture**, completed the `initialize` handshake, held stdin open, and then sent nothing:
+
+```
+initialized_at=2026-08-25T07:19:17.3Z
+child_exited_at=2026-08-25T07:49:18.3Z
+exit_code=0            # stderr: 0 bytes
+initialized -> self-exit = 1801.0s
+```
+
+The server exits **cleanly, on its own, at 30m01s idle**. `exit_code=0` and an empty stderr are the signature of a deliberate idle shutdown, not a crash, not an EOF, and not a kill.
+
+A second probe reproduced it to the same tenth of a second while holding **byte-identical stdio to opencode's own child** - spawned via Bun with `stdin/stdout/stderr: "pipe"`, so fds 0/1/2 are unix socketpairs exactly as `lsof` shows for the real opencode child, rather than the first probe's FIFO plus regular files:
+
+```
++1801.0s child exited code=0
+```
+
+Two different stdio flavours, same `1801.0s`, same `exit_code=0`. The timer is in the server and depends on neither the transport plumbing nor opencode.
+
+**The same reap was then predicted and observed live, to the second.** In this session the opencode-owned child (pid 28242, spawned 09:16:13 local) last served a call at `07:18:44.208Z`. Predicted close `07:48:44Z`; the log recorded `timestamp=2026-08-25T07:48:44.450Z level=WARN message="MCP connection closed" server=open-design`, an idle interval of **1800.242s**, and the child was gone.
+
+**The interval is idle-clocked, not age-clocked, and one unified rule explains all seven closures.** Recomputed across the whole log: five closes land 1800.3-1802.9s after the last `open-design_*` call. The two the original entry could not explain (`5406f5c9`, `1d5cfc5b`) occurred in runs with *zero* open-design calls, and are 1802.4s and 1801.7s after **run start** - the clock simply runs from connect when no call ever happens. Age is ruled out independently: pid 28242 was still alive at 30m20s of process age and only died at its idle mark.
+
+**Two evidence corrections to the original entry.**
+
+1. *The process-absence evidence is invalid.* `ps aux | grep -c '[o]pen-design-mcp'` can never match: the wrapper ends in `exec "$APP/.../Open Design Helper" .../daemon-cli.mjs mcp "$@"` (`~/.config/opencode/bin/open-design-mcp:69-70`), and `exec` replaces argv. The live process is `...Open Design Helper .../daemon-cli.mjs mcp`, which was present and healthy throughout. The conclusion "only the stdio bridge process is gone" happened to be true, but not for the stated reason. Grep the post-exec argv.
+2. *The "not a blanket idle-reap" control does not hold as stated.* Sibling servers being long-lived proves nothing here, because they were never idle *and connected* in the same sense: `chrome-devtools` sat idle over 1800s inside a live run 17 times and `playwright` 3 times, with no close. The three `chrome-devtools` closures are 3-52s after their last call, i.e. browser teardown, an unrelated cause. Server-specificity is confirmed - just by the self-exit above, not by the sibling comparison.
+
+**Downstream half confirmed exactly as written, and it is opencode's own defect.** `client.onclose` deletes `clients`, `defs`, and `instructions`, sets `{status:"failed",error:"Connection closed"}`, logs the WARN, publishes `ToolsChanged`, and never attempts a respawn (`packages/opencode/src/mcp/index.ts:443-455`; byte-identical logic in the installed 1.18.20 binary). `MCP.tools()` then skips any client whose status is not `connected` (`index.ts:675-684`), so the tools vanish from the advertised set, and the model-facing wording comes from the Vercel AI SDK's `NoSuchToolError` - `Model tried to call unavailable tool '<name>'` - confirmed present in the shipped binary. That is the whole rabbit hole: a server-side idle exit is rendered to the agent as a tool-naming mistake.
+
+**Not our defect.** No omo code participates. Our only 30-minute constants are unrelated (`packages/lsp-daemon/src/daemon-server.ts:22`, `packages/git-bash-mcp/src/mcp.ts:8`); tier-2 `.mcp.json` servers are handed to opencode at `packages/omo-opencode/src/plugin-handlers/mcp-config-handler.ts:38-68` and their lifecycle is opencode's; and our tier-3 manager uses a 5-minute idle timeout and *does* force-reconnect on use (`packages/mcp-client-core/src/skill-mcp-manager/manager.ts:53,145-188`) - which is the behavior opencode is missing.
+
+**Better workaround: restarting opencode is unnecessary.** opencode ships `MCP.connect` and a UI for it. In the TUI, run the `mcp.list` command (slash `/mcps`) and press **space** on the dead server to toggle it back - `dialog.mcp.toggle` calls `client.mcp.connect` and refreshes status. Over HTTP it is `POST /mcp/{name}/connect` (`packages/opencode/src/server/routes/instance/httpapi/groups/mcp.ts`, `McpPaths.connect`). This re-runs `createAndStore` (`index.ts:648-651`), spawning a fresh child and re-registering the tools in-session, with the sub-second handshake the entry already measured. The read-path substitution advice stands and is still cheaper when only reads are needed.
+
+**Diagnostic rule worth keeping:** when tools go missing mid-session, do not guess spellings. One grep settles it - `grep 'MCP connection closed' ~/.local/share/opencode/log/opencode.log`.
+
+**Fix status (2026-08-25, revised):** root cause identified, unfixed, and split across two owners. (a) *Upstream, Open Design:* the server self-exits at 1801s idle; the exact timer was not located in the shipped bundle, so the ask is to make the idle TTL configurable or disable it for stdio. (b) *Upstream, opencode:* `onclose` drops tool registrations permanently with no respawn-on-use and no distinct error - upstream has an open PR for **remote** reconnect ([anomalyco/opencode#43558](https://github.com/anomalyco/opencode/pull/43558)) and an open idle-disconnect issue ([#43444](https://github.com/anomalyco/opencode/issues/43444)), but nothing for local stdio. Nothing is actionable inside this repository. Severity revised `costly` -> `papercut`: recovery is an in-session `/mcps` toggle rather than a restart, and the log grep identifies it in one command - but the misleading error stays expensive for whoever has not read this entry.
