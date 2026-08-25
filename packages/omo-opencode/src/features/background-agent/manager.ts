@@ -1420,6 +1420,7 @@ The fallback retry session is now created and can be inspected directly.
         rootDescendantAlreadyReserved: false,
       })
       adoptedTask = existingTask
+      this.completingTaskIds.add(existingTask.id)
     }
 
     if (!existingTask.sessionId) {
@@ -1485,7 +1486,7 @@ The fallback retry session is now created and can be inspected directly.
       await this.concurrencyManager.acquire(concurrencyKey)
     } catch (error) {
       this.resumingBlockedTaskIds.delete(existingTask.id)
-      if (reconciledStaleRun) this.completingTaskIds.delete(existingTask.id)
+      if (reconciledStaleRun || adoptedTask) this.completingTaskIds.delete(existingTask.id)
       if (adoptedTask) {
         clearSessionAgent(input.sessionId)
         subagentSessions.delete(input.sessionId)
@@ -1686,7 +1687,7 @@ Task ${existingTask.id} resumed with parent answer.
       this.resumingBlockedTaskIds.delete(existingTask.id)
     })
 
-    if (reconciledStaleRun) this.completingTaskIds.delete(existingTask.id)
+    if (reconciledStaleRun || adoptedTask) this.completingTaskIds.delete(existingTask.id)
 
     return existingTask
   }

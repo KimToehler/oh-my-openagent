@@ -84,6 +84,21 @@ function failConcurrencyAcquire(manager: BackgroundManager): void {
   spyOn(concurrencyManager as never, "acquire" as never).mockRejectedValue(new Error("forced acquire failure") as never)
 }
 
+function suspendConcurrencyAcquire(manager: BackgroundManager): { readonly release: () => void } {
+  const concurrencyManager = Reflect.get(manager, "concurrencyManager")
+  if (typeof concurrencyManager !== "object" || concurrencyManager === null) {
+    throw new Error("BackgroundManager concurrency manager unavailable")
+  }
+  let release = (): void => {
+    throw new Error("Concurrency acquire promise was not initialized")
+  }
+  const suspended = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  spyOn(concurrencyManager as never, "acquire" as never).mockReturnValue(suspended as never)
+  return { release }
+}
+
 async function completeTask(manager: BackgroundManager, task: BackgroundTask): Promise<boolean> {
   const tryCompleteTask = Reflect.get(manager, "tryCompleteTask")
   if (typeof tryCompleteTask !== "function") throw new Error("BackgroundManager completion method unavailable")
@@ -111,6 +126,7 @@ describe("BackgroundManager resume adopt-on-miss", () => {
     const { manager } = createManager()
     stubMissChecks(manager, true, "terminal")
     const adopt = spyOn(manager, "adoptRunningSession")
+    const reconcile = spyOn(manager as never, "reconcileStaleRunningTask" as never)
 
     // when
     const resumed = await resume(manager)
@@ -127,6 +143,7 @@ describe("BackgroundManager resume adopt-on-miss", () => {
       rootDescendantAlreadyReserved: false,
     }
     expect(adopt).toHaveBeenCalledWith(expectedInput)
+    expect(reconcile).not.toHaveBeenCalled()
     expect(getTasks(manager).get(resumed.id)).toBe(resumed)
   })
 
@@ -179,6 +196,27 @@ describe("BackgroundManager resume adopt-on-miss", () => {
     // then
     expect(getTasks(manager).get(resumed.id)).toBe(resumed)
     expect(promptAsync).toHaveBeenCalledTimes(1)
+  })
+
+  test("#given orphan adoption suspended on concurrency acquire #when completion races #then claim blocks completion until resume starts and is then released", async () => {
+    // given
+    const { manager } = createManager(true)
+    const acquire = suspendConcurrencyAcquire(manager)
+
+    // when
+    const resumeResult = resume(manager)
+    await flushResumeDispatch()
+    const adopted = [...getTasks(manager).values()][0]
+    if (!adopted) throw new Error("Expected adopted task while resume waits for concurrency")
+    const completedWhileSuspended = await completeTask(manager, adopted)
+
+    // then
+    expect(completedWhileSuspended).toBe(false)
+    expect(adopted.status).toBe("running")
+    acquire.release()
+    const resumed = await resumeResult
+    expect(resumed).toBe(adopted)
+    expect(await completeTask(manager, adopted)).toBe(true)
   })
 
   test("#given an existing orphan without agent output omitted from the status registry #when resume is requested #then it refuses with transcript guidance", async () => {

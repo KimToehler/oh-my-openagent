@@ -567,3 +567,131 @@ $ tsgo --noEmit -p script/tsconfig.json
 $ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/memory-core/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json && tsgo --noEmit -p packages/omo-native/tsconfig.json
 ```
 Exit code: 0
+
+## RW3 BLOCKER FIX (poller race on adopted task during queued acquire)
+
+### RED
+Command: `bun test packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts`
+```text
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:
+209 |     const adopted = [...getTasks(manager).values()][0]
+210 |     if (!adopted) throw new Error("Expected adopted task while resume waits for concurrency")
+211 |     const completedWhileSuspended = await completeTask(manager, adopted)
+212 |
+213 |     // then
+214 |     expect(completedWhileSuspended).toBe(false)
+                                          ^
+error: expect(received).toBe(expected)
+
+Expected: false
+Received: true
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:214:37)
+(fail) BackgroundManager resume adopt-on-miss > #given orphan adoption suspended on concurrency acquire #when completion races #then claim blocks completion until resume starts and is then released [1.50ms]
+
+ 9 pass
+ 1 fail
+ 28 expect() calls
+Ran 10 tests across 1 file. [77.00ms]
+```
+Exit code: 1
+
+### GREEN and successful claim release
+Command: `bun test packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts`
+```text
+bun test v1.4.0 (1381054db)
+
+ 10 pass
+ 0 fail
+ 31 expect() calls
+Ran 10 tests across 1 file. [78.00ms]
+```
+Exit code: 0
+
+The race test first calls `tryCompleteTask` while `concurrencyManager.acquire` is suspended and expects `false`. It then resolves acquire, awaits resume, calls `tryCompleteTask` again, and expects `true`. That second successful completion proves the success-path claim release.
+
+### Claim placement and release ordering
+Claim is taken immediately after `adoptRunningSession` returns and assigns `adoptedTask`. Taking it before that call would claim an ID that does not yet exist and would require duplicating adoption internals or predicting identity. Taking it after return closes the first caller-controlled await window: adoption itself is synchronous, and the claim is set before later validation and `concurrencyManager.acquire`.
+
+After claim, the no-session-ID throw is the only throw before the acquire try/catch, but adopted tasks are constructed with the caller-provided non-empty session ID, so that invariant cannot fail for this path. The acquire rejection catch deletes the claim before adoption rollback removes task/session/descendant state and updates the parent marker. Success deletes the claim after prompt dispatch setup and before returning. Dispatch failures occur asynchronously after success release and use normal resume-error cleanup, so they must not retain the reconciliation claim.
+
+### Background-agent suite
+Command: `bun test packages/omo-opencode/src/features/background-agent`
+```text
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:
+449 |
+450 |       //#when
+451 |       await manager["pollRunningTasks"]()
+452 |
+453 |       //#then
+454 |       expect(task.status).toBe("running")
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: "running"
+Received: "cancelled"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:454:27)
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when session remains active #then keeps task running [0.97ms]
+467 |
+468 |       //#when
+469 |       await manager["pollRunningTasks"]()
+470 |
+471 |       //#then
+472 |       expect(task.status).toBe("running")
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: "running"
+Received: "error"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:472:27)
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when valid output is absent #then keeps task running [0.51ms]
+486 |
+487 |       //#when
+488 |       await manager["pollRunningTasks"]()
+489 |
+490 |       //#then
+491 |       expect(task.status).toBe("running")
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: "running"
+Received: "error"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:491:27)
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when first observation is inside grace window #then stamps and waits [0.35ms]
+
+packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts:
+186 |       await drainAsyncTimerWork()
+187 |     }
+188 |
+189 |     // then
+190 |     expect(promptAsyncCalls).toHaveLength(2)
+191 |     expect(latestWake.coalesceRequeueCount).toBeLessThanOrEqual(MAX_COALESCE_REQUEUE_ATTEMPTS)
+                                                  ^
+error: Expected and actual values must be numbers or bigints
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts:191:45)
+(fail) ParentWakePendingQueue scheduleFlush > #given an existing default timer and an already-delivered wake #when real queue cadence drives coalesce retries #then the wake reaches a second real dispatch before the cap [1.19ms]
+
+ 900 pass
+ 4 fail
+ 2369 expect() calls
+Ran 904 tests across 80 files. [31.33s]
+```
+Exit code: 1
+
+Exactly four permitted pre-existing failures: three idle-output cases in `manager.polling.test.ts`, plus numeric matcher failure in `parent-wake-pending-queue.test.ts`.
+
+### Typecheck
+Command: `bun run typecheck`
+```text
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/memory-core/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json && tsgo --noEmit -p packages/omo-native/tsconfig.json
+```
+Exit code: 0
