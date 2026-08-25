@@ -437,3 +437,133 @@ ROLLBACK REASONING
 
 LSP DIAGNOSTICS
 Unavailable in harness: `Request initialize failed with message: Could not find a valid TypeScript installation. Please ensure that the "typescript" dependency is installed in the workspace or that a valid `tsserver.path` is specified. Exiting.` Repository `bun run typecheck` completed with EXIT_CODE=0.
+
+
+## RW1 BLOCKER FIX (continuation marker leak on adoption rollback)
+
+### RED: adopted path leaks active marker
+Command: `bun test packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts`
+Marker observation from failing assertion: `sources["background-task"].state = "active"`
+```text
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:
+208 |     expect(getRootDescendantCount(manager, "current-parent")).toBe(beforeCount)
+209 |     expect(getTasks(manager).size).toBe(0)
+210 |     expect(subagentSessions.has("child-session")).toBe(false)
+211 |     expect(getSessionAgent("child-session")).toBeUndefined()
+212 |     expect(promptAsync).not.toHaveBeenCalled()
+213 |     expect(readContinuationMarker(managerDirectories.at(-1) ?? "", "current-parent")?.sources["background-task"]?.state).not.toBe("active")
+                                                                                                                                   ^
+error: expect(received).not.toBe(expected)
+
+Expected: not "active"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts:213:126)
+(fail) BackgroundManager resume adopt-on-miss > #given idle orphan adoption followed by concurrency acquire failure #when resume rejects #then adoption and descendant registration roll back [0.84ms]
+
+ 8 pass
+ 1 fail
+ 26 expect() calls
+Ran 9 tests across 1 file. [82.00ms]
+```
+
+### POSITIVE CONTROL: known-task path does not leak
+The adjacent known-task test passed in both runs. Marker file result: `NO-MARKER-FILE`.
+Decisive GREEN suite output includes all 9 tests, including control:
+```text
+bun test v1.4.0 (1381054db)
+
+ 9 pass
+ 0 fail
+ 26 expect() calls
+Ran 9 tests across 1 file. [86.00ms]
+```
+
+### GREEN: adopted path marker no longer active
+Command: `bun test packages/omo-opencode/src/features/background-agent/manager.resume-adopt.test.ts`
+Marker after rollback: `sources["background-task"].state = "idle"`
+```text
+bun test v1.4.0 (1381054db)
+
+ 9 pass
+ 0 fail
+ 26 expect() calls
+Ran 9 tests across 1 file. [86.00ms]
+```
+
+### Background-agent suite: exactly four known failures
+Command: `bun test packages/omo-opencode/src/features/background-agent`
+```text
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:
+449 | 
+450 |       //#when
+451 |       await manager["pollRunningTasks"]()
+452 | 
+453 |       //#then
+454 |       expect(task.status).toBe("running")
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: "running"
+Received: "cancelled"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:454:27)
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when session remains active #then keeps task running [0.90ms]
+467 | 
+468 |       //#when
+469 |       await manager["pollRunningTasks"]()
+470 | 
+471 |       //#then
+472 |       expect(task.status).toBe("running")
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: "running"
+Received: "error"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:472:27)
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when valid output is absent #then keeps task running [0.69ms]
+486 | 
+487 |       //#when
+488 |       await manager["pollRunningTasks"]()
+489 | 
+490 |       //#then
+491 |       expect(task.status).toBe("running")
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: "running"
+Received: "error"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:491:27)
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when first observation is inside grace window #then stamps and waits [0.58ms]
+
+packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts:
+186 |       await drainAsyncTimerWork()
+187 |     }
+188 | 
+189 |     // then
+190 |     expect(promptAsyncCalls).toHaveLength(2)
+191 |     expect(latestWake.coalesceRequeueCount).toBeLessThanOrEqual(MAX_COALESCE_REQUEUE_ATTEMPTS)
+                                                  ^
+error: Expected and actual values must be numbers or bigints
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts:191:45)
+(fail) ParentWakePendingQueue scheduleFlush > #given an existing default timer and an already-delivered wake #when real queue cadence drives coalesce retries #then the wake reaches a second real dispatch before the cap [1.06ms]
+
+ 899 pass
+ 4 fail
+ 2364 expect() calls
+Ran 903 tests across 80 files. [31.30s]
+```
+
+### Typecheck
+Command: `bun run typecheck`
+```text
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/ast-grep-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/memory-core/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json && tsgo --noEmit -p packages/omo-native/tsconfig.json
+```
+Exit code: 0

@@ -1491,6 +1491,7 @@ The fallback retry session is now created and can be inspected directly.
         subagentSessions.delete(input.sessionId)
         this.unregisterRootDescendant(input.parentSessionId)
         this.removeTask(adoptedTask)
+        this.updateBackgroundTaskMarker(input.parentSessionId)
       }
       throw error
     }

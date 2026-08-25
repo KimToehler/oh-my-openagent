@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test"
+import { rmSync } from "node:fs"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { resetLiveServerRouteForTesting } from "../../shared/live-server-route"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../shared/prompt-async-gate"
@@ -7,10 +8,12 @@ import {
   getSessionAgent,
   subagentSessions,
 } from "../claude-code-session-state"
+import { readContinuationMarker } from "../run-continuation-state"
 import { BackgroundManager } from "./manager"
 import type { AdoptRunningSessionInput, BackgroundTask } from "./types"
 
 const managers: BackgroundManager[] = []
+const managerDirectories: string[] = []
 
 function createManager(hasOutput = false): { readonly manager: BackgroundManager; readonly promptAsync: ReturnType<typeof mock> } {
   const promptAsync = mock(async () => ({ data: undefined }))
@@ -39,6 +42,7 @@ function createManager(hasOutput = false): { readonly manager: BackgroundManager
     },
   })
   managers.push(manager)
+  managerDirectories.push(directory)
   return { manager, promptAsync }
 }
 
@@ -92,6 +96,10 @@ async function flushResumeDispatch(): Promise<void> {
 
 afterEach(() => {
   while (managers.length > 0) managers.pop()?.shutdown()
+  while (managerDirectories.length > 0) {
+    const directory = managerDirectories.pop()
+    if (directory) rmSync(directory, { recursive: true, force: true })
+  }
   releaseAllPromptAsyncReservationsForTesting()
   resetLiveServerRouteForTesting()
   resetClaudeCodeSessionState()
@@ -202,6 +210,31 @@ describe("BackgroundManager resume adopt-on-miss", () => {
     expect(subagentSessions.has("child-session")).toBe(false)
     expect(getSessionAgent("child-session")).toBeUndefined()
     expect(promptAsync).not.toHaveBeenCalled()
+    expect(readContinuationMarker(managerDirectories.at(-1) ?? "", "current-parent")?.sources["background-task"]?.state).not.toBe("active")
+  })
+
+  test("#given a known task followed by concurrency acquire failure #when resume rejects #then no active continuation marker is written", async () => {
+    // given
+    const { manager } = createManager(true)
+    const knownTask: BackgroundTask = {
+      id: "known-task",
+      sessionId: "child-session",
+      parentSessionId: "current-parent",
+      parentMessageId: "current-message",
+      description: "known task",
+      prompt: "original prompt",
+      agent: "continue",
+      status: "completed",
+    }
+    getTasks(manager).set(knownTask.id, knownTask)
+    failConcurrencyAcquire(manager)
+
+    // when
+    const result = resume(manager)
+
+    // then
+    await expect(result).rejects.toThrow("forced acquire failure")
+    expect(readContinuationMarker(managerDirectories.at(-1) ?? "", "current-parent")?.sources["background-task"]?.state).not.toBe("active")
   })
 
   test("#given nested-parent terminal adoption #when resumed task completes #then root descendant registers and unregisters exactly once", async () => {
