@@ -335,4 +335,20 @@ describe("BackgroundManager resume adopt-on-miss", () => {
     expect(unregister).toHaveBeenCalledTimes(1)
     expect(unregister).toHaveBeenCalledWith("nested-parent")
   })
+
+  test("#given a task id identical to the parent session #when resume is requested #then it refuses without adopting the parent as its own subagent", async () => {
+    // given
+    const { manager, promptAsync } = createManager(completedTranscript)
+    stubMissChecks(manager, true, "terminal")
+
+    // when
+    const result = resume(manager, "current-parent", "current-parent")
+
+    // then
+    await expect(result).rejects.toThrow("cannot resume itself")
+    expect(promptAsync).not.toHaveBeenCalled()
+    expect(getTasks(manager).size).toBe(0)
+    expect(subagentSessions.has("current-parent")).toBe(false)
+    expect(getSessionAgent("current-parent")).toBeUndefined()
+  })
 })

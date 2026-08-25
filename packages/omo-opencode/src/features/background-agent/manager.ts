@@ -1396,6 +1396,12 @@ The fallback retry session is now created and can be inspected directly.
     let existingTask = this.findBySession(input.sessionId)
     let adoptedTask: BackgroundTask | undefined
     if (!existingTask) {
+      if (input.sessionId === input.parentSessionId) {
+        throw new Error(
+          `Session ${input.sessionId} cannot resume itself. ` +
+          "The task_id must identify a background child session, not the session issuing the request.",
+        )
+      }
       const sessionExists = await this.verifySessionExists(input.sessionId)
       if (!sessionExists) {
         throw new Error(
