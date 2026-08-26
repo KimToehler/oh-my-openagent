@@ -2111,3 +2111,175 @@ means "still running". The child *session* survives the park, so
 one to reuse. The probe worth pinning first is the cheapest: assert the `shouldReply` value
 of the wake queued by `notifyBlockedTask` — it is `false` today, and that is the mechanical
 root cause.
+
+## 2026-08-26 — `ctx_read` v1 request shape loops on an incompatible empty `paths` field
+
+**Severity:** costly
+**Area:** tools
+**Observed in:** `~/git/onara`, parent session `opencode://ses_fc1bb1a48ffeH59hmVy9454tq4`; child `opencode://ses_fc1b79bf4ffeJKLMFp60fIHmg1`.
+
+**What happened:** a worker retried the same `ctx_read(engine_interface="v1")` request after
+lean-ctx rejected it. The payload had a valid single `path` but also carried `paths: []`, so
+it was not a single-path read under the v1 contract. The same failed read was retried several
+times before the worker finally removed `engine_interface`.
+
+**Evidence:**
+```
+engine_interface="v1" supports only single-path ctx_read
+```
+
+First failing part: `opencode://ses_fc1b79bf4ffeJKLMFp60fIHmg1#prt_03e48dd03001UWAxMzGNTkoDtF`.
+Parent receipt: `opencode://ses_fc1bb1a48ffeH59hmVy9454tq4#prt_03e65e04c001yvNZrpvsH7KYDJ`.
+
+**Root cause / hypothesis:** v1 validates the full request shape, including empty optional
+fields. The model/tool adapter had no recovery rule saying "after this exact rejection, omit
+`engine_interface` and `paths`, or use plain `ctx_read`/shell".
+
+**Workaround:** omit `engine_interface="v1"` unless issuing a strict single-path request;
+otherwise use ordinary `ctx_read` or a targeted shell read.
+
+**Fix status:** unfixed — needs request normalization or an explicit error-recovery hint.
+
+## 2026-08-26 — Foreground timeout hid a failing detekt pre-commit gate
+
+**Severity:** costly
+**Area:** tools
+**Observed in:** `~/git/onara`, parent session `opencode://ses_fc1bb1a48ffeH59hmVy9454tq4`; child `opencode://ses_fc1b6b923ffe85o1mBslxEfb4U`.
+
+**What happened:** a commit pre-hook ran detekt. The foreground call reported a timeout, so
+three reports framed the state as "commit timed out, state unknown". Direct detached log
+capture later showed a real quality-gate failure, not a timeout.
+
+**Evidence:**
+```
+MCP error -32001: Request timed out
+Analysis failed with 34 issues.
+BUILD FAILED in 1m 23s
+EXIT:1
+```
+
+Timeout: `opencode://ses_fc1bb1a48ffeH59hmVy9454tq4#prt_03e8dcbcd001f76TMdTUcFgtAr`.
+Diagnosis: `opencode://ses_fc1bb1a48ffeH59hmVy9454tq4#prt_03e91dc92001qJYq0ZQjs5Chd7`.
+
+**Root cause / hypothesis:** the foreground cap terminated observation before the pre-hook
+printed its terminal result. The harness exposed timeout without enough context to distinguish
+"still running" from "finished unsuccessfully".
+
+**Workaround:** after a timeout, inspect `git log`, `git status`, and any redirected hook log;
+for long hooks use supported background-shell polling and verify the resulting XML/report on
+disk.
+
+**Fix status:** worked around. A terminal-status probe or direct capture of trailing tool
+output would make the failure legible.
+
+## 2026-08-26 — Detached shell completion and task completion have incompatible wake contracts
+
+**Severity:** costly
+**Area:** background tasks
+**Observed in:** `~/git/onara`, parent session `opencode://ses_fc1bb1a48ffeH59hmVy9454tq4`.
+
+**What happened:** a detached `ctx_shell` commit job was treated like a background `task`.
+The task path pushes a completion reminder; the shell path is pull-only. The shell completed,
+but a lane later sat idle with reformatting on disk and no process alive until the parent
+inspected `git log`, `git status`, and `pgrep` by hand.
+
+**Evidence:**
+```
+ctx_shell(run_in_background=true) does not notify on completion
+no <system-reminder> will ever arrive for it
+```
+
+Start: `opencode://ses_fc1bb1a48ffeH59hmVy9454tq4#prt_03e8edafa001onlHOEQHMOFhKu`.
+Harness warning: `#prt_03e91fac20018ds0HEAYr9rUFY`.
+Silent-lane discovery: `#prt_03e9ab573001E0KPE1pyYlUsnG`.
+
+**Root cause:** documented lean-ctx behaviour; the failure is a predictable contract mix-up
+between identically named `run_in_background=true` options.
+
+**Workaround:** foreground commands expected under the cap; use `task` for delegable long
+work; when detached `ctx_shell` is necessary, poll `background_action="status"` until
+terminal and verify disk effects.
+
+**Fix status:** docs-gap. Existing warnings are correct but need stronger request-level
+routing or shape-specific affordances.
+
+## 2026-08-26 — Prompted sentinel-loop workaround conflicts with active shell guidance
+
+**Severity:** costly
+**Area:** rules injection
+**Observed in:** `~/git/onara`, parent session `opencode://ses_fc1bb1a48ffeH59hmVy9454tq4`; child `opencode://ses_fc12f80a7ffenWqJHX5Bp2wzKh`.
+
+**What happened:** execution prompts prescribed a hand-rolled detached shell wrapper:
+`(cmd > /tmp/x.log; echo EXIT:$? >> /tmp/x.log) &` plus a `for`/`sleep` sentinel loop. The
+worker had an active developer rule forbidding hand-rolled sentinel wrappers, so it blocked
+before capturing its required RED test.
+
+**Evidence:**
+```
+Gradle RED verification exceeded foreground cap and user-mandated detached bounded-poll workflow conflicts with active developer rule forbidding hand-rolled sentinel wrappers
+```
+
+Blocked receipt: `opencode://ses_fc1bb1a48ffeH59hmVy9454tq4#prt_03ed74db0002j3EaTnLEQIGjWP`.
+Resolution: `#prt_03ed7f3aa001731jrJ0dHIURYQ`.
+
+**Root cause:** the parent specified an implementation mechanism rather than the invariant:
+run long work to a terminal state, then verify its on-disk effect. The rule hierarchy offered
+two incompatible mechanisms.
+
+**Workaround:** specify the contract, not a shell incantation. Prefer foreground for short
+Gradle selectors; for truly long work use supported `ctx_shell` background polling and XML /
+report verification.
+
+**Fix status:** worked around. Prompt templates should avoid prescribing unsupported sentinel
+wrappers.
+
+## 2026-08-26 — File-disjoint lanes can still starve each other through Gradle capacity
+
+**Severity:** costly
+**Area:** subagents
+**Observed in:** `~/git/onara`, parent session `opencode://ses_fc1bb1a48ffeH59hmVy9454tq4`.
+
+**What happened:** seven source-disjoint worktree lanes were dispatched together. Each ran
+Gradle with a large daemon heap against shared caches. Three lanes stalled at
+`:compileTestKotlin`; one deleted its uncommitted test to restore a clean tree, losing work.
+
+**Evidence:**
+```
+7 concurrent Gradle builds contending on the same daemon/lock
+7 concurrent Gradle daemons at -Xmx4g each exhausted memory
+```
+
+Diagnosis: `opencode://ses_fc1bb1a48ffeH59hmVy9454tq4#prt_03ee5b012001x0q5Oo1vf939xO`.
+Confirmation: `#prt_03ee5fc1600102O5SfMiIw5R2F`.
+Impact: `#prt_03ee6f3b4001wfi8efJNqoTEic`.
+
+**Root cause:** parallel dispatch gate only considered declared file overlap. It had no
+resource-capacity dimension for shared Gradle daemons, memory, or caches.
+
+**Workaround:** serialize or cap build-heavy lanes; a lane blocked on infrastructure must
+keep its dirty worktree or commit its scoped WIP rather than delete work for cleanliness.
+
+**Fix status:** unfixed — scheduler/concurrency policy needs a resource-class limit in
+addition to file-overlap safety.
+
+**Update (2026-08-26, live source trace):** The capture rule was not disabled or denied in
+the new Onara session. `~/.omo/rules/harness-findings.md:1-5` has a valid `**/*` global
+match; user-global discovery explicitly scans `~/.omo/rules`
+(`packages/rules-engine/src/constants.ts:14,29`, `finder.ts:25-51,124-148`); no filename or
+content denylist applies; and the rule was recorded in child-session cache
+`~/.local/share/opencode/storage/rules-injector/ses_fc0f6f566ffedn3RyfkfvsOzHO.json` under
+`/Users/tim/.omo/rules/harness-findings.md`.
+
+The surprise is delivery, not discovery. Rules injection does **not** add a durable
+session/system prompt: it runs only after a tracked native read/write/edit/multiedit yields
+path metadata (`packages/omo-opencode/src/hooks/rules-injector/hook.ts:37,69-79`), then
+appends the banner into that particular tool result (`injection-processor.ts:115-188`,
+`injection-output.ts:7-24`). Real-path/content-hash dedupe and transcript hydration suppress
+later replay (`injection-processor.ts:125-168`, `transcript-hydration.ts:46-56,76-106,135-170`).
+Consequently a rule can have injected successfully earlier yet be absent from the agent's
+visible working context when a later harness incident occurs. The current parent transcript
+is `opencode://ses_fc1bb1a48ffeH59hmVy9454tq4`; the cache evidence above is from its child.
+
+**Fix status (2026-08-26):** discovery works; durable recall remains a docs/design gap. A
+finding-capture rule needs an explicit re-surfacing trigger at a natural incident boundary,
+or must be carried in durable session instructions rather than one-shot tool output.
