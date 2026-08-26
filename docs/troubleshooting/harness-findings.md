@@ -1906,6 +1906,112 @@ packages/omo-opencode/src/features/background-agent/manager.ts:1713
 
 ---
 
+## 2026-08-26 — A lane that yields mid-task reports as `completed`; nothing checks for a dirty tree
+
+**Severity:** costly
+**Area:** background tasks
+**Observed in:** `~/git/onara`, orchestrating `.omo/plans/composed-days-modality-unification.md`
+
+**What happened:** background lane `bg_d601cd11` (`category="deep"`, fixing two merge-blocking
+defects) stopped mid-task and reported through the **completion** path. Its own final message
+said:
+
+> "Work incomplete. Stop point after F1 green and partial F2 implementation; no commits created."
+
+Five modified files sat in the worktree with **zero commits**. The first fix was complete and
+proven (RED `expected: <false> but was: <true>`, then `BUILD SUCCESSFUL`, XML at 11:35:16) —
+all of it uncommitted, and all of it lost if that worktree were disturbed.
+
+The parent did not catch it. The **user** did:
+
+> "check the output of the agents. i think they may have stalled"
+
+**Why the existing entries do not cover this** — four are adjacent, each different:
+
+| Entry | Covers | Why today differs |
+|---|---|---|
+| 2026-08-17 stale-cancellation misread | agent converts inactivity timer into a budget, then **parks** via `report_blocked` | today it never parked; it returned a normal completion |
+| 2026-08-17 dead task reports `running` | child **dead**, status frozen | child was **alive and correct**, it chose to stop |
+| 2026-08-24 `formatTaskResult` discards transcript | session **errors**, transcript dropped | session did **not** error; it reported cleanly |
+| 2026-08-25 invisible park | a **correctly-used** park whose wake is never delivered | no park was attempted at all |
+
+Note the 2026-08-17 corrective wording (`AGENTS.md:124`) was present and **still did not
+prevent this**. That fix inoculates the *block* path — "out of time is never a valid block
+reason". This agent took the *completion* path instead, where no equivalent statement exists.
+
+**Evidence:** the notification rendered as success-shaped:
+```
+- `bg_d601cd11`: Fix F1+F2 blockers | session: `ses_...` - completed with 2 unfinished todos
+```
+Meanwhile, on disk:
+```
+$ git log --oneline 0c96e66bc..HEAD     # → empty
+$ git status --porcelain
+ M backend_kt/.../program/ProgramPlanPersistence.kt
+ M backend_kt/.../services/TrainingService.kt
+ M backend_kt/.../integration/StackedCompositionLegsIT.kt
+ M backend_kt/.../services/TrainingServiceTest.kt
+ M docs/superpowers/evidence/composed-days-modality-unification/task-7.md
+```
+`background_output` compounded it: `Status: running`, plus a note that the child "was not
+present in the session registry for the last 20 polls" — so the status line alone was
+ambiguous. Reaching the truth took `git status`, `find -newermt`, log greps, and finally
+`full_session` to surface the agent's own admission.
+
+**Root cause:** two independent gaps, both read from `dev` source, not hypothesis.
+
+1. **The completion summary cannot distinguish "finished" from "gave up".**
+   `features/background-agent/background-task-notification-template.ts:57-66` builds the
+   summary purely from `status` and `unfinishedTodoCount`:
+   ```ts
+   const statusSuffix = task.status === "completed"
+     ? task.unfinishedTodoCount && task.unfinishedTodoCount > 0
+       ? ` - completed with ${task.unfinishedTodoCount} unfinished todo${...}`
+       : ""
+     : ` [${task.status.toUpperCase()}]${task.error ? ` - ${task.error}` : ""}`
+   ```
+   A lane that finished cleanly and one that abandoned five modified files both render as
+   `completed`. "N unfinished todos" reads as a tidy-up note, not as *work was abandoned
+   uncommitted*.
+
+2. **No dirty-tree check exists anywhere in the feature.**
+   ```
+   $ rg -n "git status|porcelain|isDirty|uncommitted" \
+       packages/omo-opencode/src/features/background-agent/ | grep -v test
+   (no matches)
+   ```
+   Nothing correlates a lane's terminal state with the worktree it was working in, so
+   uncommitted work is invisible to the parent by construction.
+
+Additionally, `rg` finds no "out of time" / commit-before-yield wording in
+`features/background-agent/spawner.ts` or `tools/report-blocked/`, so the corrective clause
+that exists for parking is never restated on the path this agent actually took.
+
+**Workaround:** never trust a `completed` summary on a lane that was doing implementation
+work. Check `git log <base>..HEAD` and `git status --porcelain` in the lane's worktree
+before believing it. On finding this shape, `background_cancel(taskId=…)` then
+`task(task_id="ses_…")` to resume **the same session** — full context is preserved and the
+partial work is still on disk. Restarting fresh discards it.
+
+**Proposed fixes** (in order of cost):
+
+1. Have the completion path run `git status --porcelain` in the lane's working directory and
+   prefix the summary with a loud marker when the tree is dirty **and** the lane produced zero
+   commits — e.g. `⚠️ UNCOMMITTED: 5 modified files, 0 commits`. Converts a silent stall into a
+   visible one. This is the cheap 80% and needs no behavioural change.
+2. Extend the 2026-08-17 corrective wording to name the completion path explicitly: a lane must
+   not *yield* with uncommitted work, not merely must not *park* over it. Current text at
+   `AGENTS.md:124` only addresses blocking.
+3. Instruct lanes to commit incrementally rather than saving commits for the end. A proven fix
+   held hostage to an unproven one is the actual failure here — F1 was complete and verified,
+   and was still at risk because F2 was not.
+
+**No existing test** covers "a lane reports completed while its worktree is dirty". The
+probe worth pinning first is the cheapest: assert that the summary line for a `completed`
+task with uncommitted changes is distinguishable from one with a clean tree.
+
+**Fix status:** unfixed.
+
 ## 2026-08-25 — A `report_blocked` park is invisible to a *busy* parent, which then reports the dead lane as "in flight"
 
 **Severity:** blocker
