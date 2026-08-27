@@ -41,6 +41,16 @@ export type CreateRuleInjectionProcessorDeps = RuleInjectionProcessorDeps & {
 	isDuplicateByContentHash?: typeof isDuplicateByContentHash;
 	saveInjectedRules?: typeof saveInjectedRules;
 	transcriptHydration?: TranscriptHydrationHook;
+	onRuleSuppressed?: (input: {
+		sessionID: string;
+		realPath: string;
+		relativePath: string;
+		matchReason: string;
+		body: string;
+		description?: string;
+	}) => void;
+	onRuleInjected?: (sessionID: string, realPath: string) => void;
+	shouldResurfaceRule?: (sessionID: string, realPath: string) => boolean;
 };
 
 export function createRuleInjectionProcessor(
@@ -66,6 +76,9 @@ export function createRuleInjectionProcessor(
 			isDuplicateByContentHashImpl = isDuplicateByContentHash,
 		saveInjectedRules: saveInjectedRulesImpl = saveInjectedRules,
 		transcriptHydration,
+		onRuleSuppressed,
+		onRuleInjected,
+		shouldResurfaceRule,
 	} = deps;
 
 	const getParsedRule = createParsedRuleReader({
@@ -123,6 +136,43 @@ export function createRuleInjectionProcessor(
 		let dirty = false;
 
 		for (const candidate of ruleFileCandidates) {
+			const isDuplicateByRealPath = isDuplicateByRealPathImpl(
+				candidate.realPath,
+				cache.realPaths,
+			);
+			if (
+				isDuplicateByRealPath &&
+				shouldResurfaceRule?.(sessionID, candidate.realPath)
+			) {
+				try {
+					const { metadata, body, statFingerprint } = getParsedRule(
+						candidate.path,
+						candidate.realPath,
+					);
+					const matchReason = getRuleMatchReason({
+						matchDecisionCache,
+						isSingleFile: candidate.isSingleFile,
+						projectRoot,
+						resolved,
+						realPath: candidate.realPath,
+						statFingerprint,
+						metadata,
+						shouldApplyRuleImpl,
+					});
+					if (matchReason !== null) {
+						onRuleSuppressed?.({
+							sessionID,
+							realPath: candidate.realPath,
+							relativePath: normalizeRuleRelativePath(candidate.relativePath),
+							matchReason,
+							body,
+							description: metadata.description,
+						});
+					}
+				} catch (error) {
+					if (!(error instanceof Error)) throw error;
+				}
+			}
 			if (isDuplicateByRealPathImpl(candidate.realPath, cache.realPaths))
 				continue;
 
@@ -144,12 +194,29 @@ export function createRuleInjectionProcessor(
 				if (matchReason === null) continue;
 
 				const contentHash = createContentHashImpl(body);
-				if (isDuplicateByContentHashImpl(contentHash, cache.contentHashes))
+				if (isDuplicateByContentHashImpl(contentHash, cache.contentHashes)) {
+					onRuleSuppressed?.({
+						sessionID,
+						realPath: candidate.realPath,
+						relativePath: normalizeRuleRelativePath(candidate.relativePath),
+						matchReason,
+						body,
+						description: metadata.description,
+					});
 					continue;
+				}
 
 				const relativePath = normalizeRuleRelativePath(candidate.relativePath);
 
 				if (normalizedTranscriptRelativePaths.has(relativePath)) {
+					onRuleSuppressed?.({
+						sessionID,
+						realPath: candidate.realPath,
+						relativePath,
+						matchReason,
+						body,
+						description: metadata.description,
+					});
 					cache.realPaths.add(candidate.realPath);
 					cache.contentHashes.add(contentHash);
 					dirty = true;
@@ -163,6 +230,7 @@ export function createRuleInjectionProcessor(
 					distance: candidate.distance,
 				});
 
+				onRuleInjected?.(sessionID, candidate.realPath);
 				cache.realPaths.add(candidate.realPath);
 				cache.contentHashes.add(contentHash);
 				dirty = true;
