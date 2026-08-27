@@ -2503,3 +2503,71 @@ attempt 3 (compact single-line array, em dashes and backticks removed from all p
 **Workaround:** the lesson content was written into `.omo/start-work/ledger.jsonl` and into this log instead. The operational rule it encoded was enforced directly by installing dependencies in every worktree.
 
 **Fix status:** unfixed
+
+## 2026-08-27 — An interrupted parent aborts its background lanes, but they keep reporting `running` until the 45-minute stale reaper
+
+**Severity:** costly
+**Area:** background tasks
+**Observed in:** oh-my-openagent, `/start-work` running two implementation lanes as background tasks
+
+**What happened:** The user interrupted the primary session turn. That abort propagated to both background lanes and killed them at 19:31:59 and 19:32:05. Neither ever resumed. But `background_output` kept reporting `Status: running` with a plausible `Last tool`, so when the user said "continue", the orchestrator checked task status, saw `running` on both, and reported both lanes healthy and still working. They had been dead for two hours. At 21:37 the 45-minute stale reaper finally fired and reported them as FINAL cancellations with "no activity for 45min", which is true but reads like a fresh hang rather than a two-hour-old abort.
+
+**Evidence:**
+```
+19:31:59.385 [unstable-agent-babysitter] Marked session cancelled {"sessionID":"ses_fbbb42581ffeE2FwjmiLssXnhN"}
+19:31:59.386 [background-agent] session.error received but session still alive, treating as transient: {"taskId":"bg_f7ae25cc","sessionId":"ses_fbbb42581ffeE2FwjmiLssXnhN","errorMessage":"Aborted"}
+
+19:32:05.389 [unstable-agent-babysitter] Marked session cancelled {"sessionID":"ses_fbbe30a9bffexHIqsUnb8N77qT"}
+19:32:05.390 [background-agent] session.error received but session still alive, treating as transient: {"taskId":"bg_34350d8c","sessionId":"ses_fbbe30a9bffexHIqsUnb8N77qT","errorMessage":"Aborted"}
+19:32:05.391 [atlas] session.error {"sessionID":"ses_fbbe30a9bffexHIqsUnb8N77qT","isAbort":true}
+```
+Status reported to the orchestrator roughly 1h40m AFTER those aborts, while the user was waiting:
+```
+| Task ID | `bg_f7ae25cc` |  | Status | **running** |  | Duration | 1h11m55s |  | Last tool | lean-ctx_ctx_shell |
+| Task ID | `bg_34350d8c` |  | Status | **running** |  | Duration | 1h13m23s |  | Last tool | lean-ctx_ctx_shell |
+```
+Last real disk activity, consistent with in-flight work draining and then silence, never with a live agent:
+```
+.worktrees/hf-top3-pr1/.omo/evidence/20260827-bg-completion-reason/  last write 19:50
+.worktrees/hf-top3-pr2  last commit e8a86869a                        19:51:23
+```
+
+**Root cause / hypothesis:** two components disagree about the same abort, one millisecond apart, and nothing reconciles them. `unstable-agent-babysitter` marks the session cancelled; the background-agent then inspects the same `session.error`, judges the session still alive, and classifies the abort as transient, so the task record stays `running`. The parent's abort is not treated as terminal for its children. The task then survives as a zombie until the unrelated `staleTimeoutMs` reaper (`background-task.ts:18`, default 2700000 ms) collects it. The "still alive" branch is presumably there to protect against transient provider errors, and a parent-initiated abort is being funnelled through it. That mechanism reading is a hypothesis; the log lines above and the timings are directly observed.
+
+**Why it is costly:** the reported status is not merely late, it is actively misleading, and it defeats the normal way an orchestrator checks liveness. The repo's own guidance is that a running child is alive and that you should poll rather than assume death, which is exactly the wrong move here. Roughly two hours of wall-clock across two lanes was lost, and a user question ("did those lanes go stale?") was needed before anyone looked at the log. Compounding it, seven duplicate `BACKGROUND TASK ANSWER ACCEPTED` reminders arrived for one already-dead task, which read like ongoing activity.
+
+**Workaround:** after ANY interruption of the primary session turn, treat every background lane as suspect regardless of its reported status. Verify liveness by effect, not by status line: check file mtimes in the lane's worktree, its commit times, and `grep` the plugin log (`$TMPDIR/oh-my-opencode.log`) for `isAbort` or "Marked session cancelled" against the lane's session id. Disk state survives the abort intact, so surviving work can be salvaged and the lane relaunched with narrowed scope rather than restarted.
+
+**Fix status:** unfixed
+
+## 2026-08-27 — A green test suite hid a feature that never fires on its common path, because the plan's example test only covered the rare branch
+
+**Severity:** costly
+**Area:** other
+**Observed in:** oh-my-openagent, PR 1 of `.omo/plans/2026-08-27-harness-findings-top3.md`, adding a completion-reason discriminator to background-task notifications
+
+**What happened:** A lane implemented the feature, added seven tests, and reached `916 pass, 0 fail`, up from a 909 baseline. The feature did not work. The reason qualifier was nested INSIDE the unfinished-todos branch of the notification template, so it rendered only when `unfinishedTodoCount > 0`. A cleanly completing background task, which is the common case and the case that motivates four of the five reason values, rendered no reason at all. The lane separately reported its live QA as blocked on agent-model resolution, but the QA could never have passed: it spawned one trivial lane that completed cleanly, so the marker it was asserting was structurally unreachable.
+
+**Evidence:** executing the real template against two fixtures, rather than reading it or trusting the suite:
+```
+CLEAN COMPLETION, completionReason "session-gone":
+  "- `task-a`: task A | session: `ses_x`"
+  reason rendered? -> false
+
+UNFINISHED TODOS, completionReason "todo-gate-expired":
+  "- `task-a`: task A | session: `ses_x` - completed with 3 unfinished todos, reason: todo-gate-expired"
+  reason rendered? -> true
+```
+The QA artifact agrees, and was the first clue:
+```
+.omo/evidence/20260827-bg-completion-reason/09-notification-lines.txt   0 bytes
+```
+
+**Root cause:** the work plan's own Test 6 example embedded the reason inside the unfinished-todos sentence:
+`expect(text).toContain("completed with 3 unfinished todos, reason: todo-gate-expired")`. Its Test 7 asserted the opposite case, that no qualifier renders when no reason is recorded. Between them the two tests never covered a clean completion WITH a reason, so an implementation that satisfied both literally could still fail the feature's main path. The lane implemented exactly what the plan specified.
+
+**Why it is costly, and the transferable lesson:** the plan was reviewed twice (Momus, Oracle) and revised three times, and this still got through, because review checked whether the tests were rigorous rather than whether they covered the common case. A test-first plan that supplies literal example assertions transfers its blind spots directly into the implementation, and a suite derived from those examples will be green over the gap. When a plan hands you exact assertion strings, check which cases they do NOT constrain before implementing. When verifying, run the feature on its ordinary input rather than only running the suite: a green suite plus an empty QA artifact is a contradiction, and the empty artifact is the one telling the truth.
+
+**Workaround:** add the missing case, a clean completion that renders its reason, and fix the template so the qualifier is not nested inside the unfinished-todos branch.
+
+**Fix status:** unfixed
