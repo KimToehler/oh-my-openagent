@@ -2443,3 +2443,63 @@ Two claims in this entry, verified separately.
 **Root cause:** only one of four tests in the block pinned `Date.now`; the other three compared historical fixture timestamps against real time.
 
 **Fix:** added one `withFixedNow(fixedNow, fn)` helper with `finally` restoration and ran all four cases through it. Expectations retain their todo-gate behavior; only clock source is deterministic.
+
+## 2026-08-27 — A fresh `git worktree` has no `node_modules`, so build, typecheck, and live QA all fail inside it
+
+**Severity:** costly
+**Area:** subagents
+**Observed in:** oh-my-openagent, `/start-work` executing `.omo/plans/2026-08-27-harness-findings-top3.md` across per-lane worktrees
+
+**What happened:** Three separate lanes working in per-task worktrees under `.worktrees/` each hit the same wall and each lost a turn to it. One reported `bun run typecheck` exit 2 and listed it as a risk in its DoneClaim; an independent reviewer then escalated it as a possible defect of the change under review. Two others reported BLOCKED when `bun run build` died, which in turn blocked the live QA that requires a fresh `dist/`. None of it was caused by the code being reviewed.
+
+**Evidence:**
+```
+packages/omo-senpi/src/components/memory/tools.ts(15,49): error TS2307: Cannot find module 'typebox' or its corresponding type declarations.
+packages/omo-senpi/src/components/memory/worker/entry-renderers.ts(24,33): error TS2307: Cannot find module '@earendil-works/pi-tui' or its corresponding type declarations.
+TYPECHECK_EXIT=2
+
+build:cli-node
+$ bun run script/build-cli-node.ts
+error: File not found ".worktrees/hf-top3-pr2/node_modules/jsonc-parser/lib/esm/main.js"
+build: FAILED: build:cli-node failed with exit code 1
+```
+```
+$ ls -d .worktrees/hf-top3-pr1/node_modules
+ls: .worktrees/hf-top3-pr1/node_modules: No such file or directory
+$ bun run typecheck        # in the MAIN checkout, same commit
+TYPECHECK_EXIT=0
+```
+
+**Root cause:** `node_modules/` is gitignored (`.gitignore:11`), and `git worktree add` only materializes tracked content, so a new worktree starts with no dependencies at all. This repo is a 30-package Bun workspace whose deps resolve from the main checkout's root `node_modules` plus per-package `node_modules` (for example `typebox` and `@earendil-works/pi-tui` live in `packages/omo-senpi/node_modules`). Every lane worktree therefore needs its own install before it can build, typecheck, or drive live QA. Same class as the already-logged `.omo/plans` worktree gap: worktree isolation is only as complete as the tracked tree.
+
+**Workaround:** `cd <worktree> && bun install` (616 packages, about 11s) immediately after `git worktree add`, before dispatching any lane into it. The first response was weaker and should not be repeated: the typecheck failure alone was diagnosed as a worktree artifact and routed around with a scoped `bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json`. That unblocked typecheck but left the underlying gap in place, and the build failure then resurfaced in two further lanes. Treat module-not-found inside a worktree as a missing-install signal, never as a defect of the change under review.
+
+**Follow-on trap:** once the install succeeds, `bun run build` regenerates nine committed bundle artifacts (`packages/omo-codex/plugin/components/codegraph/dist/{cli,serve}.js`, `packages/omo-codex/scripts/install-dist/install-local.mjs`, and six `packages/omo-senpi/plugin/extensions/*`). They show as modified in the lane's worktree despite the lane never touching them. A lane told to finish with an empty `git status --porcelain` will be tempted either to `git checkout` them, which fights the build, or to `git add -A`, which stages nine unrelated files into its commit. The contract must instead be an explicit allowlist of those known regenerated paths.
+
+**Fix status:** worked around
+
+## 2026-08-27 — `record_lesson` rejects a well-formed `globs` array and cannot write a lesson
+
+**Severity:** costly
+**Area:** tools
+**Observed in:** oh-my-openagent, attempting to persist a worktree lesson during `/start-work`
+
+**What happened:** Three consecutive `record_lesson` calls failed on valid input, so a durable lesson could not be written through the intended surface at all. The first failure named a different field than the later two, which suggests arguments are lost or mis-parsed before validation rather than a single bad field.
+
+**Evidence:**
+```
+attempt 1 (title, what_went_wrong, rule_for_next_time, globs: 3-entry array, citations: 3 entries)
+  -> undefined is not an object (evaluating 'value.replaceAll')
+
+attempt 2 (same, globs: ["packages/**/*.ts", "script/**/*.ts"], citations: 2 entries)
+  -> undefined is not an object (evaluating 'args.globs.map')
+
+attempt 3 (compact single-line array, em dashes and backticks removed from all prose)
+  -> undefined is not an object (evaluating 'args.globs.map')
+```
+
+**Root cause / hypothesis:** hypothesis, not confirmed. `args.globs` is `undefined` inside the tool despite a non-empty array being supplied, and attempt 1 failing on `value.replaceAll` points at a separate undefined string field. Both are consistent with the argument object arriving empty or partially deserialized, so the schema-declared required fields are never populated. Not reproduced against tool source; the three call shapes above are the only evidence.
+
+**Workaround:** the lesson content was written into `.omo/start-work/ledger.jsonl` and into this log instead. The operational rule it encoded was enforced directly by installing dependencies in every worktree.
+
+**Fix status:** unfixed
