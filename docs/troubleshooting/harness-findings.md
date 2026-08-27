@@ -2649,3 +2649,16 @@ Verified by effect in both cases that the adopted session never ran: no new comm
 **Workaround:** do not resume a session that has been aborted or stale-cancelled. Spawn a FRESH lane with a self-contained brief instead, and carry forward the surviving on-disk state (commits and evidence files) explicitly in the new prompt. Disk state survives both aborts and cancellations, so a fresh lane loses nothing but the conversation.
 
 **Fix status:** unfixed
+
+## 2026-08-27 — Blocked reply contract was unpinned and terminal parks expired without a parent-visible wake
+
+**Severity:** costly
+**Area:** background-agent notifications
+
+**Correction:** Earlier finding claimed a blocked wake never qualified for reply delivery. That reading became stale at `8f7f768ab`. `manager.ts` now computes `shouldReply` with `allComplete || isTaskFailure || isBlocked`; blocked wakes qualify. The former `blocked-notify.test.ts` guard was false because its sole task made `allComplete` true. Removing `|| isBlocked` kept that old test green.
+
+**Fix:** Repaired pin gives parent a second running sibling, proves `allComplete` false, and mutation proof fails when `|| isBlocked` is removed. Terminal blocked expiry now enqueues its cancelled notification before pending-parent cleanup, exposing `Blocked task expired unanswered` to the parent. No active-defer ceiling changed because forced replies into unsafe Electron-hosted environments retain crash risk from issue #4120.
+
+**Residuals:** Reply delivery still follows existing safety gating. This correction does not introduce a blocked-specific forced-dispatch route.
+
+**Fix status:** fixed
