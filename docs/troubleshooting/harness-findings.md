@@ -2582,3 +2582,34 @@ The QA artifact agrees, and was the first clue:
 **Root cause:** `background-task-notification-template.ts` made todo count and completion reason one nested suffix. A 916-pass feature suite hid this common-path defect because existing reason coverage used unfinished todos.
 
 **Fix:** render todo count and completion reason as independent completed-task suffixes. Added regression coverage for clean completion, unfinished todos plus reason, and missing reason. Live isolated HTTP-server QA recorded `reason: session-gone` in `[ALL BACKGROUND TASKS COMPLETE]`.
+
+## 2026-08-27 — A QA project under macOS `/tmp` silently disables the rules injector, because the resolved path loses its leading slash
+
+**Severity:** costly
+**Area:** rules injection
+**Observed in:** oh-my-openagent, sandboxed `opencode-qa` runs verifying a rules-injector change
+
+**What happened:** Four separate lanes, roughly two and a half hours in total, tried to observe the baseline `[Rule: ` marker in a sandboxed opencode session and never saw it once. Two of them concluded the feature was broken; a dedicated probe reported "baseline injection works on dev: no", which would have meant the QA harness could not verify this hook at all. The feature was fine the whole time. The QA fixture's own location was the defect.
+
+**Evidence:** parsed from the probe's captured tool part, not from a summary:
+```
+TITLE: 'private/tmp/rules-baseline-probe/dev-project/packages/omo-opencode/src/shared/prompt-async-gate.ts'
+META : {'preview': 'import { configureSharedSubunitLogger } ...'}
+```
+```
+$ ls -ld /tmp
+lrwxr-xr-x  1 root  wheel  11 ... /tmp -> private/tmp
+
+$ [ -e "private/tmp/rules-baseline-probe/dev-project/packages/omo-opencode/src/shared/prompt-async-gate.ts" ] && echo RESOLVES || echo "DOES NOT RESOLVE"
+DOES NOT RESOLVE (relative, no leading slash)
+```
+
+**Root cause:** two facts compound. First, the `read` tool's `metadata` carries only `preview`, with no `filePath`, so `getRuleInjectionFilePath()` (`hooks/rules-injector/output-path.ts`) falls through to `output.title`. Second, macOS `/tmp` is a **relative** symlink to `private/tmp`, so resolving a path under it yields `private/tmp/...` and drops the leading slash. The injector therefore receives a path that resolves from no working directory at all, `findProjectRoot` and `findRuleFiles` find nothing, and it correctly declines to inject. `/var/folders/...` sandbox paths are reached the same way, which is why an XDG sandbox exhibits it too.
+
+**Why it fooled every investigation:** the failure is completely silent and imitates a broken feature. The tool call succeeds, real file content comes back, the tool name `read` matches `TRACKED_TOOLS` exactly, the rule files exist, and their globs match the target. Every check a lane thinks to run is green except the marker itself. One lane reasonably hypothesized the hook was never invoked; another concluded the injector returns early at the hook boundary. Both were describing a symptom of the fixture path.
+
+**What broke the deadlock:** a contradiction that could not be argued away. The rules injector was visibly firing in the orchestrator's own session on every file read, and that repo lives under `/Users` with no symlink. "Works in production, fails in every sandbox" pointed at the fixture rather than the code, and parsing the probe's raw artifact rather than trusting its conclusion produced the title string above.
+
+**Workaround:** keep the QA PROJECT directory outside symlinked temp space, for example under `$HOME` or a real checkout under `/Users`. XDG isolation (`XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `$HOME` redirection) can stay in temp, since only the project path feeds rule discovery. Assert it before running: `python3 -c "import os;print(os.path.realpath(PROJECT))"` must not print a path starting with `private/`. More generally, any QA that exercises a path-dependent hook needs this check, and a fixture that silently produces a non-resolving path should be suspected before the feature is.
+
+**Fix status:** worked around
