@@ -8,8 +8,10 @@ import type { BackgroundTask } from "./types"
 
 type NotificationInternals = {
   readonly parentWakeNotifier: {
+    readonly getPendingParentWakes: () => Map<string, { readonly shouldReply: boolean }>
     readonly hasNotificationPreparation: (sessionID: string) => boolean
   }
+  readonly pendingByParent: Map<string, Set<string>>
   readonly tasks: Map<string, BackgroundTask>
 }
 
@@ -121,19 +123,41 @@ describe("BackgroundManager blocked task notification", () => {
     expect(wakeCount).toBe(1)
   })
 
-  test("#given a blocked wake #when notifyParentSession queues it #then the parent is asked to reply", async () => {
+  test("#given a blocked task with a running sibling #when notifyParentSession queues it #then the parent is asked to reply without all tasks complete", async () => {
     // given
     const manager = createManager()
     const task = createBlockedTask()
+    const sibling = createBlockedTask({
+      id: "running-sibling",
+      sessionId: "running-sibling-session",
+      blockedAt: undefined,
+      blockedReason: undefined,
+      error: undefined,
+    })
     const internals = addTask(manager, task)
+    internals.tasks.set(sibling.id, sibling)
+    internals.pendingByParent.set(task.parentSessionId, new Set([task.id, sibling.id]))
     Reflect.set(manager, "enableParentSessionNotifications", true)
     Reflect.set(manager, "isSessionActive", async () => true)
+    let allCompleteAtQueueTime: boolean | undefined
+    const queuePendingParentWake = internals.parentWakeNotifier.queuePendingParentWake
+    Reflect.set(internals.parentWakeNotifier, "queuePendingParentWake", (
+      parentSessionID: string,
+      notification: string,
+      promptContext: unknown,
+      shouldReply: boolean,
+    ) => {
+      allCompleteAtQueueTime = !internals.pendingByParent.has(parentSessionID)
+      queuePendingParentWake.call(internals.parentWakeNotifier, parentSessionID, notification, unsafeTestValue(promptContext), shouldReply)
+    })
 
     // when
     await Reflect.get(manager, "notifyParentSession").call(manager, task)
 
     // then
-    expect(internals.parentWakeNotifier.getPendingParentWakes().get(task.parentSessionId)?.shouldReply).toBe(true)
+    const pendingWake = internals.parentWakeNotifier.getPendingParentWakes().get(task.parentSessionId)
+    expect(pendingWake?.shouldReply).toBe(true)
+    expect(allCompleteAtQueueTime).toBe(false)
   })
 
   test("#given a notifying cancel #when cancelTask flips the task terminal #then notification preparation covers the terminal-to-wake window", async () => {
