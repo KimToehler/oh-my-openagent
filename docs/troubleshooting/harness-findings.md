@@ -2613,3 +2613,39 @@ DOES NOT RESOLVE (relative, no leading slash)
 **Workaround:** keep the QA PROJECT directory outside symlinked temp space, for example under `$HOME` or a real checkout under `/Users`. XDG isolation (`XDG_CONFIG_HOME`, `XDG_DATA_HOME`, `$HOME` redirection) can stay in temp, since only the project path feeds rule discovery. Assert it before running: `python3 -c "import os;print(os.path.realpath(PROJECT))"` must not print a path starting with `private/`. More generally, any QA that exercises a path-dependent hook needs this check, and a fixture that silently produces a non-resolving path should be suspected before the feature is.
 
 **Fix status:** worked around
+
+## 2026-08-27 — Resuming a dead background session adopts a nonexistent agent named `continue`, returning a live-looking task id that can never run
+
+**Severity:** costly
+**Area:** subagents
+**Observed in:** oh-my-openagent, `/start-work` resuming lanes whose sessions had been aborted or stale-cancelled
+
+**What happened:** Twice, calling `task(task_id="ses_...")` against a session whose agent was no longer alive did NOT fail fast. Both times it reported a successful-looking adoption, complete with "Agent continues with full previous context preserved", and returned a NEW background task id. Both times the task then died with `Agent "continue" not found`. An orchestrator that trusted the returned id would wait for a lane that had never started, and the harness reports the same wording for a healthy continuation, so the difference is invisible at the call site.
+
+**Evidence:**
+```
+task(task_id="ses_fbb40821fffeN8y2nslkBmeeTL", ...)
+  -> Background Task ID: bg_0e3f0221
+     Agent: continue
+     Status: interrupt
+     "This continuation adopted an orphaned server session using agent: continue.
+      It has no original model, no fallback chain, no category, and no loaded skill content."
+  -> [INTERRUPT] Agent "continue" not found. Make sure the agent is registered in your
+     opencode.json or provided by a plugin.
+```
+```
+task(task_id="ses_fbaea1948ffexIR9CBWzgKF2UN", ...)
+  -> Background Task ID: bg_128d9711
+     Agent: continue
+     Status: interrupt
+  -> [INTERRUPT] Agent "continue" not found.
+```
+Verified by effect in both cases that the adopted session never ran: no new commits and no file writes in the lane's worktree in the minutes following adoption.
+
+**Root cause / hypothesis:** hypothesis, not confirmed against source. The adoption path appears to substitute a literal agent named `continue` as a placeholder when the original session's agent cannot be recovered, and that name is not registered in this installation. The adoption message itself states the recovered session carries "no original model, no fallback chain, no category, and no loaded skill content", which is consistent with a placeholder that was never expected to be dispatched as a real agent. The mechanism was not traced in the plugin source; only the two observations above are direct.
+
+**Why it is costly:** it produces a plausible task id and an encouraging status line for work that cannot happen. Combined with the separate finding that aborted lanes keep reporting `running` until the 45-minute stale reaper, an orchestrator can be waiting on two different kinds of dead task while both look alive. The safe habit is the same in both cases: after any resume or any interruption, verify by effect, meaning worktree file mtimes and commit times, not by the returned status.
+
+**Workaround:** do not resume a session that has been aborted or stale-cancelled. Spawn a FRESH lane with a self-contained brief instead, and carry forward the surviving on-disk state (commits and evidence files) explicitly in the new prompt. Disk state survives both aborts and cancellations, so a fresh lane loses nothing but the conversation.
+
+**Fix status:** unfixed
