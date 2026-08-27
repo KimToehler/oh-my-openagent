@@ -41,6 +41,15 @@ export type CreateRuleInjectionProcessorDeps = RuleInjectionProcessorDeps & {
 	isDuplicateByContentHash?: typeof isDuplicateByContentHash;
 	saveInjectedRules?: typeof saveInjectedRules;
 	transcriptHydration?: TranscriptHydrationHook;
+	onRuleSuppressed?: (input: {
+		sessionID: string;
+		realPath: string;
+		relativePath: string;
+		matchReason: string;
+		body: string;
+		description?: string;
+	}) => void;
+	onRuleInjected?: (sessionID: string, realPath: string) => void;
 };
 
 export function createRuleInjectionProcessor(
@@ -66,6 +75,8 @@ export function createRuleInjectionProcessor(
 			isDuplicateByContentHashImpl = isDuplicateByContentHash,
 		saveInjectedRules: saveInjectedRulesImpl = saveInjectedRules,
 		transcriptHydration,
+		onRuleSuppressed,
+		onRuleInjected,
 	} = deps;
 
 	const getParsedRule = createParsedRuleReader({
@@ -144,12 +155,29 @@ export function createRuleInjectionProcessor(
 				if (matchReason === null) continue;
 
 				const contentHash = createContentHashImpl(body);
-				if (isDuplicateByContentHashImpl(contentHash, cache.contentHashes))
+				if (isDuplicateByContentHashImpl(contentHash, cache.contentHashes)) {
+					onRuleSuppressed?.({
+						sessionID,
+						realPath: candidate.realPath,
+						relativePath: normalizeRuleRelativePath(candidate.relativePath),
+						matchReason,
+						body,
+						description: metadata.description,
+					});
 					continue;
+				}
 
 				const relativePath = normalizeRuleRelativePath(candidate.relativePath);
 
 				if (normalizedTranscriptRelativePaths.has(relativePath)) {
+					onRuleSuppressed?.({
+						sessionID,
+						realPath: candidate.realPath,
+						relativePath,
+						matchReason,
+						body,
+						description: metadata.description,
+					});
 					cache.realPaths.add(candidate.realPath);
 					cache.contentHashes.add(contentHash);
 					dirty = true;
@@ -163,6 +191,7 @@ export function createRuleInjectionProcessor(
 					distance: candidate.distance,
 				});
 
+				onRuleInjected?.(sessionID, candidate.realPath);
 				cache.realPaths.add(candidate.realPath);
 				cache.contentHashes.add(contentHash);
 				dirty = true;

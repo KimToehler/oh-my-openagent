@@ -1,6 +1,7 @@
 import type { HookName, OhMyOpenCodeConfig } from "../../config"
 import type { ModelCacheState } from "../../plugin-state"
 import type { PluginContext } from "../types"
+import { contextCollector } from "../../features/context-injector"
 
 import {
   createCommentCheckerHooks,
@@ -105,7 +106,7 @@ export function createToolGuardHooks(args: {
     ? safeHook("rules-injector", () =>
         createRulesInjectorHook(ctx, modelCacheState, {
           skipClaudeUserRules,
-        }))
+        }, contextCollector))
     : null
 
   const tasksTodowriteDisabler = isHookEnabled("tasks-todowrite-disabler")

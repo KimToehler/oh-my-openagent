@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin";
+import { ContextCollector } from "../../features/context-injector";
 import { createDynamicTruncator } from "../../shared/dynamic-truncator";
 import { resolveSessionEventID } from "../../shared/event-session-id";
 import { matchesTrackedTool } from "../../shared/tool-name-match";
@@ -9,6 +10,7 @@ import {
 import { clearParsedRuleCache, createRuleInjectionProcessor } from "./injector";
 import { getRuleInjectionFilePath } from "./output-path";
 import { clearProjectRootCache } from "./project-root-finder";
+import { createRuleResurfacing } from "./resurfacing";
 import { createTranscriptHydrationStore } from "./transcript-hydration";
 
 interface ToolExecuteInput {
@@ -40,7 +42,9 @@ export function createRulesInjectorHook(
 	ctx: PluginInput,
 	modelCacheState?: { anthropicContext1MEnabled: boolean },
 	options?: { skipClaudeUserRules?: boolean },
+	collector?: ContextCollector,
 ) {
+	const resurfacing = collector ? createRuleResurfacing(collector) : undefined;
 	const truncator = createDynamicTruncator(ctx, modelCacheState);
 	const { getSessionCache, clearSessionCache } = createSessionCacheStore();
 	const { getSessionRuleScanCache, clearSessionRuleScanCache } =
@@ -57,12 +61,15 @@ export function createRulesInjectorHook(
 		ruleFinderOptions: options?.skipClaudeUserRules
 			? { skipClaudeUserRules: true }
 			: undefined,
+		onRuleSuppressed: resurfacing?.handleSuppressedRule,
+		onRuleInjected: resurfacing?.noteInjected,
 	});
 
 	function clearSessionState(sessionID: string): void {
 		clearSessionCache(sessionID);
 		clearSessionRuleScanCache(sessionID);
 		transcriptHydration.clearSession(sessionID);
+		resurfacing?.clearSession(sessionID);
 		clearParsedRuleCache();
 	}
 
@@ -70,6 +77,7 @@ export function createRulesInjectorHook(
 		input: ToolExecuteInput,
 		output: ToolExecuteOutput,
 	) => {
+		resurfacing?.recordToolCall(input.sessionID);
 		if (matchesTrackedTool(input.tool, TRACKED_TOOLS)) {
 			const filePath = getRuleInjectionFilePath(output);
 			if (!filePath) return;
