@@ -12,7 +12,7 @@
 ## WHAT WAS OBSERVED
 
 - RED assertion showed `reason: session-gone` absent from clean completed summary. Full output: `34-test-8-red-output.txt`.
-- GREEN selector: 30 pass, 0 fail, 68 expect calls. Full feature suite: 917 pass, 0 fail, 2402 expect calls. Scoped tsgo exited 0. Build completed. Outputs: `35-template-green-output.txt`, `36-feature-suite-output.txt`, `37-scoped-tsgo-output.txt`, `38-build-output.txt`.
+- GREEN selector: 30 pass, 0 fail, 68 expect calls. Full feature suite: 917 pass, 0 fail, 2402 expect calls. Scoped tsgo exited 0. Build completed. Outputs: `35-template-green-output.txt`, `36-feature-suite-output.txt`, `37-scoped-tsgo-output.txt`.
 - Live parent transcript contains `[ALL BACKGROUND TASKS COMPLETE]` and `reason: session-gone`: `29-live-notification-line-mock-qa.txt`, `25-parent-transcript-mock-qa.jsonl`.
 - Programmatic checks found one completion notification block and one valid union reason: `30-live-assertions-mock-qa.txt`.
 - Real DB session count was 3064 before and 3064 after: `23-real-db-before-mock-qa.txt`, `32-real-db-after-mock-qa.txt`; empty `33-real-db-count-diff-mock-qa.txt` proves equality.
@@ -22,7 +22,7 @@
 
 - RED proves prior 916-pass state missed clean completion reason output.
 - Three template cases lock behavior: clean completion renders reason, unfinished todos preserve `completed with 3 unfinished todos, reason: todo-gate-expired`, and no reason renders no `reason:` qualifier.
-- Live server exercised plugin, background delegation, completion notification, and parent transcript persistence through local mock provider. Mock request log proves requests reached `mock-model.mjs`, not vendor provider.
+- Live server exercised `session-gone` only through plugin, background delegation, completion notification, and parent transcript persistence with local mock provider. `terminal-session-status`, `todo-gate-expired`, `idle-status`, and `session-idle-event` have unit coverage only; this remains residual risk. Mock request log proves requests reached `mock-model.mjs`, not vendor provider.
 - DB before/after and teardown receipt prove isolation and cleanup.
 
 ## WHAT WAS OMITTED

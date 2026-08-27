@@ -5,7 +5,7 @@ packages/omo-opencode/src/features/background-agent/background-task-notification
 443 |           { id: "task-clean-reason", description: "Finish task", status: "completed", completionReason: "session-gone" },
 444 |         ],
 445 |       })
-446 | 
+446 |
 447 |       // then
 448 |       expect(notification).toContain("reason: session-gone")
                                  ^
