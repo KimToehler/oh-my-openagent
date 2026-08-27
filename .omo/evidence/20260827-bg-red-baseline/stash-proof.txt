@@ -1,0 +1,62 @@
+# Manager polling clock stash proof
+
+## Old test file
+
+Command:
+```text
+cd /Users/tim/git/oh-my-openagent/.worktrees/hf-top3-pr0 && GIT_MASTER=1 git stash push -u -m pr0-stash-proof && bun test packages/omo-opencode/src/features/background-agent/manager.polling.test.ts
+```
+
+Output:
+```text
+Saved working directory and index state On fix/bg-agent-red-baseline: pr0-stash-proof
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:
+449 |
+450 |       //#when
+451 |       await manager["pollRunningTasks"]()
+452 |
+453 |       //#then
+454 |       expect(task.status).toBe("running")
+                                ^
+error: expect(received).toBe(expected)
+
+Expected: "running"
+Received: "cancelled"
+
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when session remains active #then keeps task running
+
+Expected: "running"
+Received: "error"
+
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when valid output is absent #then keeps task running
+
+Expected: "running"
+Received: "error"
+
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when first observation is inside grace window #then stamps and waits
+
+ 21 pass
+ 3 fail
+ 51 expect() calls
+Ran 24 tests across 1 file. [75.00ms]
+```
+
+## Restored test file
+
+Command:
+```text
+cd /Users/tim/git/oh-my-openagent/.worktrees/hf-top3-pr0 && GIT_MASTER=1 git stash pop && bun test packages/omo-opencode/src/features/background-agent/manager.polling.test.ts
+```
+
+Output:
+```text
+Dropped refs/stash@{0} (35530f19a02dde07aa292016839e5f96cc19ca56)
+bun test v1.4.0 (1381054db)
+
+ 24 pass
+ 0 fail
+ 53 expect() calls
+Ran 24 tests across 1 file. [75.00ms]
+```

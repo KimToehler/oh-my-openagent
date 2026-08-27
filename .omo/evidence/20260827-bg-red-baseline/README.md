@@ -12,7 +12,8 @@
 - Before manager selector: `21 pass`, `3 fail`; each failed because fixture date `2026-08-17` was compared with unmocked wall clock.
 - After manager selector: `24 pass`, `0 fail`.
 - Pending-queue selector after replacement assertion: `5 pass`, `0 fail`.
-- Mutation selector failed: second real dispatch assertion received one call rather than two. Full transcript is preserved in parent task output; mutation also invalidated delay-derived queue tests because division by zero makes delay `Infinity`.
+- Base timer expectation of `1` never ran because prior deleted-field assertion threw. True post-loop state is `0`: each queued timer deletes itself from queue maps when callback begins, and final accepted dispatch schedules no replacement timer.
+- Requeue-path mutation produced `Expected length: 3` and `Received length: 6`; transcript: [`failure4-mutation.txt`](failure4-mutation.txt).
 
 ## WHY IT IS ENOUGH
 
@@ -20,7 +21,8 @@
 - `valid output is absent`: pin keeps todo-gate grace open, so absent valid output remains `running` with no unfinished count rather than accidental expiry error.
 - `first observation is inside grace window`: pin makes first observation deterministic, so test verifies stamp-and-wait behavior rather than historical fixture expiry.
 - `both grace conditions expire`: shared helper preserves existing expiry assertion and validates same fixed-time mechanism for every test in block.
-- Failure 4 decision: success path intentionally deletes `coalesceRequeueCount` in `parent-wake-prompt-dispatch.ts` after accepted dispatch, and queue merge also resets it when notifications change. It is retry-internal transient state, not an observable delivery contract. Test now asserts claimed behavior, two real `promptAsync` calls before cap; cap mutation fails this assertion, proving it bites. No production file changed.
+- Failure 4 decision: success path intentionally deletes `coalesceRequeueCount` in `parent-wake-prompt-dispatch.ts` after accepted dispatch, and queue merge also resets it when notifications change. It is retry-internal transient state, not an observable delivery contract. Test captures `requeueWake` calls and pins exactly `MAX_COALESCE_REQUEUE_ATTEMPTS` requeues before second real dispatch. Duplicating requeue path fails this assertion; no production file changed.
+- Clock stash transcript: [`stash-proof.txt`](stash-proof.txt).
 
 ## WHAT WAS OMITTED
 
