@@ -4,6 +4,7 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import * as os from "node:os";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ContextCollector, createContextInjectorMessagesTransformHook } from "../../features/context-injector";
 import { RULES_INJECTOR_STORAGE } from "./constants";
 import {
 	clearParsedRuleCache,
@@ -620,6 +621,82 @@ describe("createRuleInjectionProcessor", () => {
 		// then
 		expect(output.output).not.toContain("[Rule:");
 		expect(cached.compactionEpoch).toBe("known-epoch");
+	});
+
+	it("#given a rule suppressed by real path #when it matches again #then no reminder is queued", async () => {
+		// given
+		let suppressions = 0;
+		const processor = createRuleInjectionProcessor({
+			workspaceDirectory: projectRoot,
+			truncator: { truncate: async (_sessionID, content) => ({ result: content, truncated: false }) },
+			getSessionCache: () => ({ contentHashes: new Set(), realPaths: new Set([ruleRealPath]) }),
+			homedir: () => homeRoot,
+			onRuleSuppressed: () => { suppressions += 1; },
+		});
+
+		// when
+		await processor.processFilePathForInjection(targetFile, "session-1", createOutput());
+
+		// then
+		expect(suppressions).toBe(0);
+	});
+
+	it("#given a session that has compacted #when a previously injected rule matches again #then the full rule body is injected and not merely a reminder", async () => {
+		// given
+		const staleCache = {
+			contentHashes: new Set(["hash:rule-content\n"]),
+			realPaths: new Set([ruleRealPath]),
+			compactionEpoch: "old-epoch",
+		};
+		const processor = createRuleInjectionProcessor({
+			workspaceDirectory: projectRoot,
+			truncator: { truncate: async (_sessionID, content) => ({ result: content, truncated: false }) },
+			getSessionCache: () => staleCache,
+			homedir: () => homeRoot,
+			shouldApplyRule: () => ({ applies: true, reason: "matched" }),
+			isDuplicateByRealPath: (realPath, cache) => cache.has(realPath),
+			createContentHash: (content) => `hash:${content}`,
+			isDuplicateByContentHash: (hash, cache) => cache.has(hash),
+			transcriptHydration: {
+				hydrateSession: async () => new Set(),
+				getCompactionEpoch: () => "new-epoch",
+			},
+		});
+		const output = createOutput();
+
+		// when
+		await processor.processFilePathForInjection(targetFile, "session-1", output);
+
+		// then
+		expect(output.output).toContain("[Rule: ");
+		expect(output.output).not.toContain("[Rule reminder: ");
+	});
+
+	it("#given a queued rule reminder #when the context injector transform runs #then the spliced synthetic part contains the reminder", async () => {
+		// given
+		const collector = new ContextCollector();
+		const sessionID = "session-reminder";
+		collector.register(sessionID, {
+			id: "rule-reminder:.omo/rules/internal-prompt-injection.md",
+			source: "rules-injector",
+			content: "[Rule reminder: .omo/rules/internal-prompt-injection.md] NEVER bypass the gate.",
+		});
+		const hook = createContextInjectorMessagesTransformHook(collector);
+		const output = {
+			messages: [{
+				info: { id: "msg-1", sessionID, role: "user" },
+				parts: [{ id: "part-1", messageID: "msg-1", sessionID, type: "text", text: "edit" }],
+			}],
+		};
+
+		// when
+		await hook["experimental.chat.messages.transform"]!({}, output);
+
+		// then
+		expect(output.messages[0]?.parts[0]).toMatchObject({
+			synthetic: true,
+			text: "[Rule reminder: .omo/rules/internal-prompt-injection.md] NEVER bypass the gate.",
+		});
 	});
 
 	it("#given transcript hydration reports unrelated rule #when injecting #then rule is still injected", async () => {
