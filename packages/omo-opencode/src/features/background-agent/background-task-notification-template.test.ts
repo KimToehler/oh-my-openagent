@@ -465,6 +465,24 @@ All sibling background tasks are complete. Your next action should be to call \`
       expect(notification).toContain("- `task-error-todos`: Fail task [ERROR] - Timed out")
       expect(notification).not.toContain("unfinished todo")
     })
+
+    test("#when an error task carries a completion reason #then it preserves the error summary without a reason qualifier", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: { id: "task-error-reason", description: "Fail task", status: "error", error: "Timed out", completionReason: "session-gone" },
+        duration: "10s",
+        statusText: "ERROR",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [
+          { id: "task-error-reason", description: "Fail task", status: "error", error: "Timed out", completionReason: "session-gone" },
+        ],
+      })
+
+      // then
+      expect(notification).toContain("- `task-error-reason`: Fail task [ERROR] - Timed out")
+      expect(notification).not.toContain("reason:")
+    })
   })
 
   describe("#given all tasks completed with undefined descriptions", () => {

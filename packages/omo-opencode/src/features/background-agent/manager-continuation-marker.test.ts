@@ -8,7 +8,7 @@ import { readContinuationMarker } from "../run-continuation-state"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 import { BACKGROUND_COMPLETION_WAKE_PENDING_REASON } from "./background-task-marker"
 import { BackgroundManager } from "./manager"
-import type { BackgroundTask } from "./types"
+import type { BackgroundTask, BackgroundTaskCompletionReason } from "./types"
 
 type ParentWakeNotifierForMarkerTest = {
   readonly reserveNotificationPreparation: (sessionID: string) => void
@@ -30,7 +30,7 @@ type BackgroundManagerMarkerInternals = BackgroundManager & {
     delayMs?: number,
   ) => void
   readonly flushPendingParentWake: (sessionID: string) => Promise<void>
-  readonly tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean>
+  readonly tryCompleteTask: (task: BackgroundTask, source: string, reason: BackgroundTaskCompletionReason) => Promise<boolean>
 }
 
 const testDirectories: string[] = []
@@ -167,7 +167,7 @@ describe("BackgroundManager run continuation marker parent-wake races", () => {
 
     try {
       // when
-      const completed = await internals.tryCompleteTask(task, "marker regression")
+      const completed = await internals.tryCompleteTask(task, "marker regression", "idle-status")
 
       // then
       expect(completed).toBe(true)

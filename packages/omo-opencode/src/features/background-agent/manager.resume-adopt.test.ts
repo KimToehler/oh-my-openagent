@@ -11,7 +11,7 @@ import {
 import { setPromptReservation } from "../../shared/prompt-async-gate/reservations"
 import { readContinuationMarker } from "../run-continuation-state"
 import { BackgroundManager } from "./manager"
-import type { AdoptRunningSessionInput, BackgroundTask } from "./types"
+import type { AdoptRunningSessionInput, BackgroundTask, BackgroundTaskCompletionReason } from "./types"
 
 const managers: BackgroundManager[] = []
 const managerDirectories: string[] = []
@@ -112,9 +112,8 @@ function suspendConcurrencyAcquire(manager: BackgroundManager): { readonly relea
 }
 
 async function completeTask(manager: BackgroundManager, task: BackgroundTask): Promise<boolean> {
-  const tryCompleteTask = Reflect.get(manager, "tryCompleteTask")
-  if (typeof tryCompleteTask !== "function") throw new Error("BackgroundManager completion method unavailable")
-  return tryCompleteTask.call(manager, task, "test")
+  const tryCompleteTask = Reflect.get(manager, "tryCompleteTask") as (task: BackgroundTask, source: string, reason: BackgroundTaskCompletionReason) => Promise<boolean>
+  return tryCompleteTask.call(manager, task, "test", "idle-status")
 }
 
 async function flushResumeDispatch(): Promise<void> {
