@@ -367,6 +367,36 @@ All sibling background tasks are complete. Your next action should be to call \`
       expect(notification).toContain("- `task-todos`: Finish task - completed with 3 unfinished todos")
     })
 
+    test("#given a completed task that yielded on the todo gate #when building the notification #then the summary line names the yield reason", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: { id: "task-todos-reason", description: "Finish task", status: "completed", unfinishedTodoCount: 3, completionReason: "todo-gate-expired" },
+        duration: "10s",
+        statusText: "COMPLETED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [{ id: "task-todos-reason", description: "Finish task", status: "completed", unfinishedTodoCount: 3, completionReason: "todo-gate-expired" }],
+      })
+
+      // then
+      expect(notification).toContain("completed with 3 unfinished todos, reason: todo-gate-expired")
+    })
+
+    test("#given a completed task with no completion reason recorded #when building the notification #then no reason qualifier is rendered", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: { id: "task-no-reason", description: "Finish task", status: "completed", unfinishedTodoCount: 3 },
+        duration: "10s",
+        statusText: "COMPLETED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [{ id: "task-no-reason", description: "Finish task", status: "completed", unfinishedTodoCount: 3 }],
+      })
+
+      // then
+      expect(notification).not.toContain("reason:")
+    })
+
     test("#when building the final notification without an unfinished todo count #then it preserves the completed summary format", () => {
       // given
       const notification = buildBackgroundTaskNotificationText({
@@ -399,6 +429,23 @@ All sibling background tasks are complete. Your next action should be to call \`
       // then
       expect(notification).toContain("- `task-zero-todos`: Finish task")
       expect(notification).not.toContain("unfinished todo")
+    })
+
+    test("#given a task that completed cleanly with zero unfinished todos #when building the notification #then the summary line still names the completion reason", () => {
+      // given
+      const notification = buildBackgroundTaskNotificationText({
+        task: { id: "task-clean-reason", description: "Finish task", status: "completed", completionReason: "session-gone" },
+        duration: "10s",
+        statusText: "COMPLETED",
+        allComplete: true,
+        remainingCount: 0,
+        completedTasks: [
+          { id: "task-clean-reason", description: "Finish task", status: "completed", completionReason: "session-gone" },
+        ],
+      })
+
+      // then
+      expect(notification).toContain("reason: session-gone")
     })
 
     test("#when an error task carries an unfinished todo count #then it preserves the error summary without an annotation", () => {

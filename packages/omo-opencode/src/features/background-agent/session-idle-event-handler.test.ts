@@ -244,7 +244,7 @@ describe("handleSessionIdleBackgroundEvent", () => {
 
       //#then
       await new Promise((resolve) => setTimeout(resolve, 10))
-      expect(tryCompleteTask).toHaveBeenCalledWith(task, "session.idle event")
+      expect(tryCompleteTask).toHaveBeenCalledWith(task, "session.idle event", "session-idle-event")
     })
 
     it("#when task belongs to a team run #then should not auto-complete on idle", async () => {

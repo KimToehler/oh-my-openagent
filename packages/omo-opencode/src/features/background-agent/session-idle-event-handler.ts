@@ -1,7 +1,7 @@
 import { log } from "../../shared"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { MIN_IDLE_TIME_MS } from "./constants"
-import type { BackgroundTask } from "./types"
+import type { BackgroundTask, BackgroundTaskCompletionReason } from "./types"
 
 export function handleSessionIdleBackgroundEvent(args: {
   properties: Record<string, unknown>
@@ -9,7 +9,7 @@ export function handleSessionIdleBackgroundEvent(args: {
   idleDeferralTimers: Map<string, ReturnType<typeof setTimeout>>
   validateSessionHasOutput: (sessionID: string) => Promise<boolean>
   checkSessionTodos: (sessionID: string) => Promise<boolean>
-  tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean>
+  tryCompleteTask: (task: BackgroundTask, source: string, reason: BackgroundTaskCompletionReason) => Promise<boolean>
   emitIdleEvent: (sessionID: string) => void
 }): void {
   const {
@@ -89,7 +89,7 @@ export function handleSessionIdleBackgroundEvent(args: {
         return
       }
 
-      await tryCompleteTask(task, "session.idle event")
+      await tryCompleteTask(task, "session.idle event", "session-idle-event")
     })
     .catch((err) => {
       log("[background-agent] Error in session.idle handler:", err)
