@@ -79,7 +79,7 @@ export function createRuleResurfacing(
 			log("[rules-injector] Resurfacing decision", {
 				sessionID: input.sessionID,
 				rulePath: input.relativePath,
-				gap: gap ?? store.getGap(input.sessionID, input.realPath) ?? 0,
+				gap: gap ?? 0,
 				decision: shouldSurface ? "surface" : "suppress",
 			});
 			if (!shouldSurface) return;
