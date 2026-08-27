@@ -2432,3 +2432,14 @@ Two claims in this entry, verified separately.
 **Claim B, rules-injection durable recall.** Still open, and the mechanism is confirmed exactly as described. Discovery works: `~/.omo/rules` is in both `OPENCODE_USER_RULE_DIRS` and `SOURCE_PRIORITY` (`packages/rules-engine/src/constants.ts:14,29`) and is resolved by `addUserRuleCandidates()` from `findRuleFiles()` (`finder.ts:25-50,124-148`). Delivery is one-shot: only tracked `read`/`write`/`edit`/`multiedit` results with path metadata reach processing (`hooks/rules-injector/hook.ts:37,69-79`), and the banner is appended into that single tool output (`injection-output.ts:7-24`). Replay is then suppressed by real-path and content-hash dedupe (`injection-processor.ts:125-167`) and transcript hydration (`transcript-hydration.ts:46-56,76-106,135-170`). Cross-checked for a durable route: the context injector only consumes already-pending collector content (`features/context-injector/injector.ts:53-67,90-166`) and the Transform tier registers no rules re-injection (`plugin/hooks/create-transform-hooks.ts:70-71,108-116`); the rules injector remains a Tool Guard hook (`create-tool-guard-hooks.ts:102-109`).
 
 **Fix status (2026-08-27):** both claims still unfixed. Claim B is the more consequential: every capture rule, lesson, and path-scoped architecture rule inherits this delivery model, so a rule can be discovered, injected once, and absent from context exactly when it matters. Severity for Claim B revised `costly` -> `blocker`; Claim A stays `costly`.
+
+## 2026-08-27 — Background-agent todo-gate tests used an unpinned historical clock
+
+**Severity:** costly
+**Area:** background-agent tests
+
+**What happened:** Three todo-gate cases used a `2026-08-17` fixture from `manager.polling.test.ts:396` but called unmocked `Date.now()`. As wall-clock time moved beyond the 60-second grace period, they failed on the next unrelated edit to `manager.ts` despite unchanged production behavior.
+
+**Root cause:** only one of four tests in the block pinned `Date.now`; the other three compared historical fixture timestamps against real time.
+
+**Fix:** added one `withFixedNow(fixedNow, fn)` helper with `finally` restoration and ran all four cases through it. Expectations retain their todo-gate behavior; only clock source is deterministic.

@@ -141,6 +141,7 @@ describe("ParentWakePendingQueue scheduleFlush", () => {
     jest.setSystemTime(new Date("2026-01-01T00:00:00.000Z"))
     const { queue } = createQueue()
     const promptAsyncCalls: unknown[] = []
+    const requeues: PendingParentWake[] = []
     const latestWake: PendingParentWake = {
       promptContext: { agent: "sisyphus" },
       notifications: ["wake A"],
@@ -169,7 +170,9 @@ describe("ParentWakePendingQueue scheduleFlush", () => {
         getDispatchedWake: () => undefined,
         hasRecordedPromptAfterDispatch: async () => false,
         trackDispatchedWake: () => {},
-        requeueWake: () => {},
+        requeueWake: (wake) => {
+          requeues.push(wake)
+        },
         scheduleFlush: (delayMs) => {
           queue.scheduleFlush("parent", dispatch, delayMs)
         },
@@ -188,9 +191,7 @@ describe("ParentWakePendingQueue scheduleFlush", () => {
 
     // then
     expect(promptAsyncCalls).toHaveLength(2)
-    expect(latestWake.coalesceRequeueCount).toBeLessThanOrEqual(MAX_COALESCE_REQUEUE_ATTEMPTS)
-    expect(queue.getTimers().size).toBe(1)
-    queue.clearTimer("parent")
+    expect(requeues).toHaveLength(MAX_COALESCE_REQUEUE_ATTEMPTS)
     expect(queue.getTimers().size).toBe(0)
   })
 })

@@ -414,83 +414,107 @@ describe("BackgroundManager pollRunningTasks", () => {
       }
     }
 
-    test("#when both grace conditions expire #then completes with unfinished count", async () => {
-      //#given
+    async function withFixedNow<T>(fn: () => Promise<T>): Promise<T> {
       const originalDateNow = Date.now
       Date.now = () => fixedNow
-      const manager = createManagerWithClient({
-        status: async () => ({ data: { "ses-expired": { type: "idle" } } }),
-        todo: async () => incompleteTodos(),
-      }, { todoGateGraceMs: graceMs })
-      const task = createTodoGateTask("ses-expired")
-      injectTask(manager, task)
-
       try {
-        //#when
-        await manager["pollRunningTasks"]()
-
-        //#then
-        expect(task.status).toBe("completed")
-        expect(task.unfinishedTodoCount).toBe(3)
+        return await fn()
       } finally {
         Date.now = originalDateNow
-        await manager.shutdown()
       }
+    }
+
+    test("#when both grace conditions expire #then completes with unfinished count", async () => {
+      await withFixedNow(async () => {
+        //#given
+        const manager = createManagerWithClient({
+          status: async () => ({ data: { "ses-expired": { type: "idle" } } }),
+          todo: async () => incompleteTodos(),
+        }, { todoGateGraceMs: graceMs })
+        const task = createTodoGateTask("ses-expired")
+        injectTask(manager, task)
+
+        try {
+          //#when
+          await manager["pollRunningTasks"]()
+
+          //#then
+          expect(task.status).toBe("completed")
+          expect(task.unfinishedTodoCount).toBe(3)
+        } finally {
+          await manager.shutdown()
+        }
+      })
     })
 
     test("#when session remains active #then keeps task running", async () => {
-      //#given
-      const manager = createManagerWithClient({
-        status: async () => ({ data: { "ses-active-gate": { type: "busy" } } }),
-        todo: async () => incompleteTodos(),
-      }, { todoGateGraceMs: graceMs })
-      const task = createTodoGateTask("ses-active-gate")
-      injectTask(manager, task)
+      await withFixedNow(async () => {
+        //#given
+        const manager = createManagerWithClient({
+          status: async () => ({ data: { "ses-active-gate": { type: "busy" } } }),
+          todo: async () => incompleteTodos(),
+        }, { todoGateGraceMs: graceMs })
+        const task = createTodoGateTask("ses-active-gate")
+        injectTask(manager, task)
 
-      //#when
-      await manager["pollRunningTasks"]()
+        try {
+          //#when
+          await manager["pollRunningTasks"]()
 
-      //#then
-      expect(task.status).toBe("running")
-      await manager.shutdown()
+          //#then
+          expect(task.status).toBe("running")
+        } finally {
+          await manager.shutdown()
+        }
+      })
     })
 
     test("#when valid output is absent #then keeps task running", async () => {
-      //#given
-      const manager = createManagerWithClient({
-        status: async () => ({ data: { "ses-no-output": { type: "idle" } } }),
-        messages: async () => ({ data: [] }),
-        todo: async () => incompleteTodos(),
-      }, { todoGateGraceMs: graceMs })
-      const task = createTodoGateTask("ses-no-output")
-      injectTask(manager, task)
+      await withFixedNow(async () => {
+        //#given
+        const manager = createManagerWithClient({
+          status: async () => ({ data: { "ses-no-output": { type: "idle" } } }),
+          messages: async () => ({ data: [] }),
+          todo: async () => incompleteTodos(),
+        }, { todoGateGraceMs: graceMs })
+        const task = createTodoGateTask("ses-no-output")
+        injectTask(manager, task)
 
-      //#when
-      await manager["pollRunningTasks"]()
+        try {
+          //#when
+          await manager["pollRunningTasks"]()
 
-      //#then
-      expect(task.status).toBe("running")
-      expect(task.unfinishedTodoCount).toBeUndefined()
-      await manager.shutdown()
+          //#then
+          expect(task.status).toBe("running")
+          expect(task.unfinishedTodoCount).toBeUndefined()
+        } finally {
+          await manager.shutdown()
+        }
+      })
     })
 
     test("#when first observation is inside grace window #then stamps and waits", async () => {
-      //#given
-      const manager = createManagerWithClient({
-        status: async () => ({ data: { "ses-fresh-gate": { type: "idle" } } }),
-        todo: async () => incompleteTodos(1),
-      }, { todoGateGraceMs: graceMs })
-      const task = createTodoGateTask("ses-fresh-gate")
-      task.todoGateFirstObservedAt = undefined
-      injectTask(manager, task)
+      await withFixedNow(async () => {
+        //#given
+        const manager = createManagerWithClient({
+          status: async () => ({ data: { "ses-fresh-gate": { type: "idle" } } }),
+          todo: async () => incompleteTodos(1),
+        }, { todoGateGraceMs: graceMs })
+        const task = createTodoGateTask("ses-fresh-gate")
+        task.todoGateFirstObservedAt = undefined
+        injectTask(manager, task)
 
-      //#when
-      await manager["pollRunningTasks"]()
+        try {
+          //#when
+          await manager["pollRunningTasks"]()
 
-      //#then
-      expect(task.status).toBe("running")
-      expect(task.todoGateFirstObservedAt).toBeDefined()
-      await manager.shutdown()
+          //#then
+          expect(task.status).toBe("running")
+          expect(task.todoGateFirstObservedAt).toBeDefined()
+        } finally {
+          await manager.shutdown()
+        }
+      })
     })
 
     test("#when user and internal-wake parts arrive #then preserves the stamp", async () => {

@@ -1,0 +1,56 @@
+# Failure 4 requeue-cap bite proof
+
+## Baseline
+
+Command:
+```text
+cd /Users/tim/git/oh-my-openagent/.worktrees/hf-top3-pr0 && bun test packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts
+```
+
+Output:
+```text
+bun test v1.4.0 (1381054db)
+
+
+ 5 pass
+ 0 fail
+ 14 expect() calls
+Ran 5 tests across 1 file. [72.00ms]
+```
+
+## Mutation
+
+Mutated first coalesce branch by duplicating `input.requeueWake(input.latestWake)`, then ran:
+```text
+cd /Users/tim/git/oh-my-openagent/.worktrees/hf-top3-pr0 && bun test packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts
+```
+
+Output:
+```text
+bun test v1.4.0 (1381054db)
+MUTATION_EXIT=1
+
+
+packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts:
+189 |       await drainAsyncTimerWork()
+190 |     }
+191 | 
+192 |     // then
+193 |     expect(promptAsyncCalls).toHaveLength(2)
+194 |     expect(requeues).toHaveLength(MAX_COALESCE_REQUEUE_ATTEMPTS)
+                           ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 3
+Received length: 6
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/hf-top3-pr0/packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts:194:22)
+(fail) ParentWakePendingQueue scheduleFlush > #given an existing default timer and an already-delivered wake #when real queue cadence drives coalesce retries #then the wake reaches a second real dispatch before the cap [1.50ms]
+
+ 4 pass
+ 1 fail
+ 13 expect() calls
+Ran 5 tests across 1 file. [67.00ms]
+```
+
+Restored `packages/omo-opencode/src/features/background-agent/parent-wake-prompt-dispatch.ts` from `/tmp/parent-wake-prompt-dispatch.requeue-proof.ts` before continuing.
