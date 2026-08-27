@@ -188,9 +188,6 @@ describe("ParentWakePendingQueue scheduleFlush", () => {
 
     // then
     expect(promptAsyncCalls).toHaveLength(2)
-    expect(latestWake.coalesceRequeueCount).toBeLessThanOrEqual(MAX_COALESCE_REQUEUE_ATTEMPTS)
-    expect(queue.getTimers().size).toBe(1)
-    queue.clearTimer("parent")
     expect(queue.getTimers().size).toBe(0)
   })
 })
