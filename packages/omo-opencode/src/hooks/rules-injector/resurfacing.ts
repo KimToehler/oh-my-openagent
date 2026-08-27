@@ -14,6 +14,7 @@ export type ResurfacingStore = {
 export type RuleResurfacing = {
 	recordToolCall(sessionID: string): void;
 	noteInjected(sessionID: string, realPath: string): void;
+	shouldSurface(sessionID: string, realPath: string): boolean;
 	handleSuppressedRule(input: {
 		sessionID: string;
 		realPath: string;
@@ -72,6 +73,7 @@ export function createRuleResurfacing(
 	return {
 		recordToolCall: store.recordToolCall,
 		noteInjected: store.noteSurfaced,
+		shouldSurface: store.shouldSurface,
 		handleSuppressedRule: (input) => {
 			const gap = store.getGap(input.sessionID, input.realPath);
 			const shouldSurface = store.shouldSurface(input.sessionID, input.realPath);

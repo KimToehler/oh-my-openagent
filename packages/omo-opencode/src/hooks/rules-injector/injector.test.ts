@@ -5,6 +5,7 @@ import * as os from "node:os";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ContextCollector, createContextInjectorMessagesTransformHook } from "../../features/context-injector";
+import { createRuleResurfacing, RESURFACE_TOOL_CALL_GAP } from "./resurfacing";
 import { RULES_INJECTOR_STORAGE } from "./constants";
 import {
 	clearParsedRuleCache,
@@ -126,6 +127,7 @@ describe("createRuleInjectionProcessor", () => {
 		mkdirSync(join(projectRoot, ".github", "instructions"), {
 			recursive: true,
 		});
+		mkdirSync(join(projectRoot, ".omo", "rules"), { recursive: true });
 		mkdirSync(homeRoot, { recursive: true });
 
 		writeFileSync(targetFile, "export const value = 1;\n");
@@ -623,22 +625,54 @@ describe("createRuleInjectionProcessor", () => {
 		expect(cached.compactionEpoch).toBe("known-epoch");
 	});
 
-	it("#given a rule suppressed by real path #when it matches again #then no reminder is queued", async () => {
+	it("#given a rule suppressed by real path after the resurfacing gap #when it matches again #then a reminder is queued", async () => {
 		// given
-		let suppressions = 0;
+		const collector = new ContextCollector();
+		const resurfacing = createRuleResurfacing(collector);
+		for (let index = 0; index < RESURFACE_TOOL_CALL_GAP; index += 1) {
+			resurfacing.recordToolCall("session-1");
+		}
+		const governedRule = join(projectRoot, ".omo", "rules", "typescript.md");
+		writeFileSync(governedRule, '---\nglobs: "src/**/*.ts"\n---\nMUST preserve rule contracts.\n');
+		const governedRuleRealPath = fs.realpathSync.native(governedRule);
 		const processor = createRuleInjectionProcessor({
 			workspaceDirectory: projectRoot,
 			truncator: { truncate: async (_sessionID, content) => ({ result: content, truncated: false }) },
-			getSessionCache: () => ({ contentHashes: new Set(), realPaths: new Set([ruleRealPath]) }),
+			getSessionCache: () => ({ contentHashes: new Set(), realPaths: new Set([governedRuleRealPath]) }),
 			homedir: () => homeRoot,
-			onRuleSuppressed: () => { suppressions += 1; },
+			shouldResurfaceRule: resurfacing.shouldSurface,
+			onRuleSuppressed: resurfacing.handleSuppressedRule,
 		});
 
 		// when
 		await processor.processFilePathForInjection(targetFile, "session-1", createOutput());
 
 		// then
-		expect(suppressions).toBe(0);
+		expect(collector.hasPending("session-1")).toBe(true);
+	});
+
+	it("#given a rule suppressed by real path within the resurfacing gap #when it matches again #then no reminder is queued", async () => {
+		// given
+		const collector = new ContextCollector();
+		const resurfacing = createRuleResurfacing(collector);
+		const governedRule = join(projectRoot, ".omo", "rules", "typescript.md");
+		writeFileSync(governedRule, '---\nglobs: "src/**/*.ts"\n---\nMUST preserve rule contracts.\n');
+		const governedRuleRealPath = fs.realpathSync.native(governedRule);
+		resurfacing.noteInjected("session-1", governedRuleRealPath);
+		const processor = createRuleInjectionProcessor({
+			workspaceDirectory: projectRoot,
+			truncator: { truncate: async (_sessionID, content) => ({ result: content, truncated: false }) },
+			getSessionCache: () => ({ contentHashes: new Set(), realPaths: new Set([governedRuleRealPath]) }),
+			homedir: () => homeRoot,
+			shouldResurfaceRule: resurfacing.shouldSurface,
+			onRuleSuppressed: resurfacing.handleSuppressedRule,
+		});
+
+		// when
+		await processor.processFilePathForInjection(targetFile, "session-1", createOutput());
+
+		// then
+		expect(collector.hasPending("session-1")).toBe(false);
 	});
 
 	it("#given a session that has compacted #when a previously injected rule matches again #then the full rule body is injected and not merely a reminder", async () => {

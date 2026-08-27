@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ContextCollector } from "../../features/context-injector";
 import { createRulesInjectorHook } from "./hook";
+import { RESURFACE_TOOL_CALL_GAP } from "./resurfacing";
 
 const SESSION_ID = "rules-injector-hook-test";
 
@@ -34,7 +36,7 @@ describe("createRulesInjectorHook", () => {
 		writeFileSync(targetFile, "export const value = 1;\n");
 		writeFileSync(
 			join(projectRoot, ".omo", "rules", "typescript.md"),
-			'---\nglobs: "src/**/*.ts"\n---\nUse strict TypeScript.\n',
+			'---\nglobs: "src/**/*.ts"\n---\nMust use strict TypeScript.\n',
 		);
 	});
 
@@ -76,5 +78,70 @@ describe("createRulesInjectorHook", () => {
 
 	it("#given matching project rule #when todowrite completes #then injects nothing", async () => {
 		expect(await executeAfter("todowrite")).toBe("file content");
+	});
+
+	it("#given suppressed governed rule after gap #when hook runs #then queues concise reminder", async () => {
+		const collector = new ContextCollector();
+		const hook = createRulesInjectorHook(makeContext(projectRoot), undefined, undefined, collector);
+		const output = () => ({
+			title: "",
+			output: "file content",
+			metadata: { filePath: targetFile },
+		});
+
+		const baseline = output();
+		await hook["tool.execute.after"](
+			{ tool: "read", sessionID: SESSION_ID, callID: "baseline" },
+			baseline,
+		);
+		expect(baseline.output).toContain("[Rule: ");
+
+		for (let index = 0; index < RESURFACE_TOOL_CALL_GAP; index += 1) {
+			await hook["tool.execute.after"](
+				{ tool: "bash", sessionID: SESSION_ID, callID: `gap-${index}` },
+				{ title: "", output: "", metadata: {} },
+			);
+		}
+
+		await hook["tool.execute.after"](
+			{ tool: "read", sessionID: SESSION_ID, callID: "resurface" },
+			output(),
+		);
+
+		const pending = collector.getPending(SESSION_ID);
+		const reminder = pending.entries.find((entry) =>
+			entry.content.includes("[Rule reminder: .omo/rules/typescript.md]"),
+		)?.content;
+		expect(reminder).toBeDefined();
+		expect(reminder).toContain("Must use strict TypeScript.");
+		expect(reminder).not.toContain('globs: "src/**/*.ts"');
+		expect(reminder?.length).toBeLessThanOrEqual(600);
+	});
+
+	it("#given suppressed governed rule before gap #when hook runs #then queues no reminder", async () => {
+		const collector = new ContextCollector();
+		const hook = createRulesInjectorHook(makeContext(projectRoot), undefined, undefined, collector);
+		const output = () => ({
+			title: "",
+			output: "file content",
+			metadata: { filePath: targetFile },
+		});
+
+		await hook["tool.execute.after"](
+			{ tool: "read", sessionID: SESSION_ID, callID: "baseline" },
+			output(),
+		);
+		for (let index = 0; index < 3; index += 1) {
+			await hook["tool.execute.after"](
+				{ tool: "bash", sessionID: SESSION_ID, callID: `gap-${index}` },
+				{ title: "", output: "", metadata: {} },
+			);
+		}
+		await hook["tool.execute.after"](
+			{ tool: "read", sessionID: SESSION_ID, callID: "suppressed" },
+			output(),
+		);
+
+		expect(collector.getPending(SESSION_ID).hasContent).toBe(false);
 	});
 });

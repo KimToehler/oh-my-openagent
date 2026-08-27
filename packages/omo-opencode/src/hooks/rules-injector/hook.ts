@@ -63,6 +63,7 @@ export function createRulesInjectorHook(
 			: undefined,
 		onRuleSuppressed: resurfacing?.handleSuppressedRule,
 		onRuleInjected: resurfacing?.noteInjected,
+		shouldResurfaceRule: resurfacing?.shouldSurface,
 	});
 
 	function clearSessionState(sessionID: string): void {
