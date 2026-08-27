@@ -1,0 +1,6 @@
+[
+  {"tool":"task","when":"QA_COMPLETION_REASON_PARENT","unless":"Task launched","args":{"description":"completion reason probe","prompt":"QA_COMPLETION_REASON_CHILD: reply exactly CHILD_COMPLETE","category":"quick","run_in_background":true}},
+  {"text":"CHILD_COMPLETE","when":"QA_COMPLETION_REASON_CHILD"},
+  {"tool":"background_output","when":"[ALL BACKGROUND TASKS COMPLETE]","unless":"BACKGROUND TASK RESULT","capture":{"taskID":"background_output\\(task_id=\\\"([^\\\"]+)\\\"\\)"},"args":{"task_id":"{{taskID}}"}},
+  {"text":"QA collected background result."}
+]

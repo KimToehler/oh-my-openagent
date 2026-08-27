@@ -1,6 +1,6 @@
 import { buildBlockedAnswerInstruction } from "./blocked-answer-instruction"
 import { sanitizeUntrustedText } from "./untrusted-text"
-import type { BackgroundTaskAttempt, BackgroundTaskStatus } from "./types"
+import type { BackgroundTaskAttempt, BackgroundTaskCompletionReason, BackgroundTaskStatus } from "./types"
 
 export type BackgroundTaskNotificationStatus = "COMPLETED" | "BLOCKED" | "CANCELLED" | "INTERRUPTED" | "ERROR"
 
@@ -14,6 +14,7 @@ export interface BackgroundTaskNotificationTask {
   blockedAt?: Date
   blockedReason?: string
   unfinishedTodoCount?: number
+  completionReason?: BackgroundTaskCompletionReason
 }
 
 function formatAttemptModel(attempt: BackgroundTaskAttempt): string {
@@ -58,9 +59,9 @@ function formatTaskSummaryLine(task: BackgroundTaskNotificationTask): string {
   const sessionSuffix = task.sessionId ? ` | session: \`${task.sessionId}\`` : ""
   const baseLine = `- \`${task.id}\`: ${task.description || task.id}${sessionSuffix}`
   const statusSuffix = task.status === "completed"
-    ? task.unfinishedTodoCount && task.unfinishedTodoCount > 0
+    ? `${task.unfinishedTodoCount && task.unfinishedTodoCount > 0
       ? ` - completed with ${task.unfinishedTodoCount} unfinished todo${task.unfinishedTodoCount === 1 ? "" : "s"}`
-      : ""
+      : ""}${task.completionReason ? `, reason: ${task.completionReason}` : ""}`
     : ` [${task.status.toUpperCase()}]${task.error ? ` - ${task.error}` : ""}`
   const timeline = formatAttemptTimeline(task)
 

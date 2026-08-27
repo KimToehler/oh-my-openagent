@@ -28,6 +28,13 @@ export interface TaskProgress {
 
 export type BackgroundTaskAttemptStatus = BackgroundTaskStatus
 
+export type BackgroundTaskCompletionReason =
+  | "terminal-session-status"
+  | "todo-gate-expired"
+  | "idle-status"
+  | "session-gone"
+  | "session-idle-event"
+
 export interface BackgroundTaskAttempt {
   attemptId: string
   attemptNumber: number
@@ -109,6 +116,8 @@ export interface BackgroundTask {
   todoGateFirstObservedAt?: Date
   /** Todos left non-terminal when the gate grace expired; surfaced in the completion notification. */
   unfinishedTodoCount?: number
+  /** Path that completed the task, surfaced in the completion notification. */
+  completionReason?: BackgroundTaskCompletionReason
 }
 
 export interface BackgroundTaskSnapshot {

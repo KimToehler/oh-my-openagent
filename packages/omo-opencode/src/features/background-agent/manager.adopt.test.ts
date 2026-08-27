@@ -10,7 +10,7 @@ import {
 } from "../claude-code-session-state"
 import { BackgroundManager } from "./manager"
 import type { ConcurrencyManager } from "./concurrency"
-import type { BackgroundTask } from "./types"
+import type { BackgroundTask, BackgroundTaskCompletionReason } from "./types"
 
 const managers: BackgroundManager[] = []
 
@@ -70,8 +70,8 @@ function getConcurrencyManager(manager: BackgroundManager): ConcurrencyManager {
 }
 
 async function completeTask(manager: BackgroundManager, task: BackgroundTask): Promise<boolean> {
-  const tryCompleteTask = Reflect.get(manager, "tryCompleteTask") as (task: BackgroundTask, source: string) => Promise<boolean>
-  return tryCompleteTask.call(manager, task, "test")
+  const tryCompleteTask = Reflect.get(manager, "tryCompleteTask") as (task: BackgroundTask, source: string, reason: BackgroundTaskCompletionReason) => Promise<boolean>
+  return tryCompleteTask.call(manager, task, "test", "idle-status")
 }
 
 describe("BackgroundManager.adoptRunningSession", () => {

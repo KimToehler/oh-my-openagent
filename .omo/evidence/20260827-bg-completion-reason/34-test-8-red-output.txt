@@ -1,0 +1,25 @@
+$ cd /Users/tim/git/oh-my-openagent/.worktrees/hf-top3-pr1 && bun test packages/omo-opencode/src/features/background-agent/background-task-notification-template.test.ts
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/features/background-agent/background-task-notification-template.test.ts:
+443 |           { id: "task-clean-reason", description: "Finish task", status: "completed", completionReason: "session-gone" },
+444 |         ],
+445 |       })
+446 |
+447 |       // then
+448 |       expect(notification).toContain("reason: session-gone")
+                                 ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "reason: session-gone"
+Received: "<system-reminder>\n[BACKGROUND TASK COMPLETED]\n[ALL BACKGROUND TASKS COMPLETE]\n\n**Completed:**\n- `task-clean-reason`: Finish task\n\nAll sibling background tasks are complete. Your next action should be to call `background_output(task_id=\"<id>\")` for each task ID above.\n</system-reminder>"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/hf-top3-pr1/packages/omo-opencode/src/features/background-agent/background-task-notification-template.test.ts:448:28)
+(fail) buildBackgroundTaskNotificationText > #given a completed task that left todos unfinished > #given a task that completed cleanly with zero unfinished todos #when building the notification #then the summary line still names the completion reason [0.60ms]
+
+ 29 pass
+ 1 fail
+ 68 expect() calls
+Ran 30 tests across 1 file. [104.00ms]
+
+[exit:1]

@@ -5,7 +5,7 @@ import { checkAndInterruptStaleTasks, pruneStaleTasksAndNotifications } from "./
 import { tmpdir } from "node:os"
 import type { PluginInput } from "@opencode-ai/plugin"
 import { BackgroundManager } from "./manager"
-import type { BackgroundTask } from "./types"
+import type { BackgroundTask, BackgroundTaskCompletionReason } from "./types"
 
 describe("checkAndInterruptStaleTasks", () => {
   const mockClient = {
@@ -1130,7 +1130,8 @@ describe("pruneStaleTasksAndNotifications", () => {
       simulatedNow += 60_000
       task.progress = { toolCalls: 1, lastUpdate: new Date(simulatedNow) }
       await Reflect.get(manager, "pollRunningTasks").call(manager)
-      await Reflect.get(manager, "tryCompleteTask").call(manager, task, "test terminal cleanup")
+      const tryCompleteTask = Reflect.get(manager, "tryCompleteTask") as (task: BackgroundTask, source: string, reason: BackgroundTaskCompletionReason) => Promise<boolean>
+      await tryCompleteTask.call(manager, task, "test terminal cleanup", "idle-status")
       const nextTask = { ...task, id: "gate-task-next", status: "running" as const, completedAt: undefined }
       Reflect.get(manager, "tasks").set(nextTask.id, nextTask)
       await Reflect.get(manager, "pollRunningTasks").call(manager)

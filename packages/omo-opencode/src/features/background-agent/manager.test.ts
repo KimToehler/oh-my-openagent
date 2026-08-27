@@ -23,7 +23,7 @@ import { BackgroundManager } from "./manager"
 import { resumeTask } from "./spawner"
 import { _resetForTesting as resetProcessCleanupState } from "./process-cleanup"
 import { clearBackgroundTaskRegistryForTesting } from "./task-registry"
-import type { BackgroundTask, ResumeInput } from "./types"
+import type { BackgroundTask, BackgroundTaskCompletionReason, ResumeInput } from "./types"
 
 afterAll(() => { mock.restore() })
 
@@ -325,8 +325,8 @@ function pruneStaleTasksAndNotificationsForTest(manager: BackgroundManager): voi
 }
 
 async function tryCompleteTaskForTest(manager: BackgroundManager, task: BackgroundTask): Promise<boolean> {
-  return (cast<{ tryCompleteTask: (task: BackgroundTask, source: string) => Promise<boolean> }>(manager))
-    .tryCompleteTask(task, "test")
+  return (cast<{ tryCompleteTask: (task: BackgroundTask, source: string, reason: BackgroundTaskCompletionReason) => Promise<boolean> }>(manager))
+    .tryCompleteTask(task, "test", "idle-status")
 }
 
 function stubNotifyParentSession(manager: BackgroundManager): void {

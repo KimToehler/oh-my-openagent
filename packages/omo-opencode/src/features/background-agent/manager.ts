@@ -121,6 +121,7 @@ import {
 import type {
   BackgroundTask,
   BackgroundTaskAttempt,
+  BackgroundTaskCompletionReason,
   BackgroundTaskSnapshot,
   AdoptRunningSessionInput,
   LaunchInput,
@@ -1517,6 +1518,7 @@ The fallback retry session is now created and can be inspected directly.
     existingTask.error = undefined
     existingTask.todoGateFirstObservedAt = undefined
     existingTask.unfinishedTodoCount = undefined
+    existingTask.completionReason = undefined
     this.updateTaskParent(existingTask, input.parentSessionId)
     existingTask.parentMessageId = input.parentMessageId
     existingTask.parentModel = input.parentModel
@@ -2060,7 +2062,7 @@ Task ${existingTask.id} resumed with parent answer.
         idleDeferralTimers: this.idleDeferralTimers,
         validateSessionHasOutput: (id) => this.validateSessionHasOutput(id),
         checkSessionTodos: async (id) => (await this.checkSessionTodos(id)).hasIncompleteTodos,
-        tryCompleteTask: (task, source) => this.tryCompleteTask(task, source),
+        tryCompleteTask: (task, source, reason) => this.tryCompleteTask(task, source, reason),
         emitIdleEvent: (sessionID) => this.handleEvent({ type: "session.idle", properties: { sessionID } }),
       })
     }
@@ -2901,7 +2903,11 @@ The task was re-queued on a fallback model after a retryable failure.
    * Safely complete a task with race condition protection.
    * Returns true if task was successfully completed, false if already completed by another path.
    */
-  private async tryCompleteTask(task: BackgroundTask, source: string): Promise<boolean> {
+  private async tryCompleteTask(
+    task: BackgroundTask,
+    source: string,
+    reason: BackgroundTaskCompletionReason,
+  ): Promise<boolean> {
     // Guard: Check if task is still running (could have been completed by another path)
     if (task.status !== "running" || this.completingTaskIds.has(task.id)) {
       log("[background-agent] Task already completed, skipping:", { taskId: task.id, status: task.status, source })
@@ -2943,6 +2949,7 @@ The task was re-queued on a fallback model after a retryable failure.
         task.concurrencyKey = undefined
       }
 
+      task.completionReason = reason
       this.markForNotification(task)
 
       const idleTimer = this.idleDeferralTimers.get(task.id)
@@ -3021,6 +3028,7 @@ The task was re-queued on a fallback model after a retryable failure.
       attempts: cloneAttempts(task),
       sessionId: task.sessionId,
       unfinishedTodoCount: task.unfinishedTodoCount,
+      completionReason: task.completionReason,
     })
 
     // Update pending tracking and check if all tasks complete
@@ -3519,7 +3527,7 @@ The task was re-queued on a fallback model after a retryable failure.
           }
 
           if (sessionStatus && isTerminalSessionStatus(sessionStatus.type)) {
-            await this.tryCompleteTask(task, `polling (terminal session status: ${sessionStatus.type})`)
+            await this.tryCompleteTask(task, `polling (terminal session status: ${sessionStatus.type})`, "terminal-session-status")
             continue
           }
 
@@ -3595,11 +3603,11 @@ The task was re-queued on a fallback model after a retryable failure.
             }
 
             task.unfinishedTodoCount = todoState.incompleteTodoCount
-            await this.tryCompleteTask(task, "todo-gate grace expired")
+            await this.tryCompleteTask(task, "todo-gate grace expired", "todo-gate-expired")
             continue
           }
 
-          await this.tryCompleteTask(task, completionSource)
+          await this.tryCompleteTask(task, completionSource, sessionStatus?.type === "idle" ? "idle-status" : "session-gone")
         } catch (error) {
           log("[background-agent] Poll error for task:", { taskId: task.id, error })
         }
