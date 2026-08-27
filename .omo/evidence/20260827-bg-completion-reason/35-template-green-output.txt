@@ -1,0 +1,8 @@
+$ cd /Users/tim/git/oh-my-openagent/.worktrees/hf-top3-pr1 && bun test packages/omo-opencode/src/features/background-agent/background-task-notification-template.test.ts
+bun test v1.4.0 (1381054db)
+
+
+ 30 pass
+ 0 fail
+ 68 expect() calls
+Ran 30 tests across 1 file. [77.00ms]

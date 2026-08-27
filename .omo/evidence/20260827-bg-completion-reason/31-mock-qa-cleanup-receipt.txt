@@ -1,0 +1,3 @@
+server_pid= alive=no
+mock_pid=40857 alive=no
+sandbox=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.rgh7Uy8hR1 exists=no

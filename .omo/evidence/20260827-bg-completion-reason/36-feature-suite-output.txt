@@ -1,0 +1,8 @@
+$ cd /Users/tim/git/oh-my-openagent/.worktrees/hf-top3-pr1 && bun test packages/omo-opencode/src/features/background-agent/
+bun test v1.4.0 (1381054db)
+
+
+ 917 pass
+ 0 fail
+ 2402 expect() calls
+Ran 917 tests across 81 files. [31.17s]
