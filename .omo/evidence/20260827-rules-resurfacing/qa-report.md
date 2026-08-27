@@ -11,7 +11,7 @@ WHAT WAS OBSERVED
   `Bad Request: checking third-party user token: bad request: Personal Access Tokens are not supported for this endpoint`
 - Marker counts from `.omo/evidence/20260827-rules-resurfacing/qa-counts.txt`: `[Rule: ` = 0; `[Rule reminder: ` = 0. No ordering or imperative-body assertion is possible because provider authentication rejected prompt before session execution.
 - Real DB count remained identical: before `3055`; after `3055`.
-- Sandbox root printed by QA helper: `/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.lz5MyJQJhS`.
+- Sandbox cleanup receipt: `sandbox_removed`.
 
 WHY IT IS ENOUGH
 
