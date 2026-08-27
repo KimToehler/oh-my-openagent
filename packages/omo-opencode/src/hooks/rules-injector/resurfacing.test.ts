@@ -1,4 +1,5 @@
-import { describe, expect, it } from "bun:test";
+import { describe, expect, it, spyOn } from "bun:test";
+import * as shared from "../../shared";
 import { ContextCollector } from "../../features/context-injector";
 import {
 	buildRuleReminder,
@@ -71,6 +72,32 @@ describe("rule resurfacing", () => {
 
 		// then
 		expect(collector.hasPending(SESSION_ID)).toBe(true);
+	});
+
+	it("#given no watermark and a genuine zero gap #when each suppressed rule is evaluated #then their log payloads are distinguishable", () => {
+		// given
+		const logSpy = spyOn(shared, "log").mockImplementation(() => undefined);
+		const collector = new ContextCollector();
+		const resurfacing = createRuleResurfacing(collector);
+		const input = {
+			sessionID: SESSION_ID,
+			realPath: REAL_PATH,
+			relativePath: RULE_PATH,
+			matchReason: "matched",
+			body: "NEVER inject raw prompts.",
+		};
+
+		// when
+		resurfacing.handleSuppressedRule(input);
+		resurfacing.handleSuppressedRule(input);
+
+		// then
+		const decisions = logSpy.mock.calls
+			.filter(([message]) => message === "[rules-injector] Resurfacing decision")
+			.map(([, payload]) => payload as { gap: number | null });
+		expect(decisions[0]?.gap).toBeNull();
+		expect(decisions[1]?.gap).toBe(0);
+		logSpy.mockRestore();
 	});
 
 	it("#given a rule body containing uppercase NEVER and MUST lines #when the reminder is built #then it carries those imperative lines and not the full body", () => {

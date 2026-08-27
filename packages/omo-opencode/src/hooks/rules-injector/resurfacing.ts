@@ -6,7 +6,7 @@ export const RESURFACE_TOOL_CALL_GAP = 40;
 export type ResurfacingStore = {
 	recordToolCall(sessionID: string): void;
 	shouldSurface(sessionID: string, realPath: string): boolean;
-	getGap(sessionID: string, realPath: string): number | undefined;
+	getGap(sessionID: string, realPath: string): number | null;
 	noteSurfaced(sessionID: string, realPath: string): void;
 	clearSession(sessionID: string): void;
 };
@@ -53,7 +53,7 @@ export function createResurfacingStore(): ResurfacingStore {
 		getGap: (sessionID, realPath) => {
 			const state = getSession(sessionID);
 			const last = state.lastSurfacedAtCall.get(realPath);
-			return last === undefined ? undefined : state.toolCallCount - last;
+			return last === undefined ? null : state.toolCallCount - last;
 		},
 		noteSurfaced: (sessionID, realPath) => {
 			const state = getSession(sessionID);
@@ -79,7 +79,7 @@ export function createRuleResurfacing(
 			log("[rules-injector] Resurfacing decision", {
 				sessionID: input.sessionID,
 				rulePath: input.relativePath,
-				gap: gap ?? 0,
+				gap,
 				decision: shouldSurface ? "surface" : "suppress",
 			});
 			if (!shouldSurface) return;
