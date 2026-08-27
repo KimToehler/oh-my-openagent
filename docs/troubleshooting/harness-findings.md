@@ -2443,3 +2443,14 @@ Two claims in this entry, verified separately.
 **Root cause:** only one of four tests in the block pinned `Date.now`; the other three compared historical fixture timestamps against real time.
 
 **Fix:** added one `withFixedNow(fixedNow, fn)` helper with `finally` restoration and ran all four cases through it. Expectations retain their todo-gate behavior; only clock source is deterministic.
+
+## 2026-08-27 — Completion reasons were hidden for clean background-task completions
+
+**Severity:** costly
+**Area:** background-agent notifications
+
+**What happened:** Four completion call sites produce five union values: poller completion uses `terminal-session-status`, `todo-gate-expired`, `idle-status`, and `session-gone`; `session-idle-event-handler.ts:92` independently produces `session-idle-event` outside poller flow. Notification rendering nested reason text inside `unfinishedTodoCount > 0`, so clean completions omitted their discriminator.
+
+**Root cause:** `background-task-notification-template.ts` made todo count and completion reason one nested suffix. A 916-pass feature suite hid this common-path defect because existing reason coverage used unfinished todos.
+
+**Fix:** render todo count and completion reason as independent completed-task suffixes. Added regression coverage for clean completion, unfinished todos plus reason, and missing reason. Live isolated HTTP-server QA recorded `reason: session-gone` in `[ALL BACKGROUND TASKS COMPLETE]`.
