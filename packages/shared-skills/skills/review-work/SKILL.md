@@ -1,6 +1,6 @@
 ---
 name: review-work
-description: "Post-implementation review orchestrator. Launches 5 parallel background sub-agents: Oracle (goal/constraint verification), Oracle (code quality), Oracle (security), unspecified-high (hands-on QA execution), unspecified-high (context mining from GitHub/git/Slack/Notion). All must pass for review to pass. MUST USE before a PR handoff or when the user explicitly asks to review completed work. Triggers: 'review work', 'review my work', 'review changes', 'QA my work', 'verify implementation', 'check my work', 'validate changes', 'post-implementation review'."
+description: "Post-implementation merge gate and review orchestrator. Launches 5 parallel background sub-agents: Oracle (goal/constraint verification), Oracle (code quality, run twice cross-engine when two differently-backed reviewers exist), Oracle (security), unspecified-high (hands-on QA execution), unspecified-high (context mining from GitHub/git/Slack/Notion). All must pass for review to pass. This IS the security lane - a process that points at a separate security review is satisfied by running this. USE before merging any PR whose change is production code that is multi-file, cross-cutting, or adds a new surface; SKIP for typo, formatting, docs-only, dependency-bump, or revert changes, and state that you skipped it. Triggers: 'review work', 'review my work', 'review changes', 'QA my work', 'verify implementation', 'check my work', 'validate changes', 'post-implementation review', 'ready to merge', 'before merging'."
 ---
 ## Codex Harness Tool Compatibility
 
@@ -68,8 +68,157 @@ The 5 agents cover complementary concerns - together they form a comprehensive r
 | 1 | Goal Verifier | Oracle | Did we build what was asked? | MAIN |
 | 2 | QA Executor | unspecified-high | Does it actually work? | MAIN |
 | 3 | Code Reviewer | Oracle | Is the code well-written? | MAIN |
-| 4 | Security Auditor | Oracle | Is it secure? | SUB |
+| 4 | Security Auditor | Oracle | Is it secure? | MAIN |
 | 5 | Context Miner | unspecified-high | Did we miss any context? | MAIN |
+
+---
+
+## When to use
+
+Five parallel lanes, three of them high-cost reasoning agents, is the right
+weight for a change that can plausibly be wrong in a way review would catch. It
+is the wrong weight for a change whose failure mode is "it does not compile".
+Run the full gate when the change is production code AND at least one of the
+following is true.
+
+| Context | Run the full 5 lanes? |
+|---|---|
+| Multi-file change to production code | **Yes** |
+| Adds a new surface: endpoint, tool, hook, agent, CLI command, config key | **Yes** |
+| Cross-cutting change: touches auth, persistence, concurrency, money, PII | **Yes** |
+| Changes a security boundary, permission check, or input-handling path | **Yes** |
+| Before merging a non-trivial PR | **Yes** |
+| Inheriting unfamiliar code, or reviewing someone else's branch | **Yes** |
+| Single-file change with an obvious blast radius | Lanes 1 and 3 only |
+| Typo, comment, formatting, lint-only, generated-file refresh | **No** |
+| Dependency bump with no code change and a green lockfile diff | **No** |
+| Documentation-only change (`*.md`, no code path) | **No** |
+| Revert of a commit that was itself reviewed | **No** |
+| Per-slice review during execution, before the work is finished | **No** - review the finished branch instead |
+
+Two rules keep the gate honest.
+
+**Skipping is a decision you state, not one you make silently.** When you skip,
+say which rule let you skip and what the change was. "Skipped review-work:
+dependency bump, lockfile-only diff" is a complete record. Silence is not.
+
+**Partial runs are legitimate.** A single-file production change usually needs
+goal conformance and code quality, not hands-on QA and context mining. Run the
+lanes that can find something, name the ones you did not run, and do not call
+the result a passed full review.
+
+The cost asymmetry runs one way. A skipped review on a change that needed one
+ships a defect; a review run on a change that did not need one costs minutes.
+When genuinely unsure, run it.
+
+---
+
+## Relationship to other gates
+
+This skill is one gate among several, and the boundaries matter because a gap
+between two gates is where defects live.
+
+| Gate | Covers | Runs when |
+|---|---|---|
+| Per-slice code review | One slice, local quality, as it is written | During execution |
+| `integration-review` | Composition failures across the whole branch: duplication, naming drift, uneven APIs, missing abstractions, dead code, doc drift | End of multi-slice work |
+| **`review-work`** (this) | Goal conformance, hands-on QA, code quality, **security**, missed context | Before a PR handoff or merge |
+| Harness-specific QA | Whether the change works against the real runtime, with recorded evidence | Whenever the change touches that harness |
+
+`integration-review` and `review-work` are complements, not alternatives.
+`integration-review` reads the whole change at once and asks "is this
+well-composed?". `review-work` asks "is this correct, does it run, is it safe,
+and did we miss anything?". A large branch usually wants both, in that order:
+compose first, then verify.
+
+**`review-work` IS the security lane.** Lane 4 is a dedicated security audit.
+Any gate that routes security elsewhere with a "use a separate security review"
+pointer is satisfied by running this skill - there is no third gate to chase,
+and no separate invocation to remember. If a review process names both, running
+`review-work` discharges the security obligation. Reach for a standalone
+security audit only when the change is security-critical enough to want more
+than one lane on it: a new authentication path, a change to a trust boundary, or
+anything handling untrusted input at scale.
+
+The one gap worth naming: `review-work` reviews the change. It does not review
+the plan that produced the change. If the work was driven by a written plan,
+lane 1 below is where plan conformance is checked.
+
+---
+
+## Cross-engine lane assignment
+
+Two reviewers backed by the same model are two samples, not two opinions. They
+share training data, share blind spots, and agree with each other for reasons
+that have nothing to do with the code being correct. Agreement between them
+reads like confirmation and is not.
+
+Genuine cross-engine review needs reviewers whose *backends* differ, not whose
+prompts differ. Where the harness can supply that, use it.
+
+**Lane 3 (code quality) is the cross-engine lane.** Code quality is the
+judgment call most improved by a genuinely different reader: what one model
+treats as idiomatic another flags as a foot-gun. When two differently-backed
+reviewers are available, run lane 3 twice - once per engine - on identical
+input, and merge their findings with the reconciliation procedure below. The
+lane produces ONE verdict, not two.
+
+**Lane 1 (goal and constraint verification) is where a plan-critic engine
+fits.** Checking an implementation against a stated goal and a fixed constraint
+list is conformance checking, which is what a plan critic does well. If the
+harness offers a dedicated plan/spec critic, lane 1 is the only lane it belongs
+in - and only when the work was driven by a written plan, with that plan as the
+input.
+
+**A plan critic cannot review a code diff.** It expects a plan or spec as input
+and will reject, or worse silently mishandle, a raw diff. Never route lanes 2
+through 5 to one. The same applies to any pre-planning consultant. Reviewing
+code is the reasoning agent's job.
+
+**Determining what is actually available.** Do not infer a reviewer's backend
+from its name, and do not hardcode model identifiers into a review plan. Model
+routing is per-user configuration: two differently-named agents can resolve to
+the same backend, and one agent can resolve to different backends for different
+users. Check the harness's own agent and model configuration to find which
+reviewers are backed differently.
+
+**When a second engine is not available, say so.** Run lane 3 once and record
+the lane as single-engine. A single-engine lane 3 is a valid PASS - it is simply
+a weaker one, and the report should not imply cross-validation that did not
+happen. Never fabricate a second opinion by running the same backend twice under
+a different label.
+
+---
+
+## Reconciling findings
+
+This procedure applies to any lane that produced findings, and is mandatory for
+a two-engine lane 3. It is the step that converts raw reviewer output into
+something worth acting on.
+
+**Dedup first.** Same defect, same location, same reason means one finding, not
+two. Note when both engines flagged it - independent agreement across different
+backends is real signal, unlike agreement between two samples of one model.
+Keep correctness findings ahead of style ones.
+
+**Then validate every surviving finding against the actual code.** A reviewer's
+verdict is input, not instruction. Read the cited lines and the enclosing
+function. Trace callers and callees when the claim depends on them. Where a
+finding claims a regression, check what the merge base actually contained rather
+than trusting the description. Classify each:
+
+- **CONFIRMED** - the failure path is reproducible in the code. Fix it.
+- **PLAUSIBLE** - realistic but state-dependent. Fix if low-risk and in scope; otherwise surface with a recommendation.
+- **REFUTED** - factually wrong, already guarded, or pure style asserted as a defect. Quote the line that disproves it.
+- **INTENTIONAL** - a deliberate documented choice. Cite the comment, commit, or design note.
+
+Shipping a fix for a defect that does not exist is its own regression. A
+disproved finding is recorded as rejected with its evidence, never silently
+dropped - the reader needs to see it was considered.
+
+**Report in three buckets**, most severe first: fixed (with the verification
+result), confirmed but not fixed (with the reason and a recommendation), and
+reviewed and dismissed (one line each with the evidence).
 
 ---
 
@@ -320,9 +469,17 @@ OUTPUT FORMAT:
 
 ---
 
-### Agent 3: Code Quality Review (Oracle) - MAIN
+### Agent 3: Code Quality Review (Oracle) - MAIN - CROSS-ENGINE LANE
 
 This agent answers: "Is the code well-written, maintainable, and consistent with the codebase?"
+
+This is the lane to run twice when the harness offers two differently-backed
+reviewers - see "Cross-engine lane assignment" above. Launch both with the
+identical prompt below, in the same turn as the other lanes, then reconcile
+their findings into ONE lane verdict using "Reconciling findings". Independent
+agreement between different backends raises confidence; a disagreement is the
+finding worth reading first. If only one reviewer backend exists, run it once
+and record the lane as single-engine.
 
 ```
 task(
@@ -395,11 +552,15 @@ OUTPUT FORMAT:
 
 ---
 
-### Agent 4: Security Review (Oracle) - SUB
+### Agent 4: Security Review (Oracle) - MAIN
 
 This agent answers: "Are there security vulnerabilities in these changes?"
 
-This is supplementary - it focuses exclusively on security. It does NOT comment on code style, architecture, or functionality unless those directly create a security risk.
+This lane is focused, not optional. It comments exclusively on security and
+stays silent on style, architecture, and functionality unless those directly
+create a security risk - a narrow remit, run at full weight. This is the lane
+that discharges the security obligation for the whole gate, so a FAIL here fails
+the review exactly like any other lane.
 
 ```
 task(
@@ -579,6 +740,12 @@ ALL 5 agents returned PASS → **REVIEW PASSED**
 ANY agent returned FAIL → **REVIEW FAILED - criteria not met**
 ANY lane is INCONCLUSIVE and none failed → **REVIEW INCONCLUSIVE - not approved**
 
+A deliberately partial run (see "When to use") is scored the same way over the
+lanes you ran, and reported as **REVIEW PASSED (PARTIAL - lanes N, M)** naming
+the lanes you skipped and why. A partial pass is never reported as a full one.
+Skipping a lane is a scoping decision made before launch; dropping a lane after
+it returned FAIL is not a partial run, it is a failed review.
+
 </verdict_logic>
 
 Compile the final report in this format:
@@ -592,8 +759,8 @@ Compile the final report in this format:
 |---|------------|------------|---------|------------|
 | 1 | Goal & Constraint Verification | Oracle | PASS/FAIL/INCONCLUSIVE | HIGH/MED/LOW |
 | 2 | QA Execution | unspecified-high | PASS/FAIL/INCONCLUSIVE | HIGH/MED/LOW |
-| 3 | Code Quality | Oracle | PASS/FAIL/INCONCLUSIVE | HIGH/MED/LOW |
-| 4 | Security (supplementary) | Oracle | PASS/FAIL/INCONCLUSIVE | Severity |
+| 3 | Code Quality | Oracle (name each engine; "single-engine" if only one) | PASS/FAIL/INCONCLUSIVE | HIGH/MED/LOW |
+| 4 | Security | Oracle | PASS/FAIL/INCONCLUSIVE | Severity |
 | 5 | Context Mining | unspecified-high | PASS/FAIL/INCONCLUSIVE | HIGH/MED/LOW |
 
 ## Blocking Issues

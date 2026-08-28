@@ -1,0 +1,16 @@
+=== propagation: new sections in all 3 copies ===
+packages/shared-skills/skills/review-work/SKILL.md         sections=4
+packages/omo-senpi/plugin/skills/review-work/SKILL.md      sections=4
+packages/omo-codex/plugin/skills/review-work/SKILL.md      sections=4
+
+=== codex gate overlay survived regeneration ===
+1
+
+=== lane 4 SUB->MAIN in all copies ===
+| 4 | Security Auditor | Oracle | Is it secure? | MAIN |
+| 4 | Security Auditor | Oracle | Is it secure? | MAIN |
+| 4 | Security Auditor | Oracle | Is it secure? | MAIN |
+
+=== derived copies are gitignored build artifacts ===
+packages/omo-senpi/.gitignore:2:/plugin/skills/	packages/omo-senpi/plugin/skills/review-work/SKILL.md
+.gitignore:15:packages/omo-codex/plugin/skills/	packages/omo-codex/plugin/skills/review-work/SKILL.md
