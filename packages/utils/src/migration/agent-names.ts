@@ -41,6 +41,7 @@ export const AGENT_NAME_MAP: Record<string, string> = {
 
   // Already lowercase - passthrough
   build: "build",
+  auditor: "auditor",
   oracle: "oracle",
   librarian: "librarian",
   explore: "explore",
@@ -49,6 +50,8 @@ export const AGENT_NAME_MAP: Record<string, string> = {
 
 export const BUILTIN_AGENT_NAMES = new Set([
   "sisyphus", // was "Sisyphus"
+  "hephaestus",
+  "auditor",
   "oracle",
   "librarian",
   "explore",
@@ -57,6 +60,7 @@ export const BUILTIN_AGENT_NAMES = new Set([
   "momus", // was "Momus - Plan Critic"
   "prometheus", // was "Prometheus - Plan Builder"
   "atlas", // was "Atlas"
+  "sisyphus-junior",
   "build",
 ])
 

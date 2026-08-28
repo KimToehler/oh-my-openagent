@@ -4,9 +4,10 @@ import { isTaskSystemEnabled } from "../shared";
 
 type AgentWithPermission = { permission?: Record<string, unknown> };
 
-const TASK_DENIED_SUBAGENT_KEYS = [
+export const TASK_DENIED_SUBAGENT_KEYS = [
   "librarian",
   "explore",
+  "auditor",
   "oracle",
   "multimodal-looker",
   "metis",

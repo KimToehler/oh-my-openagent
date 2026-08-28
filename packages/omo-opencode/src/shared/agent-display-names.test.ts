@@ -101,6 +101,18 @@ describe("getAgentDisplayName", () => {
     expect(result).toBe("oracle")
   })
 
+
+  it("returns display name for auditor", () => {
+    // given
+    const configKey = "auditor"
+
+    // when
+    const result = getAgentDisplayName(configKey)
+
+    // then
+    expect(result).toBe("auditor")
+  })
+
   it("returns display name for librarian", () => {
     // given config key "librarian"
     const configKey = "librarian"
@@ -270,6 +282,7 @@ describe("AGENT_DISPLAY_NAMES", () => {
       momus: "Momus - Plan Critic",
       athena: "Athena - Council",
       "athena-junior": "Athena-Junior - Council",
+      auditor: "auditor",
       oracle: "oracle",
       librarian: "librarian",
       explore: "explore",
