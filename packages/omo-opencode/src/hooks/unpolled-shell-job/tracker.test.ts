@@ -240,6 +240,31 @@ describe("unpolled shell job tracker", () => {
     }
   })
 
+  it("keeps a job tracked when its result was consumed without a terminal poll", () => {
+    // The bounded-loop pattern the warning itself teaches: wait on a marker file,
+    // then read the result with a non-ctx_shell tool. The tracker never sees a
+    // ctx_shell status call, so the job stays outstanding and the hook fires on
+    // work the agent already consumed and acted on.
+    recordToolCall(detachedStart("shell_1f2e3d4c5b6a7988", "./gradlew build > /tmp/job.log"))
+
+    recordToolCall({
+      sessionID: SESSION,
+      tool: "lean-ctx_ctx_shell",
+      args: { command: 'for i in $(seq 1 50); do grep -q "BUILD SUCCESSFUL" /tmp/job.log && break; sleep 2; done' },
+      output: "",
+    })
+    recordToolCall({
+      sessionID: SESSION,
+      tool: "lean-ctx_ctx_read",
+      args: { path: "/tmp/job.log" },
+      output: "BUILD SUCCESSFUL in 3m 4s",
+    })
+
+    // Documents current behavior: consumption by effect does not deregister.
+    // The tracker only observes ctx_shell calls, so no signal reaches it here.
+    expect(getOutstandingJobs(SESSION).map((job) => job.jobId)).toEqual(["shell_1f2e3d4c5b6a7988"])
+  })
+
   it("caps the number of tracked jobs per session", () => {
     for (let index = 0; index < 80; index += 1) {
       const suffix = index.toString(16).padStart(8, "0")

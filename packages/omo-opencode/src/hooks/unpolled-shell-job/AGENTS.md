@@ -60,6 +60,19 @@ and was still violated three times in one session. Facts stated as reference get
 - `message.ts` builds the warning. It offers three resolutions (bounded wait / cancel /
   confirm-already-finished) rather than only "poll each one".
 
+  The wait path pairs the loop with **one terminal `status` call**, because the loop alone
+  does not deregister the job. The tracker only observes `ctx_shell` calls
+  (`tool-execute-after.ts` → `recordToolCall`); consuming a job's result by reading a
+  marker file, log, or verdict file with any other tool is invisible to it, so the job
+  stays outstanding and the hook re-fires on work the agent already finished and acted on.
+  That false positive was observed twice in one session. The message previously taught the
+  bounded loop as a complete resolution while only mentioning the clearing call as a
+  separate option, which is what produced it. Clearing on genuinely-observed completion is
+  not implementable from the hook's inputs: `session.idle` carries no job status, and the
+  tracker sees non-`ctx_shell` tool calls only as unrelated events. `tracker.test.ts`
+  pins this ("keeps a job tracked when its result was consumed without a terminal poll")
+  so the gap is characterized rather than rediscovered.
+
   The wait path prescribes a **bounded loop that breaks on completion**, because the
   earlier phrasing — a list of `background_action="status"` calls — reliably produced a
   spiral of a dozen-plus single status calls across as many turns, flooding context to
@@ -102,7 +115,7 @@ and was still violated three times in one session. Facts stated as reference get
 
 ## Testing
 
-`bun test packages/omo-opencode/src/hooks/unpolled-shell-job/` — 35 tests across
+`bun test packages/omo-opencode/src/hooks/unpolled-shell-job/` — 36 tests across
 `tracker.test.ts` (registration, status parsing, adoption, retirement, TTL/cap,
 per-session isolation) and `hook.test.ts` (dispatch shape, cooldown, settle gate,
 event filtering, dedupe-discard retry).

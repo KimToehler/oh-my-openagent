@@ -1,0 +1,8 @@
+Command: bash /tmp/run-unpolled-stub-qa.sh
+Surface: isolated OpenCode server with worktree plugin file URL, local mock OpenAI-compatible provider, local stdio MCP stub exposing myprobe_ctx_shell, all agents/categories pinned to mockprov/mock-model.
+Behavior proven: stub returns detached job shell_1f2e3d4c5b6a7988; no terminal poll/cancel runs; session.idle dispatches warning internal prompt containing new option-A text and job-specific terminal status guidance.
+
+SSE helper: .agents/skills/opencode-qa/scripts/sse-hook-probe.sh --attach <sandbox URL> --event message.part.updated
+
+Command: bun test packages/omo-opencode/src/hooks/unpolled-shell-job/
+Command: bun test packages/omo-opencode/src/plugin/tool-execute-after.test.ts

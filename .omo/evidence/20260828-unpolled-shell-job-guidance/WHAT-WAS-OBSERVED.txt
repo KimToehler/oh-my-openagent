@@ -1,0 +1,20 @@
+LIVE HOOK PROOF SUCCEEDED.
+
+Safety re-check (isolation-check-rerun.txt): HOME and XDG_CONFIG_HOME are both below OMO_QA_ROOT before sandbox config writes. No real user configuration path was written.
+
+First live attempt diagnosis corrected: prompt_async returned an empty body by design; it was not a stalled request. events.sse proves mock response and session.idle occurred. The mock called unavailable ctx_shell, which OpenCode converted to invalid before tool.execute.after. Therefore tracker never registered a job, so no warning was expected.
+
+Corrected run: sandbox opencode.json registered local MCP myprobe, exposing namespaced myprobe_ctx_shell. Stub returned `Started background job shell_1f2e3d4c5b6a7988`. Mock then returned `done` without status/cancel. events-rerun.sse captured message.part.updated internal prompt block from running plugin. captured-warning-rerun.txt contains both required literal `does NOT clear the job` and `ctx_shell(background_action="status", job_id="shell_1f2e3d4c5b6a7988")`.
+
+Artifacts:
+- isolation-check-rerun.txt
+- ctx-shell-stub.mjs
+- mock-model-rerun.log
+- opencode-serve-rerun.log
+- server-health-rerun.json
+- session-create-rerun.json
+- events-rerun.sse
+- captured-warning-rerun.txt
+- sse-hook-probe.log
+- unit-unpolled-shell-job.log
+- unit-tool-execute-after.log
