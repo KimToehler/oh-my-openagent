@@ -45,7 +45,7 @@ function formatAttemptTimeline(task: BackgroundTaskNotificationTask): string {
       ]
 
       if (attempt.status !== "completed" && attempt.error) {
-        attemptLines.push(`    Error: ${attempt.error}`)
+        attemptLines.push(`    Error: ${sanitizeUntrustedText(attempt.error, 1000)}`)
       }
 
       return attemptLines.join("\n")
@@ -57,12 +57,13 @@ function formatAttemptTimeline(task: BackgroundTaskNotificationTask): string {
 
 function formatTaskSummaryLine(task: BackgroundTaskNotificationTask): string {
   const sessionSuffix = task.sessionId ? ` | session: \`${task.sessionId}\`` : ""
-  const baseLine = `- \`${task.id}\`: ${task.description || task.id}${sessionSuffix}`
+  const safeDescription = sanitizeUntrustedText(task.description || task.id, 200).replace(/\n+/g, " ")
+  const baseLine = `- \`${task.id}\`: ${safeDescription}${sessionSuffix}`
   const statusSuffix = task.status === "completed"
     ? `${task.unfinishedTodoCount && task.unfinishedTodoCount > 0
       ? ` - completed with ${task.unfinishedTodoCount} unfinished todo${task.unfinishedTodoCount === 1 ? "" : "s"}`
       : ""}${task.completionReason ? `, reason: ${task.completionReason}` : ""}`
-    : ` [${task.status.toUpperCase()}]${task.error ? ` - ${task.error}` : ""}`
+    : ` [${task.status.toUpperCase()}]${task.error ? ` - ${sanitizeUntrustedText(task.error, 2000)}` : ""}`
   const timeline = formatAttemptTimeline(task)
 
   return `${baseLine}${statusSuffix}${timeline ? `\n${timeline}` : ""}`
