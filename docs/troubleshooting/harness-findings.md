@@ -2703,3 +2703,47 @@ Reproduced twice at `d59ca317a` with a clean tree, and independently by a second
 **Workaround:** never index a spy's call history positionally when the spied module could have been mocked elsewhere in the process. Filter to a value the test owns — a unique `sessionID` or other per-test discriminator carried in the payload — before indexing. Applied at `98d451ebe`, which keeps the original ordered assertions but selects only this test's own decisions, making the test immune to foreign history regardless of file order.
 
 **Fix status:** worked around in our test; runner behavior unfixed
+
+## 2026-08-28 — In a worktree, `sync-skills.mjs` silently regenerates Codex skills from the MAIN checkout instead of failing
+
+**Severity:** costly
+**Area:** build tooling
+**Observed in:** oh-my-openagent, editing `packages/shared-skills/skills/review-work/SKILL.md` in `.worktrees/rw-size-gate`
+
+**What happened:** after editing the shared source and running the documented regeneration commands, the Senpi copy picked up the edit and the Codex copy did not — while reporting success and writing a file with a fresh mtime. The Codex copy contained the pre-edit body, including the old `| 4 | Security Auditor | Oracle | Is it secure? | SUB |` row that the edit had changed to `MAIN`.
+
+**Evidence:**
+```
+$ cd .worktrees/rw-size-gate && npm run --prefix packages/omo-codex/plugin sync:skills
+> node scripts/sync-skills.mjs
+$ echo EXIT=$?
+EXIT=0
+
+$ for f in packages/shared-skills/.../SKILL.md packages/omo-senpi/plugin/skills/.../SKILL.md \
+           packages/omo-codex/plugin/skills/.../SKILL.md; do grep -c '^## When to use' $f; done
+1
+1
+0                      # <- regenerated, fresh mtime, zero new sections
+
+$ cd packages/omo-codex/plugin && node --input-type=module \
+    -e "import {sharedSkillsRootPath} from '@oh-my-opencode/shared-skills'; console.log(sharedSkillsRootPath())"
+RESOLVED: /Users/tim/git/oh-my-openagent/packages/shared-skills/skills/     # <- MAIN checkout, not the worktree
+```
+
+**Root cause:** the two sync scripts resolve their source differently. Senpi computes it path-relatively — `packages/omo-senpi/plugin/scripts/sync-skills.mjs:8-11` derives `repoRoot` from `import.meta.url` and joins `shared-skills/skills`, so it cannot leave its own tree. Codex calls `sharedSkillsRootPath()` (`packages/omo-codex/plugin/scripts/sync-skills.mjs:10`), whose probe walks `./skills/`, `../skills/`, `../../skills/` relative to the *resolved package* (`packages/shared-skills/index.mjs:16-23`). A fresh worktree has no `node_modules` (see the 2026-08-27 entry), so Node resolves `@oh-my-opencode/shared-skills` out of the worktree and into the main checkout, and the probe then finds the main checkout's `skills/`. The script reads there and writes into the worktree.
+
+**Why it is costly:** this is the failure mode that does not announce itself. The already-logged missing-`node_modules` finding covers builds that *crash* with module-not-found; here nothing crashes. Exit code 0, a plausible file on disk, a fresh mtime. The only way to catch it is to diff the generated copy for content you know you added — and an agent that trusts the exit code will ship a stale artifact. The Codex copy is gitignored, so `git status` shows nothing either.
+
+**Workaround:** before regenerating Codex skills from a worktree, give the worktree the dependency and verify the resolved path:
+```bash
+mkdir -p node_modules/@oh-my-opencode
+ln -sfn ../../packages/shared-skills node_modules/@oh-my-opencode/shared-skills
+cd packages/omo-codex/plugin && node --input-type=module \
+  -e "import {sharedSkillsRootPath} from '@oh-my-opencode/shared-skills'; console.log(sharedSkillsRootPath())"
+# assert the path is inside the worktree, THEN sync
+```
+A full `bun install` in the worktree fixes it too, at higher cost. Either way, verify the regenerated copy actually contains the edit rather than trusting the exit code.
+
+**Suggested real fix:** make the Codex script resolve path-relatively like the Senpi one, or have `sharedSkillsRootPath()` refuse a candidate outside the calling package's own repository root instead of silently walking to a sibling checkout.
+
+**Fix status:** unfixed; worked around per-invocation
