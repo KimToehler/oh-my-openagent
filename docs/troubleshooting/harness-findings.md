@@ -2476,6 +2476,16 @@ TYPECHECK_EXIT=0
 
 **Follow-on trap:** once the install succeeds, `bun run build` regenerates nine committed bundle artifacts (`packages/omo-codex/plugin/components/codegraph/dist/{cli,serve}.js`, `packages/omo-codex/scripts/install-dist/install-local.mjs`, and six `packages/omo-senpi/plugin/extensions/*`). They show as modified in the lane's worktree despite the lane never touching them. A lane told to finish with an empty `git status --porcelain` will be tempted either to `git checkout` them, which fights the build, or to `git add -A`, which stages nine unrelated files into its commit. The contract must instead be an explicit allowlist of those known regenerated paths.
 
+**Update (2026-08-28):** the same gap also disables the LSP inside a lane worktree, which is a separate loss from build and typecheck because it is silent. Three lanes in the post-merge review wave (`b212e8ff2`, `100a71127`, `3ca83323f`) each ran `bun install` correctly and still could not obtain diagnostics:
+
+```
+Request initialize failed with message: Could not find a valid TypeScript installation.
+Please ensure that the "typescript" dependency is installed in the workspace or that a
+valid `tsserver.path` is specified. Exiting.
+```
+
+The language server resolves `typescript` from the workspace root rather than from the per-worktree install, so `lsp_diagnostics` returns nothing useful even after dependencies are present. Unlike the build failure, this does not announce itself as a blocker: a lane simply gets no diagnostics and may report the file as clean. `bun run typecheck` (which uses `tsgo` and does not depend on the language server) is the correct substitute gate inside a worktree, and a lane brief should say so explicitly rather than asking for LSP-clean as evidence.
+
 **Fix status:** worked around
 
 ## 2026-08-27 — `record_lesson` rejects a well-formed `globs` array and cannot write a lesson
@@ -2662,3 +2672,34 @@ Verified by effect in both cases that the adopted session never ran: no new comm
 **Residuals:** Reply delivery still follows existing safety gating. This correction does not introduce a blocked-specific forced-dispatch route.
 
 **Fix status:** fixed
+
+## 2026-08-28 — `bun:test` spy call history survives another file's `mock.restore()`, silently corrupting index-based assertions
+
+**Severity:** costly
+**Area:** test runner
+**Observed in:** oh-my-openagent, post-merge review of `.omo/plans/2026-08-27-harness-findings-top3.md`
+
+**What happened:** a test that passed in isolation failed when its directory ran alongside another, at a clean commit with no local edits. `packages/omo-opencode/src/hooks/rules-injector/resurfacing.test.ts` creates `spyOn(shared, "log")` inside the test body, filters the captured calls to its own log message, and indexes `decisions[0]` and `decisions[1]` to assert a first evaluation logs `gap: null` and a second logs `gap: 0`. Run together with a background-agent file, `decisions[0].gap` was `40` — a real `RESURFACE_TOOL_CALL_GAP` payload emitted by an earlier test in the same file.
+
+**Evidence:**
+```
+$ bun test packages/omo-opencode/src/hooks/rules-injector/
+ 111 pass  0 fail
+
+$ bun test packages/omo-opencode/src/features/background-agent/abort-with-timeout.test.ts \
+           packages/omo-opencode/src/hooks/rules-injector/resurfacing.test.ts
+error: expect(received).toBeNull()
+Received: 40
+(fail) rule resurfacing > #given no watermark and a genuine zero gap #when each suppressed rule
+       is evaluated #then their log payloads are distinguishable
+ 9 pass  1 fail
+```
+Reproduced twice at `d59ca317a` with a clean tree, and independently by a second agent in its own worktree.
+
+**Root cause / hypothesis:** partly confirmed. The polluting files (`abort-with-timeout.test.ts`, `session-status-classifier.test.ts`) call `mock.module("../../shared/logger", ...)` and later `mock.restore()`. A `spyOn` created *after* that restore observes a call history that is not empty at creation time. Whether the history belongs to the restored module mock or to a shared spy registry was not traced in the runner's source; the observable fact is that a freshly created spy is not guaranteed to start with zero recorded calls when an earlier file in the same process mocked and restored the same module.
+
+**Why it is costly:** the failure is invisible to the file's own author. The suite is green per-directory and green in CI if directories are sharded, so the defect surfaces only in a combined run and looks like a flake or like a regression from whatever change happened to be under review. It cost one review lane a full investigation cycle to isolate, and it was initially misattributed to the change being reviewed.
+
+**Workaround:** never index a spy's call history positionally when the spied module could have been mocked elsewhere in the process. Filter to a value the test owns — a unique `sessionID` or other per-test discriminator carried in the payload — before indexing. Applied at `98d451ebe`, which keeps the original ordered assertions but selects only this test's own decisions, making the test immune to foreign history regardless of file order.
+
+**Fix status:** worked around in our test; runner behavior unfixed
