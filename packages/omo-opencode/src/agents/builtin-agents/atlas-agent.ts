@@ -7,7 +7,7 @@ import { log } from "../../shared/logger"
 import { applyOverrides } from "./agent-overrides"
 import { applyModelResolution } from "./model-resolution"
 import { createAtlasAgent } from "../atlas"
-import { resolveModelForConfiguredFamily } from "../../../../model-core/src"
+import { resolveModelForConfiguredFamily } from "@oh-my-opencode/model-core"
 
 export function maybeCreateAtlasConfig(input: {
   disabledAgents: string[]

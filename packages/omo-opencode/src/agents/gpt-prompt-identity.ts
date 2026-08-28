@@ -1,4 +1,4 @@
-import { ModelFamily, type ModelFamily as ModelFamilyName } from "../../../model-core/src"
+import { ModelFamily, type ModelFamily as ModelFamilyName } from "@oh-my-opencode/model-core"
 
 export type GptPromptIdentityKey = "gpt-5.5" | "gpt-5.6" | "gpt-5.6-sol" | "gpt-family"
 

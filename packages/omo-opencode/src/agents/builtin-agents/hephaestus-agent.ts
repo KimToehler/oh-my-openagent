@@ -9,7 +9,7 @@ import { applyEnvironmentContext } from "./environment-context"
 import { applyCategoryOverride, mergeAgentConfig } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
 import { applyFrontierToolSchemaPermission } from "../frontier-tool-schema-guard"
-import { resolveModelForConfiguredFamily } from "../../../../model-core/src"
+import { resolveModelForConfiguredFamily } from "@oh-my-opencode/model-core"
 
 export function maybeCreateHephaestusConfig(input: {
   disabledAgents: string[]

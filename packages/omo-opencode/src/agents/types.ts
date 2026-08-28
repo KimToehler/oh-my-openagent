@@ -1,5 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
-import type { ModelFamily } from "../../../model-core/src";
+import type { ModelFamily } from "@oh-my-opencode/model-core";
 
 import {
   isClaudeFable5Model,

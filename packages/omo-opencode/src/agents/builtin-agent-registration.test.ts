@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { AGENT_MODEL_REQUIREMENTS } from "../../../model-core/src/model-requirements"
+import { AGENT_MODEL_REQUIREMENTS } from "@oh-my-opencode/model-core"
 import { AGENT_ELIGIBILITY_REGISTRY } from "../../../team-core/src/types"
 import { BUILTIN_AGENT_NAMES } from "../../../utils/src/migration/agent-names"
 import { BuiltinAgentNameSchema } from "../config/schema/agent-names"

@@ -10,7 +10,7 @@ import { applyOverrides } from "./agent-overrides"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
 import { log } from "../../shared/logger"
-import { resolveModelForConfiguredFamily } from "../../../../model-core/src"
+import { resolveModelForConfiguredFamily } from "@oh-my-opencode/model-core"
 
 export function collectPendingBuiltinAgents(input: {
   agentSources: Record<BuiltinAgentName, import("../agent-builder").AgentSource>

@@ -1,5 +1,5 @@
 import { OmoReasoningSchema } from "@oh-my-opencode/omo-config-core"
-import { ModelFamily } from "../../../../model-core/src"
+import { ModelFamily } from "@oh-my-opencode/model-core"
 import { z } from "zod"
 import { FallbackModelObjectSchema, FallbackModelsSchema } from "./fallback-models"
 import { AgentPermissionSchema } from "./internal/permission"

@@ -9,7 +9,7 @@ import { applyOverrides } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
 import { createSisyphusAgent } from "../sisyphus"
 import { applyFrontierToolSchemaPermission } from "../frontier-tool-schema-guard"
-import { resolveModelForConfiguredFamily } from "../../../../model-core/src"
+import { resolveModelForConfiguredFamily } from "@oh-my-opencode/model-core"
 
 export function maybeCreateSisyphusConfig(input: {
   disabledAgents: string[]
