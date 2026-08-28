@@ -2849,3 +2849,69 @@ diff the sets of "<file> :: <fullName>" where status === "failed"
 That produced 90 before, 90 after, 0 new, 0 fixed — a clean result the gate could not express. Raw counts are also unreliable: an earlier comparison read 94 vs 90 purely because the new test file existed in one run and not the other. Compare names, never totals.
 
 **Fix status:** worked around; upstream gate unfixed (needs the `/app/` assumption replaced with a repo-relative path)
+
+
+## 2026-08-28 — `staleTimeoutMs` reaps *healthy, working* subagents when the parent idles
+
+**Severity:** costly
+**Area:** background tasks
+**Observed in:** `~/git/onara` — whole-diff review gate over a 136-commit / 173-file / 35k-line merge
+
+**What happened:** Three review lanes were launched with `task(run_in_background=true)`. The
+guidance for that mechanism is explicit and correct: it *notifies*, so the parent should end
+its turn and await the `<system-reminder>`. I did. Two of the three lanes were then cancelled
+at 49m with "Stale timeout (no activity for 45min)" — while they were demonstrably still
+working. Their session transcripts show tool calls and substantive reasoning right up to the
+cancellation, mid-verification of confirmed findings.
+
+**Evidence:**
+```
+bg_87abe93d  Whole-diff integration review  [CANCELLED] Stale timeout (no activity for 45min)
+bg_00738864  Frontend backend contract seam [CANCELLED] Stale timeout (no activity for 45min)
+bg_291fe814  Dead code audit                [completed] 21m49s   <- finished under the limit
+
+# the "inactive" lane, 40 minutes in, seconds before it was reaped:
+[assistant (oracle)] 13:08:24  "Strong lead: `reorderLegExercises` writes leg-local 0-based
+                                sortOrder into a day-global column. Verifying."
+[assistant (oracle)] 13:09:14  "Confirmed two strong leads. Now verifying the discipline
+                                prefix handling and clear/copy paths."
+[assistant (oracle)] 13:09:47  <last activity, then cancelled>
+```
+
+**Root cause / hypothesis (hypothesis):** the inactivity timer appears to measure the
+*parent's* activity, not the child's. The documented contract for `task(run_in_background=true)`
+is "it notifies, so you can safely end the turn"; doing exactly that makes the parent idle,
+and any child outliving 45min is then reaped regardless of its own progress. The one lane that
+survived did so only by finishing in 21m. This is distinct from the two neighbouring entries
+above: not a zombie surviving an abort, and not a dead-but-row-present task — these children
+were alive, producing output, and killed anyway.
+
+**Why it is costly:** the failure is silently biased against exactly the work most worth
+delegating. Short lanes always survive; long analytical lanes on large diffs never do, and
+they are the ones a human cannot cheaply redo. Worse, the guidance actively steers you into
+it — "end your turn and wait" is the correct instruction for the notifying mechanism, and it
+is what starves the child. The reminder also says **do NOT create a replacement task**, so the
+obvious recovery is closed off too. Two of three lanes' analysis was lost; one confirmed
+defect (`TrainingService.kt:972`, leg-local `sortOrder` written into a day-global column) was
+recoverable only by reading the dead session's transcript and re-deriving it by hand.
+
+**Workaround:** three, in order of preference.
+1. **Scope the work to fit.** Split one broad lane into several narrow ones (backend-only,
+   frontend-only, one seam each) so each finishes well inside 45min. Fixes the cause, not the
+   symptom.
+2. **Keep the parent busy.** Do genuine non-overlapping work between waits so the parent is
+   never idle for 45 consecutive minutes. Polling purely to reset a timer is waste, but real
+   parallel work is free.
+3. **Raise `background_task.staleTimeoutMs`** in `.omo/omo.jsonc` when a long lane is
+   genuinely warranted. Note the setting was not present in that repo, so the 45min default
+   applied silently — nothing surfaces it at launch time.
+
+Recovering a reaped lane: `session_read(session_id=..., from_end=true)` still returns the
+child's transcript, including leads it had confirmed before dying. Not a substitute for the
+report, but far better than discarding the run — and worth doing before any re-run, so the
+replacement is not re-deriving what is already on record.
+
+**Fix status:** worked around. Two candidate fixes: measure inactivity against the *child's*
+last activity rather than the parent's, or exempt a task from the reaper while its session
+shows recent tool calls. Also a docs gap — "it notifies, so you can safely end the turn"
+should carry the caveat that ending the turn is what starts the child's death clock.
