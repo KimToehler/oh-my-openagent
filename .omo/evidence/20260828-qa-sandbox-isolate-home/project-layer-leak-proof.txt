@@ -1,0 +1,11 @@
+=== project-layer leak: before vs after (same sandbox, only cwd differs) ===
+LEAK   cwd=under-real-home  project_layers=["/tmp/realhome.../.omo/omo.jsonc"]
+CLEAN  cwd=OMO_QA_PROJ      project_layers=[]
+
+=== re-source guard ===
+guard fired: yes
+HOME unchanged by re-source: yes
+
+=== gates ===
+bun test script/agent-env.test.ts script/agent-harness-wiring.test.ts script/agents-md-dev-env.test.ts
+ 23 pass  0 fail  110 expect() calls

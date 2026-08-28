@@ -58,9 +58,12 @@ Notes:
 - Codespaces has no host filesystem to mount; re-authenticate inside the
   container, or copy the needed files via a `postCreateCommand`.
 - For QA that must NOT touch any real config, `source script/agent/qa-sandbox.sh`
-  points `XDG_*`, `HOME`, and `CODEX_HOME` at a throwaway temp dir instead.
-  `HOME` matters as much as `XDG_*`: the plugin's own config lives at
-  `$HOME/.omo/omo.json[c]`, which is not an XDG path.
+  points `XDG_*`, `HOME`, and `CODEX_HOME` at a throwaway temp dir instead, then
+  `cd "$OMO_QA_PROJ"`. `HOME` matters as much as `XDG_*`: the plugin's own config
+  lives at `$HOME/.omo/omo.json[c]`, which is not an XDG path. The `cd` matters
+  just as much: project config layers are collected by walking `cwd` up to
+  `$HOME` and they outrank the user layer, so a cwd under your real home still
+  claims the real `~/.omo`.
 
 ## Maintenance
 

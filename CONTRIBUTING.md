@@ -161,6 +161,8 @@ This exports an isolated, throwaway environment with its own `XDG_*` directories
 
 `HOME` is redirected on purpose: the plugin reads its own config from `$HOME/.omo/omo.json[c]`, which is not an XDG path, so isolating `XDG_*` alone would leave a QA run writing to your real configuration. The helper relinks `$HOME/.opencode/bin` into the sandbox so installed opencode wrappers that resolve the binary through that path keep working.
 
+**Then `cd "$OMO_QA_PROJ"` before running anything.** Moving `HOME` is necessary but not sufficient. Project config layers are collected by walking `cwd` upward until `$HOME`, and they outrank the user layer — so from a cwd under your real home (this repo's own layout) the walk still claims your real `~/.omo`, as a project layer that beats the sandbox and that the migration engine can write to. The sandbox exports `OMO_QA_PROJ` for this; isolation is complete only when both `HOME` and `cwd` are inside it. Git identity and `~/.ssh` do not follow into the sandbox, so do not commit from a sandboxed shell.
+
 For containerized environments (Codespaces, Dev Containers, Docker), see [`.devcontainer/README.md`](.devcontainer/README.md). It documents injecting provider credentials (via `.env`, Codespaces secrets, or `remoteEnv`) and bind-mounting your `~/.codex`, `~/.claude`, and `~/.config/opencode` config into the container so OpenCode, Codex, and Claude Code all work inside it.
 
 ## Project Structure

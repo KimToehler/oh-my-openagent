@@ -74,6 +74,59 @@ sandbox without using it is unaffected, and a caller that re-exports `HOME`
 after sourcing can still defeat it. Neither is reachable from the documented
 path.
 
+## Review round 2: a CRITICAL residual hole, found and closed
+
+An independent review rejected the first version of this fix, and was right to.
+Moving `HOME` closed the original clobber path but left a second, subtler one,
+while the docs shipped an absolute "never reads or writes `~/.omo`" claim that
+was still false.
+
+**The hole:** project config layers are collected by walking `cwd` upward and
+stopping at `$HOME` (`packages/omo-config-core/src/loader/paths.ts:75-101`), and
+project layers OUTRANK the user layer. With `HOME` moved into the sandbox but
+`cwd` still under the operator's real home — this repo's own layout — the walk
+sails past the sandbox boundary and claims the real `~/.omo` as a *project*
+layer. That beats the sandbox's user layer, and the migration engine
+(`config/migration/discovery-paths.ts`, same boundary) can write to it.
+
+Consequence: the documented mock-model recipe silently does not take effect. QA
+runs against the operator's real agent/model pins — real providers, real spend —
+while the evidence claims "mock provider, no network egress."
+
+**Reproduced independently** against the real loader; same sandbox, only `cwd`
+differs (full output in `project-layer-leak-proof.txt`):
+
+```
+LEAK   cwd=under-real-home  project_layers=["/tmp/realhome.../.omo/omo.jsonc"]
+CLEAN  cwd=OMO_QA_PROJ      project_layers=[]
+```
+
+**Fix:** complete the `oqa_mk_isolated_xdg` mirror. That helper creates
+`$root/proj` and exports `OQA_PROJ` (`common.sh:80,89`) precisely so QA runs from
+a directory outside the real home; round 1 omitted it. Now exports `OMO_QA_PROJ`
+(plus `OPENCODE_TEST_HOME`, also mirrored), and every doc states that
+`cd "$OMO_QA_PROJ"` is mandatory, not cosmetic. Isolation is complete only when
+BOTH `HOME` and `cwd` sit inside the sandbox.
+
+Also fixed from the same review:
+- **Re-source chaining.** Sourcing twice in one shell linked sandbox2 against
+  sandbox1's home and orphaned the first root. Guarded via
+  `OMO_QA_SANDBOX_ACTIVE`; verified the guard fires and `HOME` is not mutated.
+- **Contradictory banner.** The closing `printf` still said only
+  `~/.config/opencode and ~/.codex are untouched` while the header claimed all
+  three. Operators read the banner, so it now prints `HOME`, `OMO_QA_PROJ`, the
+  mandatory `cd`, and the git-identity caveat.
+- **Undocumented losses.** Git identity and `~/.ssh` do not follow into the
+  sandbox, so commits from a sandboxed shell get the wrong author. Documented.
+
+A second test pins `OMO_QA_PROJ`'s existence and location, so the project-dir
+half cannot silently regress the way it was silently missing. Gates after the
+round-2 changes: **23 pass / 0 fail**.
+
+Sharper residual risk: a QA script that sources this helper and then stays in a
+repo directory under the real home is still exposed. The banner and docs are the
+mitigation; there is no enforcement.
+
 ## What was omitted
 
 No live opencode/codex session was driven here: this change is to the isolation
