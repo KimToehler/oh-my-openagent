@@ -53,6 +53,75 @@ describe("agent dev-environment scripts", () => {
       expect(body).toContain(".env") // creds injection, set once
       expect(body).toContain(":-$0")
     })
+
+    // The plugin's own config chain is $HOME/.omo/omo.json[c], which is NOT an XDG
+    // path, so isolating XDG_* alone leaves it pointing at the operator's real
+    // config. A QA run that pins agent/category models then destroys it. This
+    // executes the helper rather than grepping it, because the guarantee that
+    // matters is the value of HOME in the resulting environment.
+    test.skipIf(process.platform === "win32")(
+      "#given the QA isolation helper #when sourced #then HOME is redirected away from the real home",
+      () => {
+        const realHome = process.env["HOME"]
+        expect(realHome, "HOME must be set to run this test").toBeTruthy()
+
+        const probe = `set -e
+export HOME=${JSON.stringify(realHome)}
+. ${JSON.stringify(sandbox)} >/dev/null 2>&1
+printf 'HOME=%s\\n' "$HOME"
+printf 'OMO_QA_ROOT=%s\\n' "$OMO_QA_ROOT"
+`
+        const result = Bun.spawnSync(["bash", "-c", probe])
+        const stdout = result.stdout.toString()
+        const sandboxHome = /^HOME=(.*)$/m.exec(stdout)?.[1]
+        const qaRoot = /^OMO_QA_ROOT=(.*)$/m.exec(stdout)?.[1]
+
+        expect(qaRoot, "sandbox must export OMO_QA_ROOT").toBeTruthy()
+        expect(sandboxHome, "sandbox must export HOME").toBeTruthy()
+        expect(sandboxHome, "HOME must not remain the real home").not.toBe(realHome)
+        expect(
+          sandboxHome?.startsWith(qaRoot ?? "\0"),
+          `HOME (${sandboxHome}) must live under OMO_QA_ROOT (${qaRoot})`,
+        ).toBe(true)
+
+        if (qaRoot !== undefined && qaRoot.length > 0) {
+          Bun.spawnSync(["rm", "-rf", qaRoot])
+        }
+      },
+    )
+
+    // Moving HOME alone does not isolate the plugin's config. Project layers are
+    // collected by walking cwd upward until $HOME and they outrank the user
+    // layer, so a cwd under the operator's real home still claims the real
+    // ~/.omo — winning over the sandbox, and writable by the migration engine.
+    // The sandbox project dir is what terminates that walk inside the sandbox.
+    test.skipIf(process.platform === "win32")(
+      "#given the QA isolation helper #when sourced #then it exports a project dir inside the sandbox to run QA from",
+      () => {
+        const probe = `set -e
+. ${JSON.stringify(sandbox)} >/dev/null 2>&1
+printf 'PROJ=%s\\n' "$OMO_QA_PROJ"
+printf 'ROOT=%s\\n' "$OMO_QA_ROOT"
+printf 'ISDIR=%s\\n' "$([ -d "$OMO_QA_PROJ" ] && echo yes || echo no)"
+`
+        const result = Bun.spawnSync(["bash", "-c", probe])
+        const stdout = result.stdout.toString()
+        const proj = /^PROJ=(.*)$/m.exec(stdout)?.[1]
+        const qaRoot = /^ROOT=(.*)$/m.exec(stdout)?.[1]
+        const isDir = /^ISDIR=(.*)$/m.exec(stdout)?.[1]
+
+        expect(proj, "sandbox must export OMO_QA_PROJ").toBeTruthy()
+        expect(isDir, "OMO_QA_PROJ must exist as a directory").toBe("yes")
+        expect(
+          proj?.startsWith(qaRoot ?? "\0"),
+          `OMO_QA_PROJ (${proj}) must live under OMO_QA_ROOT (${qaRoot})`,
+        ).toBe(true)
+
+        if (qaRoot !== undefined && qaRoot.length > 0) {
+          Bun.spawnSync(["rm", "-rf", qaRoot])
+        }
+      },
+    )
   })
 
   describe(".env.example", () => {
