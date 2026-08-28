@@ -4,7 +4,10 @@ import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { ContextCollector } from "../../features/context-injector";
-import { createRulesInjectorHook } from "./hook";
+import {
+	createRulesInjectorHook,
+	resolveOpenCodePluginRoot,
+} from "./hook";
 import { RESURFACE_TOOL_CALL_GAP } from "./resurfacing";
 
 const SESSION_ID = "rules-injector-hook-test";
@@ -19,6 +22,30 @@ function makeContext(directory: string): PluginInput {
 		directory,
 	} as unknown as PluginInput;
 }
+
+	describe("resolveOpenCodePluginRoot", () => {
+		it("#when source module is loaded #then resolves package root", () => {
+			// given
+			const moduleUrl = "file:///tmp/omo-opencode/src/hooks/rules-injector/hook.ts";
+
+			// when
+			const pluginRoot = resolveOpenCodePluginRoot(moduleUrl);
+
+			// then
+			expect(pluginRoot).toBe("/tmp/omo-opencode");
+		});
+
+		it("#when bundled module is loaded #then resolves package root", () => {
+			// given
+			const moduleUrl = "file:///tmp/omo-opencode/dist/index.js";
+
+			// when
+			const pluginRoot = resolveOpenCodePluginRoot(moduleUrl);
+
+			// then
+			expect(pluginRoot).toBe("/tmp/omo-opencode");
+		});
+	});
 
 describe("createRulesInjectorHook", () => {
 	let projectRoot: string;

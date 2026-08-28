@@ -1,6 +1,8 @@
 import { clearInjectedRules, loadInjectedRules } from "./storage";
-import { createRuleScanCache } from "./rule-scan-cache";
-import type { RuleScanCache } from "./rule-scan-cache";
+import {
+	createRuleDiscoveryCache,
+	type RuleDiscoveryCache,
+} from "@oh-my-opencode/rules-engine/engine";
 
 export type SessionInjectedRulesCache = {
   contentHashes: Set<string>;
@@ -34,25 +36,26 @@ export function createSessionCacheStore(): {
 }
 
 export function createSessionRuleScanCacheStore(): {
-  getSessionRuleScanCache: (sessionID: string) => RuleScanCache;
+  getSessionRuleScanCache: (sessionID: string) => RuleDiscoveryCache;
   clearSessionRuleScanCache: (sessionID: string) => void;
 } {
-  const sessionCaches = new Map<string, RuleScanCache>();
+  const sessionCaches = new Map<string, RuleDiscoveryCache>();
 
-  function getSessionRuleScanCache(sessionID: string): RuleScanCache {
+  function getSessionRuleScanCache(sessionID: string): RuleDiscoveryCache {
     const existingCache = sessionCaches.get(sessionID);
     if (existingCache) {
       return existingCache;
     }
 
-    const cache = createRuleScanCache();
+    const cache = createRuleDiscoveryCache();
     sessionCaches.set(sessionID, cache);
     return cache;
   }
 
   function clearSessionRuleScanCache(sessionID: string): void {
     const cache = sessionCaches.get(sessionID);
-    cache?.clear();
+    cache?.scannedRuleFiles.clear();
+    cache?.singleFileInfo.clear();
     sessionCaches.delete(sessionID);
   }
 

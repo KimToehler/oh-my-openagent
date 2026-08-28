@@ -321,6 +321,28 @@ describe("createRuleInjectionProcessor", () => {
 		expect(getParsedRuleCacheStats()).toEqual({ entries: 0, bodyBytes: 0 });
 	});
 
+	it("#given a cached rule deleted from disk #when processing again #then does not throw", async () => {
+		// given
+		const { createRuleDiscoveryCache } = await import("@oh-my-opencode/rules-engine/engine");
+		const ruleScanCache = createRuleDiscoveryCache();
+		const processor = createRuleInjectionProcessor({
+			workspaceDirectory: projectRoot,
+			truncator: { truncate: async (_sessionID: string, content: string) => ({ result: content, truncated: false }) },
+			getSessionCache: () => ({ contentHashes: new Set<string>(), realPaths: new Set<string>() }),
+			getSessionRuleScanCache: () => ruleScanCache,
+			homedir: () => homeRoot,
+			shouldApplyRule: () => ({ applies: true, reason: "matched" }),
+		});
+		await processor.processFilePathForInjection(targetFile, "session-1", createOutput());
+		rmSync(ruleFile);
+
+		// when
+		const process = processor.processFilePathForInjection(targetFile, "session-2", createOutput());
+
+		// then
+		await expect(process).resolves.toBeUndefined();
+	});
+
 	it("does not save injected rules when all candidates are already cached", async () => {
 		// given
 		const sessionID = `dirty-no-new-${Date.now()}`;
@@ -782,5 +804,92 @@ describe("createRuleInjectionProcessor", () => {
 		expect(output.output).toContain(
 			"[Rule: .github/instructions/typescript.instructions.md]",
 		);
+	});
+
+	it("#given external project rule symlink #when matching target file #then does not inject escaped content", async () => {
+		// given
+		const outsideRulesDirectory = join(testRoot, "outside-rules");
+		mkdirSync(outsideRulesDirectory, { recursive: true });
+		writeFileSync(join(outsideRulesDirectory, "leak.md"), "---\nalwaysApply: true\n---\nExternal rule.\n");
+		rmSync(join(projectRoot, ".omo", "rules"), { recursive: true, force: true });
+		fs.symlinkSync(outsideRulesDirectory, join(projectRoot, ".omo", "rules"), "dir");
+		const processor = await createProcessor(projectRoot);
+
+		// when
+		const output = createOutput();
+		await processor.processFilePathForInjection(targetFile, "session-1", output);
+
+		// then
+		expect(output.output).not.toContain("External rule.");
+	});
+
+	it("#given a nested CONTEXT.md #when injecting for a child file #then injects nested context rule", async () => {
+		// given
+		const nestedDirectory = join(projectRoot, "src", "feature");
+		const nestedTargetFile = join(nestedDirectory, "index.ts");
+		const nestedContextFile = join(projectRoot, "src", "CONTEXT.md");
+		mkdirSync(nestedDirectory, { recursive: true });
+		writeFileSync(nestedTargetFile, "export const feature = true;\n");
+		writeFileSync(nestedContextFile, "Nested context rule.\n");
+		const processor = await createProcessor(projectRoot);
+
+		// when
+		const output = createOutput();
+		await processor.processFilePathForInjection(nestedTargetFile, "session-1", output);
+
+		// then
+		expect(output.output).toContain("[Rule: src/CONTEXT.md]");
+	});
+
+	it("#given same-content user and bundled rules #when injecting #then user-home rule wins", async () => {
+		// given
+		const pluginRoot = join(testRoot, "plugin");
+		const bundledRulesDirectory = join(pluginRoot, "bundled-rules");
+		const userRulesDirectory = join(homeRoot, ".omo", "rules");
+		const content = "---\nalwaysApply: true\n---\nShared rule content.\n";
+		mkdirSync(bundledRulesDirectory, { recursive: true });
+		mkdirSync(userRulesDirectory, { recursive: true });
+		writeFileSync(join(bundledRulesDirectory, "shared.md"), content);
+		writeFileSync(join(userRulesDirectory, "shared.md"), content);
+		const processor = createRuleInjectionProcessor({
+			workspaceDirectory: projectRoot,
+			pluginRoot,
+			truncator: { truncate: async (_sessionID, value) => ({ result: value, truncated: false }) },
+			getSessionCache: () => ({ contentHashes: new Set(), realPaths: new Set() }),
+			homedir: () => homeRoot,
+		});
+
+		// when
+		const output = createOutput();
+		await processor.processFilePathForInjection(targetFile, "session-1", output);
+
+		// then
+		expect(output.output).toContain("[Rule: .omo/rules/shared.md]");
+		expect(output.output).not.toContain("[Rule: bundled-rules/shared.md]");
+	});
+
+	it("#given an explicit OpenCode plugin root #when bundled rule matches #then injects bundled rule", async () => {
+		// given
+		const pluginRoot = join(testRoot, "plugin");
+		const bundledRulesDirectory = join(pluginRoot, "bundled-rules");
+		mkdirSync(bundledRulesDirectory, { recursive: true });
+		writeFileSync(
+			join(bundledRulesDirectory, "opencode.md"),
+			"---\nalwaysApply: true\n---\nBundled OpenCode rule.\n",
+		);
+		const processor = createRuleInjectionProcessor({
+			workspaceDirectory: projectRoot,
+			pluginRoot,
+			truncator: { truncate: async (_sessionID, content) => ({ result: content, truncated: false }) },
+			getSessionCache: () => ({ contentHashes: new Set(), realPaths: new Set() }),
+			homedir: () => homeRoot,
+		});
+
+		// when
+		const output = createOutput();
+		await processor.processFilePathForInjection(targetFile, "session-1", output);
+
+		// then
+		expect(output.output).toContain("[Rule: bundled-rules/opencode.md]");
 	});
 });
