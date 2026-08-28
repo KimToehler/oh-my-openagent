@@ -2989,3 +2989,80 @@ one wait: unrelated echo returned at 1.776 s while wait ran to 21.241 s
 **Workaround:** Use `background_action="wait"`, with `wait_timeout_ms` default 45 s, maximum 50 s, silently clamped, and the effective bound echoed in the header. Live QA supervised a 5-minute job in 7 `tools/call` messages, 1 launch plus 6 waits, versus about 30 status polls. `wait` does not make jobs notify, so call it again on timeout and never end a turn with a detached job outstanding. Restart the MCP client or session after `lean-ctx dev-install`, because an already-running stdio child keeps the old binary and old schema. A bounded semaphore or dedicated wait pool is NOT YET IMPLEMENTED.
 
 **Fix status:** fixed in `28af1aec3` for foreground cap and blocking wait; pool saturation needs follow-up.
+
+## 2026-08-28: `model_family` lands for agents only, so proxy-aliased categories still get the wrong prompt
+
+**Severity:** costly
+**Area:** config
+**Observed in:** oh-my-openagent, configuring a 9router-backed `onara/*` alias setup after merging `model_family`
+
+**What happened:** Model-family detection is text-based, so a proxy alias carries no vendor signal and every `onara/*` agent got Claude-shaped prompts regardless of what the router actually served. `model_family` (merged `2d1e83fa4`, plus build hotfix `53dd98f3c`) fixes that by letting the operator declare the intended primary architecture, but it was added ONLY to `AgentOverrideConfigSchema`. Categories have no such field, so half the roster is still guessing. The work is real but half-finished.
+
+**Evidence:**
+```
+$ grep -rn "model_family" packages/omo-opencode/src/config/schema/*.ts
+packages/omo-opencode/src/config/schema/agent-overrides.ts:13:  model_family: z.enum(Object.values(ModelFamily)).optional(),
+
+$ grep -n "z\.\|model" packages/omo-opencode/src/config/schema/categories.ts
+5:export const CategoryConfigSchema = z.object({
+8:  model: z.string().optional(),
+(no model_family)
+```
+Verified live, with an adequate token budget, that aliases genuinely straddle vendors:
+```
+oracle      claude-opus-5
+sisyphus    claude-opus-5
+auditor     gpt-5.6-sol
+momus       gpt-5.6-sol
+hephaestus  gpt-5.6-sol
+ultrabrain  gpt-5.6-sol
+```
+`ultrabrain` and `deep` are CATEGORIES, so they cannot express `model_family` today and keep inferring from alias text.
+
+**Root cause:** `model_family` was scoped to the agent-override schema because that is where prompt/reasoning/tool routing is applied at roster construction. Category-routed work (`sisyphus-junior` spawned via `category`) resolves its model through a different path (`packages/delegate-core/src/model-selection.ts`) that never sees an architecture declaration.
+
+**Remaining work — this finding is the tracking note:**
+1. Add `model_family` to `CategoryConfigSchema` and thread it through category model resolution, so `ultrabrain`, `deep`, `visual-engineering`, `writing`, `quick`, `artistry`, `unspecified-*` get correct prompt/reasoning treatment.
+2. Decide precedence when an agent inherits from a category (`agents.<x>.category`): does the agent's `model_family` win, or the category's? Today the question is unanswerable because only one side can declare it.
+3. Audit the remaining agents with no `model_family` set (`sisyphus`, `prometheus`, `explore`, `librarian`, `multimodal-looker`, `metis`, `atlas`, `sisyphus-junior`) — under a proxy alias every one of them is still guessing, even though `sisyphus` is verified Claude-backed.
+4. Consider a `doctor` check that flags a configured proxy-style model whose family cannot be detected from text and has no `model_family` declared. That is precisely the silent-wrong-prompt case, and nothing surfaces it today.
+5. Revisit whether the `models` catalog (`docs/reference/omo-json.md`) should carry architecture per entry, so one declaration serves every agent and category referencing that catalog key instead of repeating it per consumer.
+
+**Workaround:** declare `model_family` per agent for the vendor-straddling ones. Categories have no workaround — they stay text-inferred until item 1 lands.
+
+**Fix status:** partially fixed — agents in `2d1e83fa4`; categories, precedence, catalog, and doctor check all unfixed.
+
+## 2026-08-28: `max_tokens: 1` probes make thinking models look unavailable, and a router fail over to another vendor
+
+**Severity:** costly
+**Area:** provider
+**Observed in:** oh-my-openagent, verifying which upstream a 9router `onara/*` alias actually serves
+
+**What happened:** To confirm alias-to-vendor mapping I probed the router with `max_tokens: 1` to keep it cheap. Every alias came back GPT, including ones known to be Claude-backed. I concluded Claude routing was down and rewrote a just-written config to match the "measurement". Both the measurement and the rewrite were wrong: a thinking model spends the budget on reasoning, emits ZERO content blocks, and returns 200 OK with an empty stream. The router correctly scores that 503 and fails the combo over to the next vendor — so a one-token probe of a Claude-primary combo reliably reports GPT.
+
+**Evidence:** router log, my probe and a real session side by side:
+```
+[21:26:48] 🟢 ▶ POST sisyphus → claude/claude-opus-4-8 · FMT: openai→claude · STREAM · 1 MSG
+[21:26:49] 🟢 ✗ EMPTY STREAM · claude/claude-opus-4-8 · 200 OK with no content blocks
+[21:26:49] ⚠️ [AUTH] NOT locked [503] — request-shape error, not an account fault
+[21:26:49] ⚠️ [COMBO] Model cc/claude-opus-4-8 failed, trying next {"status":503}
+[21:26:49] ℹ️ [COMBO] Trying model 3/6: cx/gpt-5.6-terra
+
+[21:26:47] 🟣 ▶ POST sisyphus → claude/claude-opus-5 · FMT: claude (passthrough) · STREAM · 435 MSG
+[21:26:48] ℹ️ [COMBO] Model cc/claude-opus-5 succeeded
+```
+`1 MSG` is the probe, `435 MSG` the real session, same alias, same minute, opposite verdicts. Re-probed with `max_tokens: 1024`:
+```
+oracle  →  "model":"claude-opus-5"
+```
+The router message names the class outright: **request-shape error, not an account fault**.
+
+**Second, compounding defect:** the endpoint streams SSE, so `curl ... | jq` fails with `parse error: Invalid numeric literal at line 1, column 5` even on a perfectly good response. Piping to `grep -o '"model":"[^"]*"' | head -1` works.
+
+**Root cause:** `max_tokens` caps reasoning plus output on thinking models, so a tiny budget is consumed before any content block is emitted. Empty stream is indistinguishable from upstream failure at the router boundary, so combo fallback is the correct behavior — the probe was lying, not the router.
+
+**Why it is costly:** it fails in the most expensive direction. It does not error; it returns a plausible wrong answer that looks like infrastructure truth. It cost a config rewrite in the wrong direction, and it would have silently corrupted exactly the `model_family` values the previous finding is about. The operator caught it, not the evidence.
+
+**Workaround:** probe with `max_tokens: 512` or more and a trivial prompt; parse SSE with `grep`, not `jq`. Better: do not infer routing intent from live traffic at all — read the combo definition. When a probe contradicts known configuration, suspect the probe first.
+
+**Fix status:** unfixed — worth a documented probe recipe in the QA skills, since "ask the router what it served" is a recurring need.
