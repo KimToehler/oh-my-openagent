@@ -10,8 +10,6 @@ import { applyMcpConfig } from "./mcp-config-handler";
 import { applyProviderConfig } from "./provider-config-handler";
 import { loadPluginComponents } from "./plugin-components-loader";
 import { applyToolConfig } from "./tool-config-handler";
-import { installUpstreamModelObserver } from "./upstream-model-observer";
-import { resolveModelForFamilyDetection } from "@oh-my-opencode/model-core";
 import { clearFormatterCache } from "../tools/hashline-edit/formatter-trigger"
 import {
   clearRegisteredAgentNames,
@@ -66,45 +64,12 @@ function cloneAgentConfig(agents: Record<string, unknown>): Record<string, unkno
   return cloneConfigValue(agents) as Record<string, unknown>
 }
 
-/**
- * Model ids whose family may have been learned from a response, in the form the
- * detectors will see.
- *
- * Agent prompts, reasoning effort, and tool restrictions are baked into the cached
- * roster at build time. A proxy alias resolves to its real vendor only after a
- * response reports one, so unless that resolution is part of the key, the first
- * roster - built while the alias was still opaque - is replayed forever and the
- * observation never reaches an agent.
- */
-function collectResolvedModelIdentity(config: Record<string, unknown>): Record<string, string> {
-  const identity: Record<string, string> = {}
-
-  const record = (model: unknown): void => {
-    if (typeof model !== "string" || model === "") return
-    const resolved = resolveModelForFamilyDetection(model)
-    if (resolved !== model) identity[model] = resolved
-  }
-
-  record(config.model)
-  const agents = config.agent
-  if (agents !== null && typeof agents === "object") {
-    for (const agent of Object.values(agents as Record<string, unknown>)) {
-      if (agent !== null && typeof agent === "object") record((agent as { model?: unknown }).model)
-    }
-  }
-
-  return identity
-}
-
 function createAgentConfigCacheKey(config: Record<string, unknown>): string {
   return JSON.stringify({
     agent: config.agent,
     default_agent: config.default_agent,
     model: config.model,
     skills: config.skills,
-    // Changes when a response teaches us the real vendor behind an alias, so the
-    // roster is rebuilt with the correct prompt instead of replaying the stale one.
-    resolvedModels: collectResolvedModelIdentity(config),
   })
 }
 
@@ -130,10 +95,6 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     const formatterConfig = config.formatter;
 
     setAdditionalAllowedMcpEnvVars(pluginConfig.mcp_env_allowlist ?? [])
-    // Wrap each provider's fetch so the model that actually served a response is
-    // recorded. This is the only supported way to observe a successful response:
-    // no plugin hook exposes one. See upstream-model-observer.ts.
-    installUpstreamModelObserver(config)
     applyProviderConfig({
       config,
       modelCacheState,
