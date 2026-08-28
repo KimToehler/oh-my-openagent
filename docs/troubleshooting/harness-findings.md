@@ -2816,3 +2816,36 @@ $ background_output(task_id="bg_67de996b")
 ```
 
 So the sequence for a cancelled-then-blocked task is: cancel → `background_cancel` reports `cancelled` while `background_output` still reports `BLOCKED` → one `CHILD AWAITING RESPONSE` reminder at ~10 min → expiry at ~28 min. Ignoring the reminder is therefore safe and self-resolving; the hazard is confined to that one reminder window, where the copy-paste invocation is the only thing urging a resume. Note the final notice is labelled `Error` and `ACTION REQUIRED` even though expiry was the correct outcome, which is a second, milder instance of the same problem: terminal states for deliberately-abandoned tasks are reported as failures needing attention.
+
+## 2026-08-28 — A repo's own "no regression" gate reported all 90 pre-existing failures as regressions outside Docker
+
+**Severity:** costly
+**Area:** third-party repo tooling (9router); the pattern is general
+**Observed in:** ~/git/9router while adding a feature
+
+**What happened:** the project's `CLAUDE.md` states the suite is deliberately not all-green and that regressions must be judged with `tests/__baseline__/verify-no-regression.mjs`, not a raw run. Following that instruction, the gate reported 90 regressions on a tree whose only change was additive — which taken at face value would have blocked a clean change, or prompted "fixing" 90 unrelated tests.
+
+**Evidence:**
+```
+$ node tests/__baseline__/verify-no-regression.mjs /tmp/vitest-after.json
+❌ REGRESSION: 90 test pass→fail:
+  - undefined :: AUDIT-002: API key masking ...
+  - undefined :: request normalization ...        # every entry prefixed "undefined ::"
+
+$ head -1 tests/__baseline__/known-fails.txt
+tests/unit/claude-header-forwarding.test.js :: proxyAwareFetch — ...
+```
+
+**Root cause:** the gate derives each test's identity with `f.name.split("/app/")[1]`, assuming the suite ran inside a container rooted at `/app`. From a normal checkout that split yields `undefined`, so every key becomes `undefined :: <test name>`, matches nothing in `known-fails.txt`, and is classified as a new failure. The gate is not wrong about the data; it is silently keyed to an environment its own docs never mention.
+
+**Why it is costly:** a trusted tool fails loudly in a way that looks like the developer's fault. The instruction to use it is explicit, so the natural reading is "my change broke 90 tests." Recovering requires disbelieving the project's documented gate — exactly the instinct a careful agent suppresses.
+
+**Workaround:** compare failure SETS by name across two runs on the same tree, rather than trusting the gate or a count:
+```
+baseline: stash the change, vitest run --reporter=json --outputFile=before.json
+after:    restore the change, vitest run --reporter=json --outputFile=after.json
+diff the sets of "<file> :: <fullName>" where status === "failed"
+```
+That produced 90 before, 90 after, 0 new, 0 fixed — a clean result the gate could not express. Raw counts are also unreliable: an earlier comparison read 94 vs 90 purely because the new test file existed in one run and not the other. Compare names, never totals.
+
+**Fix status:** worked around; upstream gate unfixed (needs the `/app/` assumption replaced with a repo-relative path)
