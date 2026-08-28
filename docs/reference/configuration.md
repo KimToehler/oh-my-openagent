@@ -212,6 +212,7 @@ Agent tab cycling defaults to Sisyphus, Hephaestus, Prometheus, Atlas. Override 
 | Option            | Type                    | Description                                                     |
 | ----------------- | ----------------------- | --------------------------------------------------------------- |
 | `model`           | string                  | Model override (`provider/model`)                               |
+| `model_family`    | architecture enum       | Static intended-primary architecture for startup prompt, reasoning, and tool routing. Values: `claude-opus-4.6`, `claude-opus-4.7`, `claude-opus-4.8`, `claude-opus-5`, `claude-fable-5`, `gemini`, `glm`, `gpt`, `gpt-5.5`, `gpt-5.6`, `kimi-k2`, `kimi-k2.7`, `kimi-k3`, `minimax` |
 | `models`          | array                   | Ordered model chain; entries are strings or per-model objects   |
 | `fallback_models` | string\|array           | Deprecated compatibility fallback chain                         |
 | `reasoning`       | string                  | Canonical reasoning level or harness-native preset token        |
@@ -238,6 +239,8 @@ Agent tab cycling defaults to Sisyphus, Hephaestus, Prometheus, Atlas. Override 
 | `compaction`      | object                  | Compaction model and reasoning override                         |
 
 Prometheus is the exception for prompt replacement: its mandatory planner prompt always remains active so it can load `ulw-plan` first. For `agents.prometheus`, both `prompt` and `prompt_append` are appended to the mandatory base prompt instead of replacing it.
+
+`model_family` is resolved once during startup from explicit config. It describes intended primary model architecture, not provider model ID. Runtime combo fallback can serve another architecture without rebuilding startup prompts, reasoning settings, tools, or agent roster.
 
 #### Anthropic Extended Thinking
 
