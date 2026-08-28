@@ -1,6 +1,7 @@
 /// <reference types="bun-types" />
 
 import { describe, test, expect } from "bun:test"
+import { createAuditorAgent } from "./auditor"
 import { createOracleAgent } from "./oracle"
 import { createLibrarianAgent } from "./librarian"
 import { createExploreAgent } from "./explore"
@@ -35,6 +36,7 @@ describe("read-only agent tool restrictions", () => {
     const restrictedAgentNames = [
       "explore",
       "librarian",
+      "auditor",
       "oracle",
       "metis",
       "momus",
@@ -66,6 +68,21 @@ describe("read-only agent tool restrictions", () => {
       expect(restrictions[toolName]).toBeUndefined()
     }
     expect(restrictions.task).toBe(false)
+  })
+
+  describe("Auditor", () => {
+    test("denies all file-writing and delegation tools", () => {
+      // given
+      const agent = createAuditorAgent(TEST_MODEL)
+
+      // when
+      const permission = agent.permission as Record<string, string>
+
+      // then
+      for (const tool of [...FILE_WRITE_TOOLS, "task", "call_omo_agent"]) {
+        expect(permission[tool]).toBe("deny")
+      }
+    })
   })
 
   describe("Oracle", () => {

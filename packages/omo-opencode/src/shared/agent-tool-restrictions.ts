@@ -33,6 +33,14 @@ const AGENT_RESTRICTIONS: Record<string, Record<string, boolean>> = {
 
   librarian: EXPLORATION_AGENT_DENYLIST,
 
+  auditor: {
+    write: false,
+    edit: false,
+    apply_patch: false,
+    task: false,
+    call_omo_agent: false,
+  },
+
   oracle: {
     write: false,
     edit: false,
