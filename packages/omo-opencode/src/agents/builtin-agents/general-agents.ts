@@ -10,6 +10,7 @@ import { applyOverrides } from "./agent-overrides"
 import { applyEnvironmentContext } from "./environment-context"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
 import { log } from "../../shared/logger"
+import { resolveModelForConfiguredFamily } from "../../../../model-core/src"
 
 export function collectPendingBuiltinAgents(input: {
   agentSources: Record<BuiltinAgentName, import("../agent-builder").AgentSource>
@@ -105,7 +106,8 @@ export function collectPendingBuiltinAgents(input: {
     }
     const { model, variant: resolvedVariant } = resolution
 
-    let config = buildAgent(source, model, mergedCategories)
+    const architectureModel = resolveModelForConfiguredFamily(model, override?.model_family)
+    let config: AgentConfig = { ...buildAgent(source, architectureModel, mergedCategories), model }
 
     // Apply resolved variant from model fallback chain
     if (resolvedVariant) {

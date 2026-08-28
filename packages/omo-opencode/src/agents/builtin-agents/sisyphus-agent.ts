@@ -9,7 +9,7 @@ import { applyOverrides } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
 import { createSisyphusAgent } from "../sisyphus"
 import { applyFrontierToolSchemaPermission } from "../frontier-tool-schema-guard"
-import { setSisyphusRuntimePromptContext } from "../sisyphus-runtime-prompt-reconciler"
+import { resolveModelForConfiguredFamily } from "../../../../model-core/src"
 
 export function maybeCreateSisyphusConfig(input: {
   disabledAgents: string[]
@@ -79,15 +79,22 @@ export function maybeCreateSisyphusConfig(input: {
     return undefined
   }
   const { model: sisyphusModel, variant: sisyphusResolvedVariant } = sisyphusResolution
-
-  let sisyphusConfig = createSisyphusAgent(
+  const sisyphusArchitectureModel = resolveModelForConfiguredFamily(
     sisyphusModel,
-    availableAgents,
-    undefined,
-    availableSkills,
-    availableCategories,
-    useTaskSystem
+    sisyphusOverride?.model_family,
   )
+
+  let sisyphusConfig: AgentConfig = {
+    ...createSisyphusAgent(
+      sisyphusArchitectureModel,
+      availableAgents,
+      undefined,
+      availableSkills,
+      availableCategories,
+      useTaskSystem,
+    ),
+    model: sisyphusModel,
+  }
 
   if (sisyphusResolvedVariant) {
     sisyphusConfig = { ...sisyphusConfig, variant: sisyphusResolvedVariant }
@@ -95,37 +102,18 @@ export function maybeCreateSisyphusConfig(input: {
 
   sisyphusConfig = applyOverrides(sisyphusConfig, sisyphusOverride, mergedCategories, directory)
 
-  const resolvedModel = sisyphusConfig.model ?? ""
+  const sisyphusToolSchemaModel = sisyphusOverride?.model_family === undefined
+    ? (sisyphusConfig.model ?? sisyphusArchitectureModel)
+    : sisyphusArchitectureModel
   sisyphusConfig.permission = applyFrontierToolSchemaPermission(
     sisyphusConfig.permission,
-    resolvedModel,
+    sisyphusToolSchemaModel,
     sisyphusOverride?.permission,
     (sisyphusOverride as { tools?: Record<string, boolean> } | undefined)?.tools
   )
 
   sisyphusConfig = applyEnvironmentContext(sisyphusConfig, directory, {
     disableOmoEnv,
-  })
-
-  // The body above is baked from the *configured* model. If the user switches to
-  // a different model family in the TUI, the system-transform hook rebuilds the
-  // prompt for the runtime model using this captured pipeline (issue #5297/#5316).
-  setSisyphusRuntimePromptContext({
-    configuredModel: sisyphusModel,
-    bakedPrompt: sisyphusConfig.prompt ?? "",
-    rebuildPromptForModel: (runtimeModel: string): string => {
-      let rebuilt = createSisyphusAgent(
-        runtimeModel,
-        availableAgents,
-        undefined,
-        availableSkills,
-        availableCategories,
-        useTaskSystem
-      )
-      rebuilt = applyOverrides(rebuilt, sisyphusOverride, mergedCategories, directory)
-      rebuilt = applyEnvironmentContext(rebuilt, directory, { disableOmoEnv })
-      return rebuilt.prompt ?? ""
-    },
   })
 
   return sisyphusConfig

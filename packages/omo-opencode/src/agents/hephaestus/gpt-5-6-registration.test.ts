@@ -52,6 +52,33 @@ describe("maybeCreateHephaestusConfig GPT-5.6 registration", () => {
 		});
 	}
 
+	test("#given a proxy alias and static GPT-5.6 family #when Hephaestus registers #then prompt routing uses family while transport model remains alias", () => {
+		// given
+		const model = "proxy/primary"
+		const agentOverrides: AgentOverrides = {
+			hephaestus: { model, model_family: "gpt-5.6" },
+		}
+
+		// when
+		const config = maybeCreateHephaestusConfig({
+			disabledAgents: [],
+			agentOverrides,
+			availableModels: new Set([model]),
+			systemDefaultModel: model,
+			isFirstRunNoCache: false,
+			availableAgents: [],
+			availableSkills: [],
+			availableCategories: [],
+			mergedCategories: {},
+			useTaskSystem: false,
+		})
+
+		// then
+		expect(config?.model).toBe(model)
+		expect(config?.permission).toHaveProperty("grep", "deny")
+		expect(config?.permission).toHaveProperty("glob", "deny")
+	})
+
 	test("#given an unsupported Claude model #when Hephaestus registers #then no config is registered", () => {
 		// given
 		const model = "anthropic/claude-sonnet-4-6";
