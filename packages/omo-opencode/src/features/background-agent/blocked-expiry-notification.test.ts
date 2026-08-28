@@ -9,6 +9,8 @@ type ManagerInternals = {
     readonly getPendingParentWakes: () => Map<string, { readonly notification: string; readonly shouldReply: boolean }>
   }
   readonly tasks: Map<string, BackgroundTask>
+  readonly pendingByParent: Map<string, Set<string>>
+  readonly expireBlockedTask: (taskId: string) => void
 }
 
 const managers: BackgroundManager[] = []
@@ -94,6 +96,36 @@ describe("BackgroundManager blocked expiry notification", () => {
 
     // then
     expect(captured.join("\n")).toContain("Blocked task expired unanswered")
+  })
+
+  test("#given a running blocked task with a running sibling #when the blocked expiry deadline passes #then its terminal notification keeps the sibling in progress", async () => {
+    // given
+    jest.useFakeTimers()
+    const manager = createManager()
+    const task = createBlockedTask({ status: "running", completedAt: undefined })
+    const sibling = createBlockedTask({ id: "running-sibling", sessionId: "running-sibling-child", description: "running sibling", status: "running", completedAt: undefined, blockedAt: undefined, blockedReason: undefined })
+    const internals = addTask(manager, task)
+    addTask(manager, sibling)
+    internals.pendingByParent.set(task.parentSessionId, new Set([task.id, sibling.id]))
+    const captured: string[] = []
+    const queuePendingParentWake = internals.parentWakeNotifier.queuePendingParentWake
+    Reflect.set(internals.parentWakeNotifier, "queuePendingParentWake", (
+      parentSessionID: string,
+      notification: string,
+      promptContext: unknown,
+      shouldReply: boolean,
+    ) => {
+      captured.push(notification)
+      queuePendingParentWake.call(internals.parentWakeNotifier, parentSessionID, notification, unsafeTestValue(promptContext), shouldReply)
+    })
+    // when
+    internals.expireBlockedTask(task.id)
+    await flushAsyncWork()
+
+    // then
+    const text = captured.join("\n")
+    expect(text).toContain("**1 task still in progress.**")
+    expect(text).not.toContain("**All other background tasks are complete.**")
   })
 
   test("#given a blocked task that is resumed before expiry #when the expiry timer would have fired #then no expiry notification is sent", async () => {

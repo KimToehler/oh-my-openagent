@@ -2686,8 +2686,8 @@ The task was re-queued on a fallback model after a retryable failure.
     task.completedAt = new Date()
     task.error = "Blocked task expired unanswered"
     this.blockedNotificationTaskIds.delete(taskId)
-    // Notify before cleanup preserves this parent's pending set, so terminal expiry
-    // cannot take the no-sibling recompute path and vanish like an unobserved timer.
+    // Terminal expiry is cancelled before notification, so no-sibling recompute excludes
+    // it while isTaskFailure still makes the parent wake reply-worthy.
     void this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch((error) => {
       log("[background-agent] blocked-expiry parent notification failed:", { taskId, error })
     })
