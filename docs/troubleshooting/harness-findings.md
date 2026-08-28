@@ -2806,3 +2806,13 @@ $ background_output(task_id="bg_67de996b")
 **Workaround:** before answering any `CHILD AWAITING RESPONSE` reminder, check the task's real state with `background_cancel` (which reports `already cancelled`) rather than `background_output` alone, and confirm no replacement task supersedes it. Do not treat the reminder's suggested invocation as authorization to resume.
 
 **Fix status:** unfixed
+
+**Update (same session, 20 minutes later):** the ignored task reached a terminal state on its own, confirming the escalation is time-boxed rather than indefinite:
+
+```
+[BACKGROUND TASK CANCELLED]
+**ID:** `bg_67de996b` | Duration: 28m 36s
+**Error:** Blocked task expired unanswered
+```
+
+So the sequence for a cancelled-then-blocked task is: cancel → `background_cancel` reports `cancelled` while `background_output` still reports `BLOCKED` → one `CHILD AWAITING RESPONSE` reminder at ~10 min → expiry at ~28 min. Ignoring the reminder is therefore safe and self-resolving; the hazard is confined to that one reminder window, where the copy-paste invocation is the only thing urging a resume. Note the final notice is labelled `Error` and `ACTION REQUIRED` even though expiry was the correct outcome, which is a second, milder instance of the same problem: terminal states for deliberately-abandoned tasks are reported as failures needing attention.
