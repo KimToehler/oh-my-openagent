@@ -23,7 +23,7 @@ export {
 } from "./constants.js";
 export { loadDynamicCandidates } from "./engine-dynamic-loader.js";
 export { loadCandidate, staticMatchReason } from "./engine-loader.js";
-export { isRootSingleFile, pathBasesForTarget, toPosixPath } from "./engine-paths.js";
+export { isRootSingleFile, isSameOrChildPath, pathBasesForTarget, toPosixPath } from "./engine-paths.js";
 export { loadStaticCandidates } from "./engine-static-loader.js";
 export { createEngine, defaultConfig } from "./engine.js";
 export {
