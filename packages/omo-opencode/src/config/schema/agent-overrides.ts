@@ -1,4 +1,5 @@
 import { OmoReasoningSchema } from "@oh-my-opencode/omo-config-core"
+import { ModelFamily } from "../../../../model-core/src"
 import { z } from "zod"
 import { FallbackModelObjectSchema, FallbackModelsSchema } from "./fallback-models"
 import { AgentPermissionSchema } from "./internal/permission"
@@ -8,6 +9,8 @@ export const AgentOverrideConfigSchema = z.object({
   model: z.string().optional(),
   /** Ordered model chain; the first entry is primary and the rest are fallbacks. */
   models: z.array(z.union([z.string(), FallbackModelObjectSchema])).optional(),
+  /** Static primary-model architecture used for startup prompt, reasoning, and tool routing. */
+  model_family: z.enum(Object.values(ModelFamily)).optional(),
   fallback_models: FallbackModelsSchema.optional(),
   reasoning: OmoReasoningSchema.optional(),
   /** @deprecated Use `reasoning` instead. */

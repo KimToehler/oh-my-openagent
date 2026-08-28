@@ -218,6 +218,33 @@ describe("AgentOverrideConfigSchema", () => {
     })
   })
 
+  describe("model_family field", () => {
+    test("accepts a configured model architecture", () => {
+      // given
+      const config = { model_family: "gpt-5.6" }
+
+      // when
+      const result = AgentOverrideConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(true)
+      if (result.success) {
+        expect(result.data.model_family).toBe("gpt-5.6")
+      }
+    })
+
+    test("rejects an unknown configured model architecture", () => {
+      // given
+      const config = { model_family: "openai/gpt-5.6" }
+
+      // when
+      const result = AgentOverrideConfigSchema.safeParse(config)
+
+      // then
+      expect(result.success).toBe(false)
+    })
+  })
+
   describe("variant field", () => {
     test("accepts variant as optional string", () => {
       // given
