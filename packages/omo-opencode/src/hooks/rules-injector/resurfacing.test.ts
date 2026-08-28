@@ -79,8 +79,9 @@ describe("rule resurfacing", () => {
 		const logSpy = spyOn(shared, "log").mockImplementation(() => undefined);
 		const collector = new ContextCollector();
 		const resurfacing = createRuleResurfacing(collector);
+		const sessionID = `${SESSION_ID}-log-payloads`;
 		const input = {
-			sessionID: SESSION_ID,
+			sessionID,
 			realPath: REAL_PATH,
 			relativePath: RULE_PATH,
 			matchReason: "matched",
@@ -93,11 +94,36 @@ describe("rule resurfacing", () => {
 
 		// then
 		const decisions = logSpy.mock.calls
-			.filter(([message]) => message === "[rules-injector] Resurfacing decision")
+			.filter(([message, payload]) =>
+				message === "[rules-injector] Resurfacing decision"
+				&& (payload as { sessionID?: string }).sessionID === sessionID,
+			)
 			.map(([, payload]) => payload as { gap: number | null });
 		expect(decisions[0]?.gap).toBeNull();
 		expect(decisions[1]?.gap).toBe(0);
 		logSpy.mockRestore();
+	});
+
+	it("#given a rule suppressed before the resurfacing gap #when evaluated #then logs without building a discarded reminder", () => {
+		// given
+		const collector = new ContextCollector();
+		const resurfacing = createRuleResurfacing(collector);
+		resurfacing.noteInjected(SESSION_ID, REAL_PATH);
+		const input = {
+			sessionID: SESSION_ID,
+			realPath: REAL_PATH,
+			relativePath: RULE_PATH,
+			matchReason: "matched",
+			get body(): string {
+				throw new Error("suppressed rule must not build a reminder");
+			},
+		};
+
+		// when
+		resurfacing.handleSuppressedRule(input);
+
+		// then
+		expect(collector.hasPending(SESSION_ID)).toBe(false);
 	});
 
 	it("#given a rule body containing uppercase NEVER and MUST lines #when the reminder is built #then it carries those imperative lines and not the full body", () => {
