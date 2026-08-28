@@ -1,0 +1,6 @@
+# Pairing + envelope repro on merged dev 3ca83323f
+# regex source: packages/omo-opencode/src/tools/background-task/parent-transcript-pairing.ts:95
+
+long-250char     PAIR: ses_xyz | CLOSING_TAG_LEAK: false
+multiline        PAIR: ses_xyz | CLOSING_TAG_LEAK: false
+envelope-escape  PAIR: ses_xyz | CLOSING_TAG_LEAK: false

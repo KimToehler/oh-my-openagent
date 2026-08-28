@@ -1,0 +1,21 @@
+bun test v1.4.0 (1381054db)
+
+packages/omo-opencode/src/hooks/rules-injector/resurfacing.test.ts:
+93 | 
+94 | 		// then
+95 | 		const decisions = logSpy.mock.calls
+96 | 			.filter(([message]) => message === "[rules-injector] Resurfacing decision")
+97 | 			.map(([, payload]) => payload as { gap: number | null });
+98 | 		expect(decisions[0]?.gap).toBeNull();
+                                 ^
+error: expect(received).toBeNull()
+
+Received: 40
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/hooks/rules-injector/resurfacing.test.ts:98:29)
+(fail) rule resurfacing > #given no watermark and a genuine zero gap #when each suppressed rule is evaluated #then their log payloads are distinguishable [0.23ms]
+
+ 9 pass
+ 1 fail
+ 15 expect() calls
+Ran 10 tests across 2 files. [72.00ms]
