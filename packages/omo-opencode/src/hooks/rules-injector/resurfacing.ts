@@ -77,7 +77,6 @@ export function createRuleResurfacing(
 		handleSuppressedRule: (input) => {
 			const gap = store.getGap(input.sessionID, input.realPath);
 			const shouldSurface = store.shouldSurface(input.sessionID, input.realPath);
-			const reminder = buildRuleReminder(input);
 			log("[rules-injector] Resurfacing decision", {
 				sessionID: input.sessionID,
 				rulePath: input.relativePath,
@@ -85,6 +84,7 @@ export function createRuleResurfacing(
 				decision: shouldSurface ? "surface" : "suppress",
 			});
 			if (!shouldSurface) return;
+			const reminder = buildRuleReminder(input);
 			collector.register(input.sessionID, {
 				id: `rule-reminder:${input.relativePath}`,
 				source: "rules-injector",

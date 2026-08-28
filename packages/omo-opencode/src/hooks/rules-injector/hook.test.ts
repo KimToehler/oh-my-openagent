@@ -118,6 +118,44 @@ describe("createRulesInjectorHook", () => {
 		expect(reminder?.length).toBeLessThanOrEqual(600);
 	});
 
+	it("#given pending rule-reminder context #when session is deleted #then collector clears that session", async () => {
+		// given
+		const collector = new ContextCollector();
+		const hook = createRulesInjectorHook(makeContext(projectRoot), undefined, undefined, collector);
+		collector.register(SESSION_ID, {
+			id: "rule-reminder:typescript",
+			source: "rules-injector",
+			content: "[Rule reminder: .omo/rules/typescript.md]",
+		});
+
+		// when
+		await hook.event({
+			event: { type: "session.deleted", properties: { sessionID: SESSION_ID } },
+		});
+
+		// then
+		expect(collector.hasPending(SESSION_ID)).toBe(false);
+	});
+
+	it("#given pending rule-reminder context #when session is compacted #then collector retains that session", async () => {
+		// given
+		const collector = new ContextCollector();
+		const hook = createRulesInjectorHook(makeContext(projectRoot), undefined, undefined, collector);
+		collector.register(SESSION_ID, {
+			id: "rule-reminder:typescript",
+			source: "rules-injector",
+			content: "[Rule reminder: .omo/rules/typescript.md]",
+		});
+
+		// when
+		await hook.event({
+			event: { type: "session.compacted", properties: { sessionID: SESSION_ID } },
+		});
+
+		// then
+		expect(collector.hasPending(SESSION_ID)).toBe(true);
+	});
+
 	it("#given suppressed governed rule before gap #when hook runs #then queues no reminder", async () => {
 		const collector = new ContextCollector();
 		const hook = createRulesInjectorHook(makeContext(projectRoot), undefined, undefined, collector);

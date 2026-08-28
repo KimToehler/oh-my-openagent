@@ -66,11 +66,12 @@ export function createRulesInjectorHook(
 		shouldResurfaceRule: resurfacing?.shouldSurface,
 	});
 
-	function clearSessionState(sessionID: string): void {
+	function clearSessionState(sessionID: string, clearCollector = false): void {
 		clearSessionCache(sessionID);
 		clearSessionRuleScanCache(sessionID);
 		transcriptHydration.clearSession(sessionID);
 		resurfacing?.clearSession(sessionID);
+		if (clearCollector) collector?.clear(sessionID);
 		clearParsedRuleCache();
 	}
 
@@ -101,7 +102,7 @@ export function createRulesInjectorHook(
 		if (event.type === "session.deleted") {
 			const sessionID = resolveSessionEventID(props);
 			if (sessionID) {
-				clearSessionState(sessionID);
+				clearSessionState(sessionID, true);
 			}
 			clearProjectRootCache();
 		}
