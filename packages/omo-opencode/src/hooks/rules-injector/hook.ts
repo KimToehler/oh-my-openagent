@@ -1,3 +1,5 @@
+import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { PluginInput } from "@opencode-ai/plugin";
 import { ContextCollector } from "../../features/context-injector";
 import { createDynamicTruncator } from "../../shared/dynamic-truncator";
@@ -36,6 +38,12 @@ interface EventInput {
 	};
 }
 
+export function resolveOpenCodePluginRoot(moduleUrl = import.meta.url): string {
+	const moduleDirectory = dirname(fileURLToPath(moduleUrl));
+	if (basename(moduleDirectory) === "dist") return join(moduleDirectory, "..");
+	return join(moduleDirectory, "..", "..", "..");
+}
+
 const TRACKED_TOOLS = ["read", "write", "edit", "multiedit"];
 
 export function createRulesInjectorHook(
@@ -54,6 +62,7 @@ export function createRulesInjectorHook(
 	});
 	const { processFilePathForInjection } = createRuleInjectionProcessor({
 		workspaceDirectory: ctx.directory,
+		pluginRoot: resolveOpenCodePluginRoot(),
 		truncator,
 		getSessionCache,
 		getSessionRuleScanCache,
