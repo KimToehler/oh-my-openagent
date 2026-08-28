@@ -16,6 +16,14 @@ function chatInit(model: string): { body: string } {
   return { body: JSON.stringify({ model, messages: [] }) }
 }
 
+/**
+ * The body observation is deliberately fire-and-forget so it never delays a
+ * response, so a body-sourced record lands a microtask after the call returns.
+ */
+async function settleObservation(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0))
+}
+
 describe("upstream model observer", () => {
   beforeEach(() => {
     _resetObservedUpstreamModelsForTesting()
@@ -73,6 +81,7 @@ describe("upstream model observer", () => {
       )
 
       await wrapped("https://router.example/v1/chat/completions", chatInit("oracle"))
+      await settleObservation()
 
       expect(getObservedUpstreamModel("onara/oracle")).toBe("onara/claude-opus-5")
     })

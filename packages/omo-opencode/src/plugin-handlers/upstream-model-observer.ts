@@ -78,6 +78,22 @@ function observedModelFromHeader(response: Response, providerID: string): string
 }
 
 /**
+ * Store an observation, unless the response merely echoed the model that was asked
+ * for.
+ *
+ * Both sides are qualified before comparing. A direct provider answers with the same
+ * id it was given, but the request body carries it bare (`claude-opus-4-5`) while the
+ * observation is qualified (`anthropic/claude-opus-4-5`); comparing those raw made
+ * every direct request record a useless self-mapping and log a misleading redirect.
+ */
+function record(providerID: string, configuredModel: string, observed: string): void {
+  if (observed === qualify(configuredModel, providerID)) return
+  recordObservedUpstreamModel(`${providerID}/${configuredModel}`, observed)
+  recordObservedUpstreamModel(configuredModel, observed)
+  log(`[upstream-model] ${providerID}/${configuredModel} served by ${observed}`)
+}
+
+/**
  * Wrap one provider's fetch. Never throws and never alters the response: the
  * observation is a side effect, and a failure to identify a model must not break a
  * working request.
@@ -91,12 +107,18 @@ export function wrapProviderFetch(providerID: string, existing: FetchLike | unde
     try {
       const configuredModel = requestedModelFrom(init)
       if (configuredModel !== undefined) {
-        const observed =
-          observedModelFromHeader(response, providerID) ?? (await observedModelFromBody(response, providerID))
-        if (observed !== undefined && observed !== configuredModel) {
-          recordObservedUpstreamModel(`${providerID}/${configuredModel}`, observed)
-          recordObservedUpstreamModel(configuredModel, observed)
-          log(`[upstream-model] ${providerID}/${configuredModel} served by ${observed}`)
+        const fromHeader = observedModelFromHeader(response, providerID)
+        if (fromHeader !== undefined) {
+          record(providerID, configuredModel, fromHeader)
+        } else {
+          // Deliberately NOT awaited: reading the body is a side effect for a cache,
+          // with no ordering requirement, and awaiting it would delay every
+          // non-streaming response by a full extra parse. A late record is harmless.
+          void observedModelFromBody(response, providerID)
+            .then((fromBody) => {
+              if (fromBody !== undefined) record(providerID, configuredModel, fromBody)
+            })
+            .catch(() => {})
         }
       }
     } catch {

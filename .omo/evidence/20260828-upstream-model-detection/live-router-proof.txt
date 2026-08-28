@@ -20,6 +20,28 @@ requested momus      -> served by gpt-5.6-sol
 requested ultrabrain -> served by gpt-5.6-sol
 requested oracle     -> served by claude-opus-5
 
+=== CORRECTION (post-review) ===
+The run above proves the REGISTRY and the FACTORY, by calling createOracleAgent
+directly. It does NOT prove OpenCode rebuilds its agent roster: agent configs are
+built once at config-hook time and cached. Review caught this, and the first
+version of this change recorded the truth but never applied it in-session.
+
+Fix: the agent cache key now includes the resolved upstream identity
+(createAgentConfigCacheKey -> collectResolvedModelIdentity), so an observation
+invalidates the cached roster.
+
+=== RE-VERIFIED LIVE, through the real cache-key path ===
+cache key includes resolvedModels? true
+identity BEFORE turn: {}
+identity AFTER  turn: {"onara/momus":"onara/gpt-5.6-sol"}
+isGptModel("onara/momus") after turn: true
+
+The key changes after a real router turn, so the roster is rebuilt instead of
+replayed. upstream-model-detection.test.ts now drives createConfigHandler and
+asserts createBuiltinAgents is called again; reverting only the cache-key line
+makes that test fail (1 fail / 4 pass), so it guards the behavior rather than
+factory purity.
+
 === deployed router does NOT yet carry the header commits ===
 GET /v1/models: 92 models, 24 combos, 0 with upstream_models
 chat response carried no X-9Router-Upstream-Model

@@ -55,8 +55,9 @@ drained stream. Streaming responses are skipped by content-type.
   still gets a readable body, error propagation, idempotent install, existing
   provider `fetch` preserved.
 - `packages/omo-opencode/src/plugin-handlers/upstream-model-detection.test.ts` -
-  end to end through `createOracleAgent`, including the fallback reverting the agent
-  to the Claude shape.
+  end to end through `createConfigHandler`, proving a response observation
+  invalidates the cached roster and re-invokes `createBuiltinAgents`; also covers
+  the fallback reverting the agent to the Claude shape.
 - **Live** against the deployed router - see `live-router-proof.txt`.
 
 ## What was observed
@@ -74,6 +75,32 @@ everything to GPT.
 
 Gates: 996 pass / 0 fail across `model-core`, `agents`, and `plugin-handlers`;
 typecheck clean.
+
+## Review round 2: the fix recorded the truth but did not apply it
+
+An independent review rejected the first version, and reproduced the defect. Agent
+prompts, reasoning effort, and tool restrictions are baked into a roster that
+`config-handler.ts` memoizes on a cache key of `{agent, default_agent, model,
+skills}`. The registry was not in that key, so once the roster was built with the
+alias unresolved, every later config-hook run replayed the stale clone and
+`createOracleAgent` was never called again.
+
+Worse, the original test could not catch it: it called `createOracleAgent` directly,
+proving the factory is a pure function of the registry - which was never in doubt -
+while its name claimed the agent was rebuilt. The first live proof had the same gap.
+
+Fixed:
+- `createAgentConfigCacheKey` now folds in `collectResolvedModelIdentity(config)`, so
+  an observation invalidates the cached roster.
+- `upstream-model-detection.test.ts` drives `createConfigHandler` and asserts
+  `createBuiltinAgents` is invoked again. Reverting only the cache-key line makes it
+  fail (1 fail / 4 pass), so it guards behavior rather than factory purity.
+- The direct-provider guard compared a qualified observation against a bare
+  requested id, so every direct Anthropic/OpenAI call recorded a useless
+  self-mapping and logged a misleading redirect. Both sides are now qualified;
+  verified that a direct provider records nothing while a real redirect still does.
+- The body read is no longer awaited. It was delaying every non-streaming response
+  by a full extra parse for a side effect with no ordering requirement.
 
 ## Why it is enough
 
