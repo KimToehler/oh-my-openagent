@@ -1,0 +1,3 @@
+Running OpenCode loaded worktree plugin, invoked namespaced MCP tool ending in ctx_shell, tracker registered returned shell job ID, turn went idle, and plugin dispatched warning as internal async prompt. SSE message.part.updated wire capture contains exact new option-A text and exact terminal status call naming registered job ID. This proves lifecycle hook behavior on real plugin surface.
+
+Residual risk: temporary stub validates integration contracts only, not real ctx_shell implementation. Required unit gates cover tracker parsing and tool.execute.after terminal-status behavior.

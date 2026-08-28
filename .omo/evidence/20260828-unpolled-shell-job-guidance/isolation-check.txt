@@ -1,0 +1,3 @@
+OMO_QA_ROOT=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.7Iez86BaWp
+HOME=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.7Iez86BaWp/home
+XDG_CONFIG_HOME=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.7Iez86BaWp/config

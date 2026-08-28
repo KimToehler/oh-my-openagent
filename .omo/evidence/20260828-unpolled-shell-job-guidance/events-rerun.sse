@@ -1,0 +1,224 @@
+data: {"id":"evt_0483c825800122qb7SO1EGgEta","type":"server.connected","properties":{}}
+
+data: {"id":"evt_0483c825a002cs4vR6odbkZgFl","type":"session.created","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"ses_fb7c37da5ffeGFjrpG4zR44fPU","slug":"misty-island","version":"1.18.20","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","title":"New session - 2026-08-28T11:58:40.218Z","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787918320218,"updated":1787918320218}}}}
+
+data: {"id":"evt_0483c8283001OQeqdL3luXE7d4","type":"session.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"ses_fb7c37da5ffeGFjrpG4zR44fPU","slug":"misty-island","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","title":"New session - 2026-08-28T11:58:40.218Z","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787918320218,"updated":1787918320259}}}}
+
+data: {"id":"evt_0483c831e001ItN3x3FlfXf3jV","type":"tui.toast.show","properties":{"title":"⚠️ Provider Cache Missing","message":"Model filtering disabled. RESTART OpenCode to enable full functionality.","variant":"warning","duration":6000}}
+
+data: {"id":"evt_0483c828d0014nwMeNlkwdA3gv","type":"message.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"msg_0483c8283001J3jJKPk6weMKgm","role":"user","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","time":{"created":1787918320259},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"}}}}
+
+data: {"id":"evt_0483c8331001qARW4O7ASZiB7e","type":"message.part.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","part":{"type":"text","text":"LIVE_UNPOLLED_PROBE","messageID":"msg_0483c8283001J3jJKPk6weMKgm","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","id":"prt_0483c8286001v3nPhNfs5TpZqF"},"time":1787918320433}}
+
+data: {"id":"evt_0483c8333001AVCBLO2SEMzqHJ","type":"session.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"ses_fb7c37da5ffeGFjrpG4zR44fPU","slug":"misty-island","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","title":"New session - 2026-08-28T11:58:40.218Z","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787918320218,"updated":1787918320435}}}}
+
+data: {"id":"evt_0483c8336001I1lUIqVOC1B7Jq","type":"session.status","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","status":{"type":"busy"}}}
+
+data: {"id":"evt_0483c8337001ehRUURd7iQB45o","type":"message.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"msg_0483c83370016BhkreffqYIQAj","parentID":"msg_0483c8283001J3jJKPk6weMKgm","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1787918320439},"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU"}}}
+
+data: {"id":"evt_0483c8366001029cvyP2uEIcDF","type":"session.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"ses_fb7c37da5ffeGFjrpG4zR44fPU","slug":"misty-island","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","title":"done","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787918320218,"updated":1787918320435}}}}
+
+data: {"id":"evt_0483c86550019DAMXz7JxI70L4","type":"session.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"ses_fb7c37da5ffeGFjrpG4zR44fPU","slug":"misty-island","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","title":"done","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787918320218,"updated":1787918321237}}}}
+
+data: {"id":"evt_0483c86560013BANWpGkGeOPF3","type":"session.diff","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","diff":[]}}
+
+data: {"id":"evt_0483c8657001KNSJylj2rX13Pj","type":"message.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"role":"user","time":{"created":1787918320259},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"},"id":"msg_0483c8283001J3jJKPk6weMKgm","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","summary":{"diffs":[]}}}}
+
+data: {"id":"evt_0483c87060011uCu4JSgC65lFl","type":"plugin.added","properties":{"id":"core/config-reference"}}
+
+data: {"id":"evt_0483c8706002deyrXAUTNpMoUf","type":"plugin.added","properties":{"id":"agent"}}
+
+data: {"id":"evt_0483c8706003UCruT6kH5Sj6ER","type":"plugin.added","properties":{"id":"command"}}
+
+data: {"id":"evt_0483c8707001n3hcqLpk311Rvs","type":"plugin.added","properties":{"id":"skill"}}
+
+data: {"id":"evt_0483c8707002kOClXiV1uhpjLX","type":"plugin.added","properties":{"id":"models-dev"}}
+
+data: {"id":"evt_0483c8707003dNHYMsHJMmjJVl","type":"plugin.added","properties":{"id":"config-agent"}}
+
+data: {"id":"evt_0483c8708001mRqKSRPeWvTgKn","type":"plugin.added","properties":{"id":"config-command"}}
+
+data: {"id":"evt_0483c8708002ifGuaTABj3Sd4A","type":"plugin.added","properties":{"id":"config-skill"}}
+
+data: {"id":"evt_0483c8708003512IhvmJ29dHMv","type":"plugin.added","properties":{"id":"alibaba"}}
+
+data: {"id":"evt_0483c8708004fuGyAEDxVWwG7B","type":"plugin.added","properties":{"id":"amazon-bedrock"}}
+
+data: {"id":"evt_0483c8708005kJ19lUDMPmMJd8","type":"plugin.added","properties":{"id":"anthropic"}}
+
+data: {"id":"evt_0483c87090018U8kkvUp1auHRT","type":"plugin.added","properties":{"id":"azure-cognitive-services"}}
+
+data: {"id":"evt_0483c877c001WhDOaxVwBTKEFC","type":"plugin.added","properties":{"id":"azure"}}
+
+data: {"id":"evt_0483c877c002qbRGqhZ4o2Oct4","type":"plugin.added","properties":{"id":"cerebras"}}
+
+data: {"id":"evt_0483c877c003nm5nm3s74VY3Li","type":"plugin.added","properties":{"id":"cloudflare-ai-gateway"}}
+
+data: {"id":"evt_0483c877c004JAJ7rhk6LiQmW2","type":"plugin.added","properties":{"id":"cloudflare-workers-ai"}}
+
+data: {"id":"evt_0483c877c005Yl0Ygmn79EZH2k","type":"plugin.added","properties":{"id":"cohere"}}
+
+data: {"id":"evt_0483c877c006QJdP5TSrhVWf6l","type":"plugin.added","properties":{"id":"deepinfra"}}
+
+data: {"id":"evt_0483c877c007f1NuJuF6bcnWdq","type":"plugin.added","properties":{"id":"gateway"}}
+
+data: {"id":"evt_0483c877d001A0z7RDkDy7kYno","type":"plugin.added","properties":{"id":"github-copilot"}}
+
+data: {"id":"evt_0483c877d002J0Yzp7xQfKo7nK","type":"plugin.added","properties":{"id":"gitlab"}}
+
+data: {"id":"evt_0483c877d003GO08v17uAtauuM","type":"plugin.added","properties":{"id":"google"}}
+
+data: {"id":"evt_0483c877d004vD4WIkQf3xtNtL","type":"plugin.added","properties":{"id":"google-vertex-anthropic"}}
+
+data: {"id":"evt_0483c877d005y2wLAIPAGfaOPT","type":"plugin.added","properties":{"id":"google-vertex"}}
+
+data: {"id":"evt_0483c8786001v9tR12TXnqRuJo","type":"plugin.added","properties":{"id":"groq"}}
+
+data: {"id":"evt_0483c8786002UXVV6iac82C9Fh","type":"plugin.added","properties":{"id":"kilo"}}
+
+data: {"id":"evt_0483c8787001dlYD5Owhxe7xFK","type":"plugin.added","properties":{"id":"llmgateway"}}
+
+data: {"id":"evt_0483c8787002EzhGsJnZuiYSsT","type":"plugin.added","properties":{"id":"mistral"}}
+
+data: {"id":"evt_0483c8787003jTjl2FS5OgHF1h","type":"plugin.added","properties":{"id":"nvidia"}}
+
+data: {"id":"evt_0483c8788001iFv1a7V3MaaIr6","type":"plugin.added","properties":{"id":"opencode"}}
+
+data: {"id":"evt_0483c8788002O4VNJkfyXdYLcs","type":"plugin.added","properties":{"id":"snowflake-cortex"}}
+
+data: {"id":"evt_0483c8788003mVHd47av0E62Yj","type":"plugin.added","properties":{"id":"openai-compatible"}}
+
+data: {"id":"evt_0483c8788004uJyqC4hmkGWhHP","type":"plugin.added","properties":{"id":"openai"}}
+
+data: {"id":"evt_0483c8788005pHAzrchuMhf0Bc","type":"plugin.added","properties":{"id":"openrouter"}}
+
+data: {"id":"evt_0483c8788006GMn5dtS7AvqdrF","type":"plugin.added","properties":{"id":"perplexity"}}
+
+data: {"id":"evt_0483c87890015J1uJEfgJ6AgCX","type":"plugin.added","properties":{"id":"sap-ai-core"}}
+
+data: {"id":"evt_0483c87bc0018qugTzbq9FLke5","type":"catalog.updated","properties":{}}
+
+data: {"id":"evt_0483c87bc002Fh5UITF5AhwBiT","type":"plugin.added","properties":{"id":"togetherai"}}
+
+data: {"id":"evt_0483c87bd001J10T7xH59Oo4wB","type":"plugin.added","properties":{"id":"vercel"}}
+
+data: {"id":"evt_0483c87bd002hJeV4YFiwUfjwj","type":"plugin.added","properties":{"id":"venice"}}
+
+data: {"id":"evt_0483c87bd003C1eD2pdcPA8hu6","type":"plugin.added","properties":{"id":"xai"}}
+
+data: {"id":"evt_0483c87bd004hx4jPB9zKSsnsa","type":"plugin.added","properties":{"id":"zenmux"}}
+
+data: {"id":"evt_0483c87bd005yqAxndjR0N07Ze","type":"plugin.added","properties":{"id":"dynamic-provider"}}
+
+data: {"id":"evt_0483c87be001wPNFaYFltOMa9a","type":"plugin.added","properties":{"id":"config-plugin"}}
+
+data: {"id":"evt_0483c87be002Jo4p1ZRBe1uobB","type":"plugin.added","properties":{"id":"config-provider"}}
+
+data: {"id":"evt_0483c87bf0011c5ZQZpv2ViF85","type":"plugin.added","properties":{"id":"variant"}}
+
+data: {"id":"evt_0483c87bf002GxY4jKvLPcB37Q","type":"reference.updated","properties":{}}
+
+data: {"id":"evt_0483c87cc001FD9ytRtkURdQSe","type":"integration.updated","properties":{}}
+
+data: {"id":"evt_0483c87ed001hDksFLmFsxqEFN","type":"catalog.updated","properties":{}}
+
+data: {"id":"evt_0483c87f0001b5jGvV1bNYbrj5","type":"session.status","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","status":{"type":"busy"}}}
+
+data: {"id":"evt_0483c87fb001cYZFr7e0SOZJdY","type":"message.part.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","part":{"id":"prt_0483c87fb001bSO7sT1Glq5Bmt","messageID":"msg_0483c83370016BhkreffqYIQAj","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","type":"step-start"},"time":1787918321659}}
+
+data: {"id":"evt_0483c87fd001nTjpizvw0SUQLr","type":"message.part.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","part":{"id":"prt_0483c87fd001Upov8n4UcQBi3Y","messageID":"msg_0483c83370016BhkreffqYIQAj","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","type":"tool","tool":"myprobe_ctx_shell","callID":"call_myprobe_ctx_shell","state":{"status":"pending","input":{},"raw":""}},"time":1787918321661}}
+
+data: {"id":"evt_0483c8800001QT3OnHEmRn1IX4","type":"message.part.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","part":{"type":"tool","tool":"myprobe_ctx_shell","callID":"call_myprobe_ctx_shell","state":{"status":"running","input":{"command":"./gradlew build","run_in_background":true},"time":{"start":1787918321664}},"id":"prt_0483c87fd001Upov8n4UcQBi3Y","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","messageID":"msg_0483c83370016BhkreffqYIQAj"},"time":1787918321664}}
+
+data: {"id":"evt_0483c88120012l9tDeHnDZb7o7","type":"message.part.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","part":{"type":"tool","tool":"myprobe_ctx_shell","callID":"call_myprobe_ctx_shell","state":{"status":"completed","input":{"command":"./gradlew build","run_in_background":true},"output":"Started background job shell_1f2e3d4c5b6a7988","metadata":{"truncated":false},"title":"","time":{"start":1787918321664,"end":1787918321682}},"id":"prt_0483c87fd001Upov8n4UcQBi3Y","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","messageID":"msg_0483c83370016BhkreffqYIQAj"},"time":1787918321682}}
+
+data: {"id":"evt_0483c8814001D4bQDpHfwSm24K","type":"message.part.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","part":{"id":"prt_0483c88140013huUymxgcf1nVh","reason":"tool-calls","messageID":"msg_0483c83370016BhkreffqYIQAj","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","type":"step-finish","tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1787918321684}}
+
+data: {"id":"evt_0483c8815001MxN30JKB0lcb35","type":"message.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"msg_0483c83370016BhkreffqYIQAj","parentID":"msg_0483c8283001J3jJKPk6weMKgm","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1787918320439,"completed":1787918321686},"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","finish":"tool-calls"}}}
+
+data: {"id":"evt_0483c8816001U8j8lVIun2cBqr","type":"message.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"msg_0483c83370016BhkreffqYIQAj","parentID":"msg_0483c8283001J3jJKPk6weMKgm","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1787918320439,"completed":1787918321686},"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","finish":"tool-calls"}}}
+
+data: {"id":"evt_0483c8817001t9wbjD2uqxzd1Z","type":"session.status","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","status":{"type":"busy"}}}
+
+data: {"id":"evt_0483c8817002Gc9Dx8jkMHqcan","type":"message.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"msg_0483c88170015eo35vhgu1pF6e","parentID":"msg_0483c8283001J3jJKPk6weMKgm","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1787918321687},"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU"}}}
+
+data: {"id":"evt_0483c881a001xUdXafdmbbhk5y","type":"session.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"ses_fb7c37da5ffeGFjrpG4zR44fPU","slug":"misty-island","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","title":"done","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787918320218,"updated":1787918321690}}}}
+
+data: {"id":"evt_0483c881b0018oiRw7FaND6Ju4","type":"session.diff","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","diff":[]}}
+
+data: {"id":"evt_0483c881c001uKJkNQbazDITlP","type":"message.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"role":"user","time":{"created":1787918320259},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"},"summary":{"diffs":[]},"id":"msg_0483c8283001J3jJKPk6weMKgm","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU"}}}
+
+data: {"id":"evt_0483c8824001QNtHaeNn05WL4h","type":"session.status","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","status":{"type":"busy"}}}
+
+data: {"id":"evt_0483c8828001gIdAum3RPU9kDK","type":"message.part.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","part":{"id":"prt_0483c8828001lN75bgVQQWEQW4","messageID":"msg_0483c88170015eo35vhgu1pF6e","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","type":"step-start"},"time":1787918321704}}
+
+data: {"id":"evt_0483c8829001uKUb6S0VREcDkn","type":"message.part.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","part":{"id":"prt_0483c8829001EKA71WHqJTvYMO","messageID":"msg_0483c88170015eo35vhgu1pF6e","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","type":"text","text":"","time":{"start":1787918321705}},"time":1787918321705}}
+
+data: {"id":"evt_0483c882a001ukY1GiqWBZ9Orr","type":"message.part.delta","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","messageID":"msg_0483c88170015eo35vhgu1pF6e","partID":"prt_0483c8829001EKA71WHqJTvYMO","field":"text","delta":"done"}}
+
+data: {"id":"evt_0483c882a002RnGzdl9Swhu8JC","type":"message.part.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","part":{"id":"prt_0483c8829001EKA71WHqJTvYMO","messageID":"msg_0483c88170015eo35vhgu1pF6e","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","type":"text","text":"done","time":{"start":1787918321705,"end":1787918321706}},"time":1787918321706}}
+
+data: {"id":"evt_0483c882b001540mFVganILMOx","type":"message.part.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","part":{"id":"prt_0483c882b001uIu6bi23QUwlp4","reason":"stop","messageID":"msg_0483c88170015eo35vhgu1pF6e","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","type":"step-finish","tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1787918321707}}
+
+data: {"id":"evt_0483c882b0027QPyzeojLJtmho","type":"message.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"msg_0483c88170015eo35vhgu1pF6e","parentID":"msg_0483c8283001J3jJKPk6weMKgm","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1787918321687,"completed":1787918321708},"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","finish":"stop"}}}
+
+data: {"id":"evt_0483c882c001Z5QfFCjyOVfrdo","type":"message.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"msg_0483c88170015eo35vhgu1pF6e","parentID":"msg_0483c8283001J3jJKPk6weMKgm","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1787918321687,"completed":1787918321708},"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","finish":"stop"}}}
+
+data: {"id":"evt_0483c882d001cnBtr6BEJN2sWq","type":"session.status","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","status":{"type":"busy"}}}
+
+data: {"id":"evt_0483c882e001rfhWyghSfyqZmV","type":"session.status","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","status":{"type":"idle"}}}
+
+data: {"id":"evt_0483c882e002MxQTQ9I8frb4Tu","type":"session.idle","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU"}}
+
+data: {"id":"evt_0483c882f001ZJiajkRmeuFk3K","type":"session.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"ses_fb7c37da5ffeGFjrpG4zR44fPU","slug":"misty-island","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","title":"done","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787918320218,"updated":1787918321711}}}}
+
+data: {"id":"evt_0483c8830001VOyD5uSqpfUoqq","type":"session.diff","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","diff":[]}}
+
+data: {"id":"evt_0483c88300029p9fuCvulTFgUX","type":"message.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"role":"user","time":{"created":1787918320259},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"},"summary":{"diffs":[]},"id":"msg_0483c8283001J3jJKPk6weMKgm","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU"}}}
+
+data: {"id":"evt_0483c8976001sMcLB595c6k2Hh","type":"message.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"msg_0483c8973001AfYrP3Lf2e05dW","role":"user","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","time":{"created":1787918322035},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"}}}}
+
+data: {"id":"evt_0483c8977001fewcOosS7E57q0","type":"message.part.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","part":{"type":"text","text":"<unpolled-background-shell-jobs>\nYou are ending your turn with 1 detached `ctx_shell` job is still outstanding:\n- `shell_1f2e3d4c5b6a7988` — `./gradlew build`\n\n`ctx_shell(run_in_background=true)` **does not notify** on completion — unlike\n`task(run_in_background=true)`, no `<system-reminder>` will ever arrive for it. If you\nend the turn expecting one, the work stalls until a human intervenes.\n\nResolve every job listed above before yielding. Pick ONE of:\n\n**A. Wait for it — bounded loop, then ONE terminal `status` call.**\nWait in a single shell call that exits as soon as the job lands:\n\n```bash\nfor i in $(seq 1 50); do\n  grep -qE \"BUILD (SUCCESSFUL|FAILED)|<your done marker>\" /tmp/job.log 2>/dev/null && break\n  sleep 2\ndone\n```\n\nThat is one call and it returns the moment the work finishes. Firing\n`background_action=\"status\"` over and over is the failure mode this replaces: it burns a\ndozen turns, floods the context, and reports nothing the loop would not have caught.\n(The \"never sleep-poll\" guidance is about a single blind `sleep 300`, which wastes the\nfull wait even when the job finished in 5s. A loop that breaks on completion is correct.)\n\n**The loop alone does NOT clear the job.** Only a `ctx_shell` call naming the job id\nderegisters it — reading a marker file, a log, or a verdict file is invisible here, so\nthis warning will fire again on work you already finished. Close every waited-on job\nwith one terminal call:\n`ctx_shell(background_action=\"status\", job_id=\"shell_1f2e3d4c5b6a7988\")`\n\n**B. You no longer need it — cancel explicitly:**\n`ctx_shell(background_action=\"cancel\", job_id=\"shell_1f2e3d4c5b6a7988\")`\n\n**C. You already consumed its result by other means.** A job whose output you read from\na file is still registered — that is the most common reason a job you know finished is\nlisted above. Same fix: one `background_action=\"status\"` call (A) clears it on a\nterminal status or `not found`; `cancel` (B) always clears it.\n\nNext time, prefer not to detach at all: `ctx_shell` runs in the FOREGROUND up to ~110s,\nwhich covers most builds and test runs. Detaching is for work that genuinely exceeds\nthat — and if the work is delegable, `task(run_in_background=true)` notifies, so it can\nbe awaited by simply ending the turn.\n</unpolled-background-shell-jobs>","messageID":"msg_0483c8973001AfYrP3Lf2e05dW","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","id":"prt_0483c8973002UqYn4ioQRHf3oT"},"time":1787918322039}}
+
+data: {"id":"evt_0483c8977002AlTyNKNnCmqCJq","type":"session.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"ses_fb7c37da5ffeGFjrpG4zR44fPU","slug":"misty-island","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","title":"done","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787918320218,"updated":1787918322039}}}}
+
+data: {"id":"evt_0483c89790014ZXr9uvn27r2UU","type":"session.status","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","status":{"type":"busy"}}}
+
+data: {"id":"evt_0483c8979002U5LOHdRlfBNKBN","type":"message.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"msg_0483c8979001JeAg7bcHuGzXVH","parentID":"msg_0483c8973001AfYrP3Lf2e05dW","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1787918322041},"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU"}}}
+
+data: {"id":"evt_0483c897b001mU5m28RoMWtCMU","type":"tui.toast.show","properties":{"title":"⚠️ Provider Cache Missing","message":"Model filtering disabled. RESTART OpenCode to enable full functionality.","variant":"warning","duration":6000}}
+
+data: {"id":"evt_0483c897c001tlr7eKb4J5dirw","type":"session.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"ses_fb7c37da5ffeGFjrpG4zR44fPU","slug":"misty-island","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","title":"done","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787918320218,"updated":1787918322044}}}}
+
+data: {"id":"evt_0483c897c002kz6tcZNFp6fTL2","type":"session.diff","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","diff":[]}}
+
+data: {"id":"evt_0483c897d001049gJfuDwEeAnl","type":"message.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"role":"user","time":{"created":1787918322035},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"},"id":"msg_0483c8973001AfYrP3Lf2e05dW","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","summary":{"diffs":[]}}}}
+
+data: {"id":"evt_0483c897e001NJ7aG22xMjj4iF","type":"session.status","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","status":{"type":"busy"}}}
+
+data: {"id":"evt_0483c8982001DR4HUnRTpGyKnM","type":"message.part.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","part":{"id":"prt_0483c8982001oBHCIFQKkFQR0B","messageID":"msg_0483c8979001JeAg7bcHuGzXVH","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","type":"step-start"},"time":1787918322050}}
+
+data: {"id":"evt_0483c8982002f3m5VXRLMVvaF2","type":"message.part.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","part":{"id":"prt_0483c8982002OlDq2fzevz65LI","messageID":"msg_0483c8979001JeAg7bcHuGzXVH","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","type":"text","text":"","time":{"start":1787918322050}},"time":1787918322050}}
+
+data: {"id":"evt_0483c8983001QEGe8DSxgXIgqq","type":"message.part.delta","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","messageID":"msg_0483c8979001JeAg7bcHuGzXVH","partID":"prt_0483c8982002OlDq2fzevz65LI","field":"text","delta":"done"}}
+
+data: {"id":"evt_0483c8983002IoOeQa8se4cxI3","type":"message.part.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","part":{"id":"prt_0483c8982002OlDq2fzevz65LI","messageID":"msg_0483c8979001JeAg7bcHuGzXVH","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","type":"text","text":"done","time":{"start":1787918322050,"end":1787918322051}},"time":1787918322051}}
+
+data: {"id":"evt_0483c8984001sdlXCjKncXF05G","type":"message.part.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","part":{"id":"prt_0483c8984001EKgkMB3ja4UcLJ","reason":"stop","messageID":"msg_0483c8979001JeAg7bcHuGzXVH","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","type":"step-finish","tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1787918322052}}
+
+data: {"id":"evt_0483c8984002t9wYlexBROA75x","type":"message.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"msg_0483c8979001JeAg7bcHuGzXVH","parentID":"msg_0483c8973001AfYrP3Lf2e05dW","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1787918322041,"completed":1787918322053},"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","finish":"stop"}}}
+
+data: {"id":"evt_0483c8985001P6dKXkOe4tR0iR","type":"message.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"msg_0483c8979001JeAg7bcHuGzXVH","parentID":"msg_0483c8973001AfYrP3Lf2e05dW","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1787918322041,"completed":1787918322053},"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","finish":"stop"}}}
+
+data: {"id":"evt_0483c8985002VMbcwOL3tdJRbw","type":"session.status","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","status":{"type":"busy"}}}
+
+data: {"id":"evt_0483c8986001T5yYDqQpPtWTGL","type":"session.status","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","status":{"type":"idle"}}}
+
+data: {"id":"evt_0483c8986002YahHHJ5r0ZvgKl","type":"session.idle","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU"}}
+
+data: {"id":"evt_0483c8987001Gd2gEwMnC8Lq2H","type":"session.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"id":"ses_fb7c37da5ffeGFjrpG4zR44fPU","slug":"misty-island","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.QDsX2rx08f/project","title":"done","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1787918320218,"updated":1787918322055}}}}
+
+data: {"id":"evt_0483c8987002kXr7uNoiT0y9qA","type":"session.diff","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","diff":[]}}
+
+data: {"id":"evt_0483c8988001iolEs4OQPi51Bx","type":"message.updated","properties":{"sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU","info":{"role":"user","time":{"created":1787918322035},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"},"summary":{"diffs":[]},"id":"msg_0483c8973001AfYrP3Lf2e05dW","sessionID":"ses_fb7c37da5ffeGFjrpG4zR44fPU"}}}
+
