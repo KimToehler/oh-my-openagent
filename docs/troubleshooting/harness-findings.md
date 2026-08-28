@@ -2490,6 +2490,26 @@ valid `tsserver.path` is specified. Exiting.
 
 The language server resolves `typescript` from the workspace root rather than from the per-worktree install, so `lsp_diagnostics` returns nothing useful even after dependencies are present. Unlike the build failure, this does not announce itself as a blocker: a lane simply gets no diagnostics and may report the file as clean. `bun run typecheck` (which uses `tsgo` and does not depend on the language server) is the correct substitute gate inside a worktree, and a lane brief should say so explicitly rather than asking for LSP-clean as evidence.
 
+**Update (2026-08-28, second):** the worst variant of this gap is not a crash but a **silently wrong test target**. A lane migrating the OpenCode rules-injector onto `@oh-my-opencode/rules-engine` inside `.worktrees/opencode-bundled-rules` found its own edits were not what the tests exercised:
+
+```
+$ ls -d .worktrees/opencode-bundled-rules/node_modules
+(no output — directory does not exist)
+$ bun -e 'console.log(import.meta.resolve("@oh-my-opencode/rules-engine/engine"))'
+file:///Users/tim/git/oh-my-openagent/packages/rules-engine/src/engine/index.ts
+```
+
+With no worktree-local `node_modules`, Bun's resolution walks *upward* out of the worktree and lands on the main checkout's workspace symlinks. A cross-package change therefore compiles and runs green while testing the main checkout's copy of the dependency — the TDD red/green signal is real but measures the wrong tree. This is the same escape mechanism already logged for the Codex `sync:skills` probe (see the 2026-08-27 shared-skills entry), now confirmed to apply to ordinary workspace imports under `bun test`, which makes it a general hazard for any worktree lane touching two packages at once.
+
+`bun install` in the worktree fixes it, but installing is not the lesson — **verifying** is. After install, assert the resolution actually points inside the worktree before trusting any result:
+
+```bash
+cd <worktree> && bun install
+bun -e 'console.log(import.meta.resolve("@oh-my-opencode/<pkg>"))'   # must contain .worktrees/<lane>
+```
+
+A lane brief that says only "run `bun install` first" still permits this failure, because a lane that skips the install gets green tests rather than an error. Single-package lanes are unaffected in practice, which is why this went unnoticed until a cross-package migration hit it.
+
 **Fix status:** worked around
 
 ## 2026-08-27 — `record_lesson` rejects a well-formed `globs` array and cannot write a lesson
