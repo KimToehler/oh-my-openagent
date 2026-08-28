@@ -127,6 +127,9 @@ Here's a practical starting `~/.omo/omo.jsonc`. OpenCode plugin settings live in
       // Architecture consultation: GPT-5.6 Sol or Claude Opus
       "oracle": { "model": "openai/gpt-5.6-sol", "reasoning": "high" },
 
+      // Independent implementation review: Claude keeps this lane distinct from Oracle's GPT model
+      "auditor": { "model": "anthropic/claude-opus-5", "model_family": "claude-opus-5" },
+
       // Prometheus inherits sisyphus model; just add prompt guidance
       "prometheus": {
         "prompt_append": "Leverage deep & quick agents heavily, always in parallel.",

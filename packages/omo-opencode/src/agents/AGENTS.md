@@ -1,15 +1,15 @@
 ---
 name: agents-directory
-description: Developer reference for all 11 Oh My OpenAgent agent definitions, factory patterns, tool restrictions, and model routing.
+description: Developer reference for all 12 Oh My OpenAgent agent definitions, factory patterns, tool restrictions, and model routing.
 ---
 
-# src/agents/ — 11 Agent Definitions
+# src/agents/ — 12 Agent Definitions
 
 **Generated:** 2026-05-15
 
 ## OVERVIEW
 
-11 built-in agents. Type enum: [`src/config/schema/agent-names.ts`](../config/schema/agent-names.ts) `BuiltinAgentNameSchema`. 10 of them register via [`builtin-agents.ts`](builtin-agents.ts) `agentSources` record (factory functions). **Prometheus is special-cased** — it has no `createPrometheusAgent` factory; instead [`prometheus-agent-config-builder.ts`](../plugin-handlers/prometheus-agent-config-builder.ts) constructs its config directly during `agent-config-handler` Phase 3.
+12 built-in agents. Type enum: [`src/config/schema/agent-names.ts`](../config/schema/agent-names.ts) `BuiltinAgentNameSchema`. 11 of them register via [`builtin-agents.ts`](builtin-agents.ts) `agentSources` record (factory functions). **Prometheus is special-cased** — it has no `createPrometheusAgent` factory; instead [`prometheus-agent-config-builder.ts`](../plugin-handlers/prometheus-agent-config-builder.ts) constructs its config directly during `agent-config-handler` Phase 3.
 
 All factories follow `createXXXAgent(model) → AgentConfig`. Each carries a static `mode` property (`AgentFactory` type in [`src/agents/types.ts`](types.ts)). Composed via `buildAgent()`.
 
@@ -21,6 +21,7 @@ Modes verified from each agent file's `const MODE: AgentMode = ...` and (for Pro
 |-------|---------------|------|------|--------------------------|---------|
 | **Sisyphus** | claude-opus-5 max | (model default) | primary | kimi-k3 → gpt-5.6-sol medium → glm-5.2 → big-pickle | Main orchestrator, plans + delegates; `thinking: { type: "enabled", budgetTokens: 32000 }` |
 | **Hephaestus** | gpt-5.6-sol medium | (model default) | primary | GPT-5.6 Sol only (`requiresProvider`: openai \| github-copilot \| opencode \| vercel) | Autonomous deep worker |
+| **Auditor** | claude-opus-5 max | 0.1 | subagent | gemini-3.1-pro high → gpt-5.6-sol xhigh → glm-5.2 | Independent read-only implementation reviewer |
 | **Oracle** | gpt-5.6-sol xhigh (high on Copilot) | 0.1 | subagent | gemini-3.1-pro high → claude-opus-5 max → glm-5.2 | Read-only consultation |
 | **Librarian** | gpt-5.6-luna-fast | 0.1 | subagent | qwen3.7-plus → minimax-m2.7-highspeed → minimax-m3 → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | External docs/code search |
 | **Explore** | gpt-5.6-luna-fast | 0.1 | subagent | qwen3.7-plus → minimax-m2.7-highspeed → minimax-m3 → minimax-m2.7 → claude-haiku-4-5 → gpt-5.4-nano | Contextual grep |
@@ -37,6 +38,7 @@ Defined in [`src/shared/agent-tool-restrictions.ts`](../shared/agent-tool-restri
 
 | Agent | Denied Tools |
 |-------|-------------|
+| Auditor | write, edit, apply_patch, task, call_omo_agent |
 | Oracle | write, edit, task, call_omo_agent |
 | Librarian | write, edit, task, call_omo_agent |
 | Explore | write, edit, task, call_omo_agent |

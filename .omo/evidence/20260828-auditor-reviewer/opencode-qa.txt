@@ -1,0 +1,12 @@
+$ bash /Users/tim/git/oh-my-openagent/.agents/skills/opencode-qa/scripts/lib/common.sh --self-check
+PASS: dependencies present (opencode sqlite3 curl jq tmux)
+PASS: oqa_db_path -> /Users/tim/.local/share/opencode/opencode.db
+PASS: oqa_sql_escape quotes single quotes
+PASS: oqa_free_port -> 56415
+PASS: isolated XDG sandbox auto-removed on exit (/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.Pqgzzj20fW)
+PASS: isolated HOME points inside sandbox
+PASS: isolated HOME preserves HOME-based opencode shim
+PASS: common.sh self-check
+$ bash /Users/tim/git/oh-my-openagent/.agents/skills/opencode-qa/scripts/sse-hook-probe.sh --self-test
+first matching event: {"type":"server.connected"}
+PASS: SSE /event opened and delivered server.connected

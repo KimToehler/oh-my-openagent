@@ -1,0 +1,16 @@
+$ bun test packages/shared-skills/review-work-auditor-lane.test.ts packages/omo-opencode/src/agents/builtin-agent-registration.test.ts packages/omo-opencode/src/agents/auditor.test.ts packages/omo-opencode/src/agents/tool-restrictions.test.ts packages/model-core/src/model-requirements-invariants.test.ts
+bun test v1.4.0 (1381054db)
+
+ 23 pass
+ 0 fail
+ 736 expect() calls
+Ran 23 tests across 5 files. [78.00ms]
+$ bun test packages/omo-opencode/src/tools/delegate-task/ packages/omo-opencode/src/plugin-handlers/ packages/team-core/src/
+bun test v1.4.0 (1381054db)
+
+ 891 pass
+ 1 skip
+ 0 fail
+ 2117 expect() calls
+Ran 892 tests across 89 files. [3.11s]
+$ bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json

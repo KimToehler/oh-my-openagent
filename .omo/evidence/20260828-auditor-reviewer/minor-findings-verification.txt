@@ -1,0 +1,24 @@
+$ grep -n -i -E "11 agent|12 agent|agent factories|BuiltinAgentNameSchema" requested documentation paths
+--- packages/omo-opencode/src/AGENTS.md
+155:| `agents/` | 12 agent factories + dynamic prompt builder | yes (+ atlas, hephaestus, prometheus, sisyphus, sisyphus-junior, builtin-agents) |
+--- packages/omo-opencode/src/config/AGENTS.md
+14:├── agent-names.ts              # BuiltinAgentNameSchema enum (12 names: sisyphus, hephaestus, auditor, prometheus, oracle, librarian, explore, multimodal-looker, metis, momus, atlas, sisyphus-junior)
+--- packages/model-core/AGENTS.md
+17:| `agent-model-requirements.ts` | Hardcoded `AGENT_MODEL_REQUIREMENTS` fallback chains (12 agents) |
+--- packages/AGENTS.md
+63:- **`omo-opencode`** is the OpenCode Ultimate edition - the former root `src/`, moved here by the package layering refactor (100% git rename). It is the build entry for the main npm dist (`packages/omo-opencode/src/index.ts` → root `dist/`) and holds all 12 agents, ~55 hooks, native tools, features, and built-in MCPs. Full breakdown in [`packages/omo-opencode/src/AGENTS.md`](omo-opencode/src/AGENTS.md).
+--- README.md
+116:- **Ultimate Edition (omo for OpenCode)** — full omo. 12 agents, 54+ lifecycle hooks, 5 built-in MCPs, all slash commands, Team Mode, ulw-loop, ultrawork, hashline edits — everything.
+145:**Strongly recommended: let an LLM agent install this for you.** The Ultimate edition setup involves subscription detection, model selection across 12 agents, and per-provider authentication — humans fat-finger these. An LLM agent reads the full guide and walks every step correctly.
+--- docs/guide/installation.md
+31:**Strongly recommended: let an LLM agent install Ultimate for you.** Ultimate setup involves subscription detection, model selection across 12 agents, provider authentication, and config migration — humans fat-finger these. An LLM agent reads the full guide and walks every step correctly.
+287:**Provider selection is agent-specific.** There is no single global provider priority — each of the 12 agents has its own fallback chain.
+$ bun test packages/omo-opencode/src/agents packages/team-core packages/model-core packages/utils/src/migration
+bun test v1.4.0 (1381054db)
+
+ 938 pass
+ 1 skip
+ 0 fail
+ 2878 expect() calls
+Ran 939 tests across 97 files. [1309.00ms]
+$ bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json

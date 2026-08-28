@@ -28,7 +28,7 @@ For Senpi, the `@beta` tag is required; bare `npm i -g omo-ai` fails by design. 
 
 ## For Humans
 
-**Strongly recommended: let an LLM agent install Ultimate for you.** Ultimate setup involves subscription detection, model selection across 11 agents, provider authentication, and config migration — humans fat-finger these. An LLM agent reads the full guide and walks every step correctly.
+**Strongly recommended: let an LLM agent install Ultimate for you.** Ultimate setup involves subscription detection, model selection across 12 agents, provider authentication, and config migration — humans fat-finger these. An LLM agent reads the full guide and walks every step correctly.
 
 ### Ultimate (OpenCode) — let an agent do it
 
@@ -284,7 +284,7 @@ Map their answer to:
    - **yes** -> `--vercel-ai-gateway=yes`
    - **no** -> `--vercel-ai-gateway=no` (default)
 
-**Provider selection is agent-specific.** There is no single global provider priority — each of the 11 agents has its own fallback chain.
+**Provider selection is agent-specific.** There is no single global provider priority — each of the 12 agents has its own fallback chain.
 
 **MUST STRONGLY WARN, WHEN USER SAID THEY DON'T HAVE CLAUDE SUBSCRIPTION, SISYPHUS AGENT MIGHT NOT WORK IDEALLY.**
 
