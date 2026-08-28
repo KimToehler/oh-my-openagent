@@ -83,9 +83,20 @@ and was still violated three times in one session. Facts stated as reference get
   spamming `status`.
 
   It also closes with the point that most jobs should never have been detached:
-  `ctx_shell` runs in the foreground up to ~110s, and delegable work belongs in
-  `task(run_in_background=true)`, which notifies. Telling an agent how to clean up a
-  detached job without telling it not to detach next time treats the symptom.
+  a foreground `ctx_shell` call is bounded by two separate limits — the MCP client
+  aborts the tool call at a **measured ~59 s** (`sleep 58` returns normally, `sleep 60`
+  returns `MCP error -32001: Request timed out`), and lean-ctx's own foreground cap is
+  now **45 s** (`LEAN_CTX_SHELL_FG_CAP_MS` default, lowered from 110 s so the cap trips
+  before the client abort does). Anything expected to run longer than that and delegable
+  belongs in `task(run_in_background=true)`, which notifies. Telling an agent how to
+  clean up a detached job without telling it not to detach next time treats the symptom.
+
+  When the job genuinely must be owned by this agent, `background_action="wait"` is now
+  the supervision path: it blocks server-side until the job is terminal or
+  `wait_timeout_ms` elapses (default 45 s, max 50 s, silently clamped). That makes each
+  check-in cheap — roughly 6 calls for a 5-minute job instead of ~30 — but it does **not**
+  make the job notify, so a `wait` that returns on timeout must be called again, and a
+  turn must still never end with a detached job outstanding.
 
 - `hook.ts` runs on `session.idle` and dispatches an **internal continuation prompt**
   (`dispatchInternalPrompt`, `mode: "async"`), the same mechanism `goal` and
