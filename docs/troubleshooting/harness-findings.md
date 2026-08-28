@@ -2854,6 +2854,30 @@ That produced 90 before, 90 after, 0 new, 0 fixed — a clean result the gate co
 
 **Fix status:** worked around; upstream gate unfixed (needs the `/app/` assumption replaced with a repo-relative path)
 
+## 2026-08-28 — Model-family cache invalidation misses OMO-owned agent and category overrides after a proxy alias resolves
+
+**Severity:** warning
+**Area:** model routing
+**Observed in:** oh-my-openagent review of `feat/upstream-model-detection`
+
+**What happened:** the new upstream-model observer correctly learns `onara/momus → onara/gpt-5.6-sol` from a real response and invalidates the cached agent roster by adding resolved identities to `createAgentConfigCacheKey`. But the key walks only OpenCode's `config.model` and `config.agent[*].model`. OMO's own overrides live separately in `pluginConfig.agents` and `pluginConfig.categories` (loaded from `~/.omo/omo.jsonc`), so an agent/category that exists only there can retain a stale baked prompt/permission shape after an observation.
+
+**Evidence:**
+```
+category model resolves to: openai/gpt-5.6-sol
+isGptModel(onara/ultrabrain): true
+roster rebuilt after CATEGORY observation? false (1 -> 1)
+
+roster rebuilt after pluginConfig.agents observation? false (1 -> 1)
+CONTROL rebuilt? true (1 -> 2)
+```
+
+**Why it is not a merge blocker:** per-call consumers already read the registry fresh: `resolveDeepCategoryPromptAppend` (`tools/delegate-task/openai-categories.ts:70`) runs per delegation and `resolveCompatibleModelSettings` (`plugin/chat-params.ts:118`) runs per request. Category-routed prompt selection and reasoning-effort compatibility therefore improve immediately. The stale surface is narrower: a baked agent prompt/tool-permission shape whose model exists only in OMO config and never surfaces in `config.agent`. That is strictly less broken than before the upstream-model mechanism existed.
+
+**Follow-up:** extend `collectResolvedModelIdentity` to accept and walk `pluginConfig.agents` / `pluginConfig.categories` model ids too, then add the category and OMO-override reproductions as regression tests.
+
+**Fix status:** known follow-up; not fixed in the initial upstream-model change
+
 
 ## 2026-08-28 — `staleTimeoutMs` reaps *healthy, working* subagents when the parent idles
 
