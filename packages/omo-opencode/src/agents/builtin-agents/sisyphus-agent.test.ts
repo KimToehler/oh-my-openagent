@@ -6,6 +6,35 @@ import type { AgentOverrides } from "../types";
 import type { CategoryConfig } from "../../config/schema";
 
 describe("maybeCreateSisyphusConfig", () => {
+  describe("#given proxy alias with static GPT-5.6 family", () => {
+    test("#when config is created #then transport alias remains while frontier tools are denied", () => {
+      // given
+      const model = "proxy/primary"
+      const agentOverrides: AgentOverrides = {
+        sisyphus: { model, model_family: "gpt-5.6" },
+      }
+
+      // when
+      const config = maybeCreateSisyphusConfig({
+        disabledAgents: [],
+        agentOverrides,
+        availableModels: new Set([model]),
+        systemDefaultModel: model,
+        isFirstRunNoCache: false,
+        availableAgents: [],
+        availableSkills: [],
+        availableCategories: [],
+        mergedCategories: {},
+        useTaskSystem: false,
+      })
+
+      // then
+      expect(config?.model).toBe(model)
+      expect(config?.permission).toHaveProperty("grep", "deny")
+      expect(config?.permission).toHaveProperty("glob", "deny")
+    })
+  })
+
   describe("#given GPT model with user override allowing apply_patch", () => {
     test("#when config is created #then user override is respected", () => {
       // given
