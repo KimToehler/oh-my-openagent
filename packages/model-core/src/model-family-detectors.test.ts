@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import {
+  ModelFamily,
+  resolveModelForConfiguredFamily,
   isClaudeFable5Model,
   isClaudeOpus46Model,
   isClaudeOpus47Model,
@@ -17,6 +19,27 @@ import {
 } from "./model-family-detectors"
 
 describe("model family detectors", () => {
+  test("uses configured family architecture instead of model text", () => {
+    // given
+    const configuredModel = "proxy/primary"
+
+    // when
+    const architectureModel = resolveModelForConfiguredFamily(configuredModel, ModelFamily.Gpt56)
+
+    // then
+    expect(architectureModel).toBe("openai/gpt-5.6")
+  })
+
+  test("keeps configured model when family is absent", () => {
+    // given
+    const configuredModel = "proxy/primary"
+
+    // when
+    const architectureModel = resolveModelForConfiguredFamily(configuredModel)
+
+    // then
+    expect(architectureModel).toBe(configuredModel)
+  })
   test("#given GPT model ids #then detects GPT family only", () => {
     expect(isGptModel("openai/gpt-5.5")).toBe(true)
     expect(isGptModel("github-copilot/gpt-4o")).toBe(true)

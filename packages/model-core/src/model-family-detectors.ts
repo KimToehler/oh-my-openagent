@@ -1,3 +1,43 @@
+export const ModelFamily = {
+  ClaudeOpus46: "claude-opus-4.6",
+  ClaudeOpus47: "claude-opus-4.7",
+  ClaudeOpus48: "claude-opus-4.8",
+  ClaudeOpus5: "claude-opus-5",
+  ClaudeFable5: "claude-fable-5",
+  Gemini: "gemini",
+  Glm: "glm",
+  Gpt55: "gpt-5.5",
+  Gpt56: "gpt-5.6",
+  Gpt: "gpt",
+  KimiK2: "kimi-k2",
+  KimiK27: "kimi-k2.7",
+  KimiK3: "kimi-k3",
+  MiniMax: "minimax",
+} as const
+
+export type ModelFamily = (typeof ModelFamily)[keyof typeof ModelFamily]
+
+const MODEL_FAMILY_ARCHITECTURE_MODELS: Record<ModelFamily, string> = {
+  [ModelFamily.ClaudeOpus46]: "anthropic/claude-opus-4-6",
+  [ModelFamily.ClaudeOpus47]: "anthropic/claude-opus-4-7",
+  [ModelFamily.ClaudeOpus48]: "anthropic/claude-opus-4-8",
+  [ModelFamily.ClaudeOpus5]: "anthropic/claude-opus-5",
+  [ModelFamily.ClaudeFable5]: "anthropic/claude-fable-5",
+  [ModelFamily.Gemini]: "google/gemini-3-pro",
+  [ModelFamily.Glm]: "zai/glm-5",
+  [ModelFamily.Gpt55]: "openai/gpt-5.5",
+  [ModelFamily.Gpt56]: "openai/gpt-5.6",
+  [ModelFamily.Gpt]: "openai/gpt-5",
+  [ModelFamily.KimiK2]: "kimi/kimi-k2",
+  [ModelFamily.KimiK27]: "kimi/kimi-k2.7",
+  [ModelFamily.KimiK3]: "kimi/kimi-k3",
+  [ModelFamily.MiniMax]: "minimax/minimax-m2",
+}
+
+export function resolveModelForConfiguredFamily(model: string, modelFamily?: ModelFamily): string {
+  return modelFamily === undefined ? model : MODEL_FAMILY_ARCHITECTURE_MODELS[modelFamily]
+}
+
 function extractModelName(model: string): string {
   return model.includes("/") ? (model.split("/").pop() ?? model) : model
 }
