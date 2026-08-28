@@ -9,6 +9,7 @@ import { applyEnvironmentContext } from "./environment-context"
 import { applyCategoryOverride, mergeAgentConfig } from "./agent-overrides"
 import { applyModelResolution, getFirstFallbackModel } from "./model-resolution"
 import { applyFrontierToolSchemaPermission } from "../frontier-tool-schema-guard"
+import { resolveModelForConfiguredFamily } from "../../../../model-core/src"
 
 export function maybeCreateHephaestusConfig(input: {
   disabledAgents: string[]
@@ -78,8 +79,12 @@ export function maybeCreateHephaestusConfig(input: {
     return undefined
   }
   const { model: hephaestusModel, variant: hephaestusResolvedVariant } = hephaestusResolution
+  const hephaestusArchitectureModel = resolveModelForConfiguredFamily(
+    hephaestusModel,
+    hephaestusOverride?.model_family,
+  )
 
-  if (!isHephaestusSupportedModel(hephaestusModel)) {
+  if (!isHephaestusSupportedModel(hephaestusArchitectureModel)) {
     log("[agent-registration] Agent skipped: unsupported Hephaestus model", {
       agent: "hephaestus",
       configuredModel: hephaestusModel,
@@ -87,21 +92,24 @@ export function maybeCreateHephaestusConfig(input: {
     return undefined
   }
 
-  let hephaestusConfig = createHephaestusAgent(
-    hephaestusModel,
-    availableAgents,
-    undefined,
-    availableSkills,
-    availableCategories,
-    useTaskSystem
-  )
+  let hephaestusConfig: AgentConfig = {
+    ...createHephaestusAgent(
+      hephaestusArchitectureModel,
+      availableAgents,
+      undefined,
+      availableSkills,
+      availableCategories,
+      useTaskSystem,
+    ),
+    model: hephaestusModel,
+  }
 
   hephaestusConfig = { ...hephaestusConfig, variant: hephaestusResolvedVariant ?? "medium" }
 
   const hepOverrideCategory = (hephaestusOverride as Record<string, unknown> | undefined)?.category as string | undefined
   if (hepOverrideCategory) {
     hephaestusConfig = applyCategoryOverride(hephaestusConfig, hepOverrideCategory, mergedCategories)
-    if (!isHephaestusSupportedModel(hephaestusConfig.model)) {
+    if (!isHephaestusSupportedModel(hephaestusArchitectureModel)) {
       log("[agent-registration] Agent skipped: unsupported Hephaestus category model", {
         agent: "hephaestus",
         configuredModel: hephaestusConfig.model,
@@ -114,7 +122,7 @@ export function maybeCreateHephaestusConfig(input: {
 
   if (hephaestusOverride) {
     hephaestusConfig = mergeAgentConfig(hephaestusConfig, hephaestusOverride, directory)
-    if (!isHephaestusSupportedModel(hephaestusConfig.model)) {
+    if (!isHephaestusSupportedModel(hephaestusArchitectureModel)) {
       log("[agent-registration] Agent skipped: unsupported Hephaestus override model", {
         agent: "hephaestus",
         configuredModel: hephaestusConfig.model,
@@ -123,10 +131,12 @@ export function maybeCreateHephaestusConfig(input: {
     }
   }
 
-  const resolvedModel = hephaestusConfig.model ?? ""
+  const hephaestusToolSchemaModel = hephaestusOverride?.model_family === undefined
+    ? (hephaestusConfig.model ?? hephaestusArchitectureModel)
+    : hephaestusArchitectureModel
   hephaestusConfig.permission = applyFrontierToolSchemaPermission(
     hephaestusConfig.permission,
-    resolvedModel,
+    hephaestusToolSchemaModel,
     hephaestusOverride?.permission,
     (hephaestusOverride as { tools?: Record<string, boolean> } | undefined)?.tools
   )
