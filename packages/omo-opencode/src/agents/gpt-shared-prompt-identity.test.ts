@@ -31,4 +31,15 @@ describe("shared GPT prompt identities", () => {
       expect(source).toBe("gpt")
     })
   }
+
+  test("uses configured GPT-5.6 architecture instead of proxy model text", () => {
+    // given
+    const configuredModel = "proxy/primary"
+
+    // when
+    const identity = getGptPromptIdentityKey(configuredModel, "gpt-5.6")
+
+    // then
+    expect(identity).toBe("gpt-5.6")
+  })
 })

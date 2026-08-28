@@ -1,4 +1,5 @@
 import type { AgentConfig } from "@opencode-ai/sdk";
+import type { ModelFamily } from "../../../model-core/src";
 
 import {
   isClaudeFable5Model,
@@ -162,6 +163,7 @@ export type AgentName = BuiltinAgentName;
 
 export type AgentOverrideConfig = Partial<AgentConfig> & {
   category?: string;
+  model_family?: ModelFamily;
   prompt_append?: string;
   skills?: string[];
   tools?: Record<string, boolean>;

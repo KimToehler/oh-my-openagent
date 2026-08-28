@@ -7,6 +7,7 @@ import { log } from "../../shared/logger"
 import { applyOverrides } from "./agent-overrides"
 import { applyModelResolution } from "./model-resolution"
 import { createAtlasAgent } from "../atlas"
+import { resolveModelForConfiguredFamily } from "../../../../model-core/src"
 
 export function maybeCreateAtlasConfig(input: {
   disabledAgents: string[]
@@ -61,13 +62,20 @@ export function maybeCreateAtlasConfig(input: {
     return undefined
   }
   const { model: atlasModel, variant: atlasResolvedVariant } = atlasResolution
+  const atlasArchitectureModel = resolveModelForConfiguredFamily(
+    atlasModel,
+    orchestratorOverride?.model_family,
+  )
 
-  let orchestratorConfig = createAtlasAgent({
+  let orchestratorConfig: AgentConfig = {
+    ...createAtlasAgent({
+      model: atlasArchitectureModel,
+      availableAgents,
+      availableSkills,
+      userCategories,
+    }),
     model: atlasModel,
-    availableAgents,
-    availableSkills,
-    userCategories,
-  })
+  }
 
   if (atlasResolvedVariant) {
     orchestratorConfig = { ...orchestratorConfig, variant: atlasResolvedVariant }
