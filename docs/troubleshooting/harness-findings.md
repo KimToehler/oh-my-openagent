@@ -2747,3 +2747,35 @@ A full `bun install` in the worktree fixes it too, at higher cost. Either way, v
 **Suggested real fix:** make the Codex script resolve path-relatively like the Senpi one, or have `sharedSkillsRootPath()` refuse a candidate outside the calling package's own repository root instead of silently walking to a sibling checkout.
 
 **Fix status:** unfixed; worked around per-invocation
+
+## 2026-08-28 — `qa-sandbox.sh` does not isolate `HOME`, so QA overwrote the operator's real `~/.omo/omo.jsonc`
+
+**Severity:** dangerous — destroys real user configuration
+**Area:** QA tooling
+**Observed in:** oh-my-openagent, live-hook QA of the `unpolled-shell-job` message change
+
+**What happened:** a QA subagent was told to isolate with `source script/agent/qa-sandbox.sh`, then to pin every agent and category to a mock model per the recipe in `blocked-escalation-probe.sh`. That recipe writes the agent/category pins to `$HOME/.omo/omo.jsonc`, because that is where the plugin actually reads them. `qa-sandbox.sh` never sets `HOME`, so `$HOME` was still the operator's real home. The operator's live config — 11 agent model routes, 8 category routes, `team_mode`, `background_task`, `runtime_fallback`, `lessons` — was replaced by a single line of mock-model pins.
+
+**Evidence:**
+```
+$ sed -n '15,29p' script/agent/qa-sandbox.sh
+export XDG_DATA_HOME="$OMO_QA_ROOT/data"
+export XDG_CONFIG_HOME="$OMO_QA_ROOT/config"
+export XDG_CACHE_HOME="$OMO_QA_ROOT/cache"
+export XDG_STATE_HOME="$OMO_QA_ROOT/state"
+export CODEX_HOME="$OMO_QA_ROOT/codex"
+# ... no HOME anywhere in the file
+
+$ cat ~/.omo/omo.jsonc          # after the QA run
+{"[opencode]":{"agents":{"sisyphus":{"model":"mockprov/mock-model"}, ... }}}
+```
+
+**Root cause:** two isolation mechanisms disagree about `HOME`, and the weaker one advertises itself as equivalent to the stronger one. `oqa_mk_isolated_xdg` (`.agents/skills/opencode-qa/scripts/lib/common.sh:69-80`) creates `$root/home` and rewrites `HOME`, which is why it also needs `oqa_preserve_home_opencode_bin` (`common.sh:57-65`) to relink `$HOME/.opencode/bin`. `qa-sandbox.sh` isolates only the four `XDG_*` vars plus `CODEX_HOME`. The plugin's own unified config chain is `$HOME/.omo/omo.json[c]`, which is **not** an XDG path, so XDG isolation does not cover it at all.
+
+**Why it is costly:** the script's header states it "mirrors the opencode-qa (`oqa_mk_isolated_xdg`) ... skill conventions" and that "the running machine's `~/.config/opencode` and `~/.codex` are untouched". Both sentences are true and both are irrelevant to the file that got destroyed. An agent that sources the documented sandbox helper, sees `[qa-sandbox] host ... are untouched`, and then follows the documented mock-model recipe will silently overwrite real user config while believing it is isolated. There is no warning and no backup: the plugin writes timestamped `.bak` files on *migrations*, not on third-party writes, so the newest backup here was six days stale and predated a `lessons` enable.
+
+**Recovery, for the next person:** `~/.omo/` retains migration-era backups (`omo.jsonc.bak.*`). Diff the newest against what the config should contain, restore it, then re-apply anything enabled after that backup's timestamp — the backup NAME encodes what it predates (`pre-lessons-enable-...` meant `lessons` had to be re-added by hand). Preserve the clobbered file first for comparison rather than deleting it.
+
+**Suggested real fix:** `qa-sandbox.sh` must export an isolated `HOME` (with the `.opencode/bin` relink that `oqa_preserve_home_opencode_bin` already implements), or its header must stop claiming parity with `oqa_mk_isolated_xdg` and state plainly that `$HOME/.omo/**` is NOT isolated. A guard that refuses to write agent/category pins when `HOME` equals the real home would turn a silent destruction into a loud failure.
+
+**Fix status:** unfixed; config restored by hand from `omo.jsonc.bak.pre-lessons-enable-20260822T163914` plus a re-added `lessons` block
