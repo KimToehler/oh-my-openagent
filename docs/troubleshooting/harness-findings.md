@@ -2943,3 +2943,29 @@ replacement is not re-deriving what is already on record.
 last activity rather than the parent's, or exempt a task from the reaper while its session
 shows recent tool calls. Also a docs gap — "it notifies, so you can safely end the turn"
 should carry the caveat that ending the turn is what starts the child's death clock.
+
+## 2026-08-28: `ctx_shell` client aborts at ~59 s, and blocking waits can saturate server pool
+
+**Severity:** costly
+**Area:** tools
+**Observed in:** lean-ctx and oh-my-openagent, during live harness QA
+
+**What happened:** The MCP client aborts a foreground `ctx_shell` call at a measured ~59 s, not ~110 s. The old `LEAN_CTX_SHELL_FG_CAP_MS` default of `110_000` left a 59 to 110 s dead zone where commands died before detach, while supervising one 4m48s Gradle run cost about 30 model round trips because `status` returned immediately and no blocking wait existed.
+
+**Evidence:**
+```
+sleep 45, 52, 56, 58: returned normally
+sleep 60, 75: MCP error -32001: Request timed out
+progress notifications do NOT reset the client abort timer
+mcp.lean-ctx in opencode.json: command, enabled, type; no environment key
+rust/src/cli/dispatch/server.rs:39-40: worker_threads = parallelism.clamp(1,4), max_blocking_threads = (worker_threads*4).clamp(8,32)
+18-core host: worker_threads=4, max_blocking_threads=16
+N=1 0.160 s, N=2 0.164 s, N=4 0.160 s, N=6 0.161 s, N=8 0.157 s, N=12 0.157 s, N=16 20.138 s, N=18 20.322 s, N=24 20.143 s
+one wait: unrelated echo returned at 1.776 s while wait ran to 21.241 s
+```
+
+**Root cause:** The MCP client has a measured ~59 s abort ceiling. `LEAN_CTX_SHELL_FG_CAP_MS` defaulted to `110_000` on the false premise of a ~120 s host abort, creating the dead zone. The `mcp.lean-ctx` block has no `environment` key, so `LEAN_CTX_SHELL_TIMEOUT_MS` is not pinned there and the effective fallback remains the 2-minute `DEFAULT_TIMEOUT`. A server-side blocking wait occupies one Tokio blocking-pool slot. Measured unrelated tools remain unaffected through 12 waiters and starve for a full wait duration at 16 or more, matching `max_blocking_threads=16`.
+
+**Workaround:** Use `background_action="wait"`, with `wait_timeout_ms` default 45 s, maximum 50 s, silently clamped, and the effective bound echoed in the header. Live QA supervised a 5-minute job in 7 `tools/call` messages, 1 launch plus 6 waits, versus about 30 status polls. `wait` does not make jobs notify, so call it again on timeout and never end a turn with a detached job outstanding. Restart the MCP client or session after `lean-ctx dev-install`, because an already-running stdio child keeps the old binary and old schema. A bounded semaphore or dedicated wait pool is NOT YET IMPLEMENTED.
+
+**Fix status:** fixed in `28af1aec3` for foreground cap and blocking wait; pool saturation needs follow-up.
