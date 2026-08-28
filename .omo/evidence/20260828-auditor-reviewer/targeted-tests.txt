@@ -1,0 +1,7 @@
+$ bun test packages/omo-opencode/src/agents/auditor.test.ts packages/omo-opencode/src/agents/tool-restrictions.test.ts packages/model-core/src/model-requirements-invariants.test.ts packages/model-core/src/model-requirements-agents.test.ts
+bun test v1.4.0 (1381054db)
+
+ 33 pass
+ 0 fail
+ 760 expect() calls
+Ran 33 tests across 4 files. [72.00ms]

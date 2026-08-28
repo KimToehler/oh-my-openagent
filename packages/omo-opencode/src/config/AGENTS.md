@@ -11,7 +11,7 @@
 ```
 config/schema/
 ├── oh-my-opencode-config.ts    # ROOT: composes all sub-schemas
-├── agent-names.ts              # BuiltinAgentNameSchema enum (11 names: sisyphus, hephaestus, prometheus, oracle, librarian, explore, multimodal-looker, metis, momus, atlas, sisyphus-junior)
+├── agent-names.ts              # BuiltinAgentNameSchema enum (12 names: sisyphus, hephaestus, auditor, prometheus, oracle, librarian, explore, multimodal-looker, metis, momus, atlas, sisyphus-junior)
 ├── agent-overrides.ts          # AgentOverrideConfigSchema (21 fields per agent)
 ├── agent-definitions.ts        # custom agent definition schema
 ├── categories.ts               # 8 built-in + custom categories

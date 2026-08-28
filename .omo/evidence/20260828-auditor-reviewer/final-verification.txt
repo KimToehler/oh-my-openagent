@@ -1,0 +1,10 @@
+$ bun test packages/omo-opencode/src/agents/auditor.test.ts packages/omo-opencode/src/agents/tool-restrictions.test.ts packages/omo-opencode/src/agents/utils.test.ts packages/model-core/src/model-requirements-invariants.test.ts packages/model-core/src/model-requirements-agents.test.ts
+bun test v1.4.0 (1381054db)
+
+ 104 pass
+ 0 fail
+ 923 expect() calls
+Ran 104 tests across 5 files. [112.00ms]
+$ bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+$ bun run packages/shared-skills/skills/programming/scripts/typescript/check-no-excuse-rules.ts [10 changed TypeScript paths]
+No violations in 10 file(s).

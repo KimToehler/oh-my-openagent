@@ -197,6 +197,11 @@ export const AGENT_ELIGIBILITY_REGISTRY: Readonly<Record<string, {
     rejectionMessage:
       "Agent 'hephaestus' lacks teammate permission. Either apply D-36 (add teammate: \"allow\" in tool-config-handler.ts) or use subagent_type: \"sisyphus\" instead.",
   },
+  auditor: {
+    verdict: "hard-reject",
+    rejectionMessage:
+      "Agent 'auditor' is read-only (cannot write files). Team members must write to mailbox inbox files. Use delegate-task with subagent_type: 'auditor' for read-only analysis instead.",
+  },
   oracle: {
     verdict: "hard-reject",
     rejectionMessage:
@@ -238,7 +243,7 @@ export const AGENT_ELIGIBILITY_REGISTRY: Readonly<Record<string, {
 
 /**
  * §V.3 member validation error messages live in member-parser.ts.
- * Includes: "Unknown subagent_type '<name>'. Available ELIGIBLE agents: sisyphus, atlas, sisyphus-junior, hephaestus (if D-36 applied). Use delegate-task for read-only agents like oracle, librarian, explore, metis, momus, multimodal-looker."
+ * Includes: "Unknown subagent_type '<name>'. Available ELIGIBLE agents: sisyphus, atlas, sisyphus-junior, hephaestus (if D-36 applied). Use delegate-task for read-only agents like auditor, oracle, librarian, explore, metis, momus, multimodal-looker."
  */
 
 const parseMemberBase = createParseMember(MemberSchema, AGENT_ELIGIBILITY_REGISTRY)

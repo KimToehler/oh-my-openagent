@@ -40,6 +40,31 @@ export const AGENT_MODEL_REQUIREMENTS: Record<string, ModelRequirement> = {
     requiresProvider: ["openai", "github-copilot", "opencode", "vercel"],
     requiresAnyModel: true,
   },
+  auditor: {
+    fallbackChain: [
+      {
+        providers: ["anthropic", "github-copilot", "opencode", "vercel"],
+        model: "claude-opus-5",
+        variant: "max",
+      },
+      {
+        providers: ["google", "github-copilot", "opencode", "vercel"],
+        model: "gemini-3.1-pro",
+        variant: "high",
+      },
+      {
+        providers: ["openai", "opencode", "vercel"],
+        model: "gpt-5.6-sol",
+        variant: "xhigh",
+      },
+      {
+        providers: ["github-copilot"],
+        model: "gpt-5.6-sol",
+        variant: "high",
+      },
+      { providers: ["opencode-go", "vercel"], model: "glm-5.2" },
+    ],
+  },
   oracle: {
     fallbackChain: [
       {

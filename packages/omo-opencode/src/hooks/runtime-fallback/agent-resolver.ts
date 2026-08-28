@@ -2,6 +2,7 @@ import { getSessionAgent } from "../../features/claude-code-session-state"
 
 export const AGENT_NAMES = [
   "sisyphus",
+  "auditor",
   "oracle",
   "librarian",
   "explore",
