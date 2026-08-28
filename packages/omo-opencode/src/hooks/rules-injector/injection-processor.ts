@@ -1,5 +1,15 @@
 import { homedir } from "node:os";
-import { findProjectRoot, findRuleFiles } from "./finder";
+import {
+	GITHUB_INSTRUCTIONS_PATTERN,
+	safeRealpathSync,
+} from "@oh-my-opencode/rules-engine";
+import {
+	findRuleCandidates,
+	findProjectRoot,
+	isSameOrChildPath,
+	sortCandidates,
+	type RuleDiscoveryCache,
+} from "@oh-my-opencode/rules-engine/engine";
 import { appendInjectedRulesToOutput } from "./injection-output";
 import type {
 	RuleFileReader,
@@ -20,7 +30,6 @@ import { createParsedRuleReader } from "./parsed-rule-cache";
 import { resolveFilePath } from "./path-resolution";
 import { getRuleMatchReason } from "./rule-match-reason";
 import type { FindRuleFilesOptions } from "./rule-file-finder";
-import type { RuleScanCache } from "./rule-scan-cache";
 import { saveInjectedRules } from "./storage";
 
 const EMPTY_TRANSCRIPT_SET: ReadonlySet<string> = new Set();
@@ -30,7 +39,8 @@ function normalizeRuleRelativePath(relativePath: string): string {
 }
 
 export type CreateRuleInjectionProcessorDeps = RuleInjectionProcessorDeps & {
-	getSessionRuleScanCache?: (sessionID: string) => RuleScanCache;
+	getSessionRuleScanCache?: (sessionID: string) => RuleDiscoveryCache;
+	pluginRoot?: string;
 	ruleFinderOptions?: FindRuleFilesOptions;
 	readFileSync?: RuleFileReader;
 	statSync?: RuleStatReader;
@@ -68,6 +78,7 @@ export function createRuleInjectionProcessor(
 		getSessionCache,
 		getSessionRuleScanCache,
 		ruleFinderOptions,
+		pluginRoot,
 		homedir: getHomeDir = homedir,
 		shouldApplyRule: shouldApplyRuleImpl = shouldApplyRule,
 		isDuplicateByRealPath: isDuplicateByRealPathImpl = isDuplicateByRealPath,
@@ -86,9 +97,7 @@ export function createRuleInjectionProcessor(
 		statSync: deps.statSync,
 	});
 	const matchDecisionCache = createMatchDecisionCache();
-	const finderOptions: FindRuleFilesOptions = ruleFinderOptions
-		? { ...ruleFinderOptions, workspaceDirectory }
-		: { workspaceDirectory };
+	const skipClaudeUserRules = ruleFinderOptions?.skipClaudeUserRules ?? false;
 
 	async function processFilePathForInjection(
 		filePath: string,
@@ -121,17 +130,37 @@ export function createRuleInjectionProcessor(
 		}
 		const ruleScanCache = getSessionRuleScanCache?.(sessionID);
 		const home = getHomeDir();
+		const disabledSources = skipClaudeUserRules
+			? new Set<string>(["~/.claude/rules"])
+			: undefined;
 		const normalizedTranscriptRelativePaths = new Set(
 			[...transcriptRelativePaths].map(normalizeRuleRelativePath),
 		);
 
-		const ruleFileCandidates = findRuleFiles(
+		const projectRootRealPath = projectRoot === null
+			? null
+			: safeRealpathSync(projectRoot);
+		const ruleFileCandidates = sortCandidates(findRuleCandidates({
 			projectRoot,
-			home,
-			resolved,
-			finderOptions,
-			ruleScanCache,
-		);
+			targetFile: resolved,
+			homeDir: home,
+			pluginRoot,
+			disabledSources,
+			cache: ruleScanCache,
+		}))
+			.filter((candidate) =>
+				!candidate.path.includes(".github/instructions/") ||
+				GITHUB_INSTRUCTIONS_PATTERN.test(candidate.path),
+			)
+			.map((candidate) => ({
+				...candidate,
+				realPath: safeRealpathSync(candidate.path),
+			}))
+			.filter((candidate) =>
+				projectRootRealPath === null ||
+				candidate.isGlobal ||
+				isSameOrChildPath(candidate.realPath, projectRootRealPath),
+			);
 		const toInject: RuleToInject[] = [];
 		let dirty = false;
 
