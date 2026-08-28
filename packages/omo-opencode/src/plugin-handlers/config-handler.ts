@@ -10,6 +10,7 @@ import { applyMcpConfig } from "./mcp-config-handler";
 import { applyProviderConfig } from "./provider-config-handler";
 import { loadPluginComponents } from "./plugin-components-loader";
 import { applyToolConfig } from "./tool-config-handler";
+import { installUpstreamModelObserver } from "./upstream-model-observer";
 import { clearFormatterCache } from "../tools/hashline-edit/formatter-trigger"
 import {
   clearRegisteredAgentNames,
@@ -95,6 +96,10 @@ export function createConfigHandler(deps: ConfigHandlerDeps) {
     const formatterConfig = config.formatter;
 
     setAdditionalAllowedMcpEnvVars(pluginConfig.mcp_env_allowlist ?? [])
+    // Wrap each provider's fetch so the model that actually served a response is
+    // recorded. This is the only supported way to observe a successful response:
+    // no plugin hook exposes one. See upstream-model-observer.ts.
+    installUpstreamModelObserver(config)
     applyProviderConfig({
       config,
       modelCacheState,

@@ -1,0 +1,26 @@
+=== LIVE END-TO-END against the deployed 9router (router.onara.eu) ===
+Driven through the real observer wrapper installed by the config hook.
+Requests were real chat completions; the key was read from opencode auth.json
+and never printed.
+
+onara/momus
+   resolved       : onara/gpt-5.6-sol
+   isGptModel     : false -> true
+   reasoningEffort: undefined -> xhigh
+   prompt changed : true
+
+onara/oracle
+   resolved       : onara/claude-opus-5
+   isGptModel     : false -> false
+   reasoningEffort: undefined -> undefined
+   prompt changed : false
+
+=== ground truth from the router (curl, body "model" field) ===
+requested momus      -> served by gpt-5.6-sol
+requested ultrabrain -> served by gpt-5.6-sol
+requested oracle     -> served by claude-opus-5
+
+=== deployed router does NOT yet carry the header commits ===
+GET /v1/models: 92 models, 24 combos, 0 with upstream_models
+chat response carried no X-9Router-Upstream-Model
+=> the body "model" field alone is sufficient; the header is an optional override
