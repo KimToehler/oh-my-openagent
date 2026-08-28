@@ -15,6 +15,7 @@ import {
   isKimiK27Model,
   isKimiK3Model,
   isMiniMaxModel,
+  resolveModelForFamilyDetection,
 } from "@oh-my-opencode/model-core";
 
 export {
@@ -122,8 +123,15 @@ export interface AgentPromptMetadata {
   keyTrigger?: string;
 }
 
+/**
+ * Mirrors the model-core helper of the same name, including its resolution of an
+ * observed upstream model. The GPT-5.5/5.6 detectors below are adapter-local, so
+ * they would otherwise keep matching against an opaque proxy alias and stay false
+ * for a GPT-backed agent even after a response identified the vendor.
+ */
 function extractModelName(model: string): string {
-  return model.includes("/") ? (model.split("/").pop() ?? model) : model;
+  const resolved = resolveModelForFamilyDetection(model);
+  return resolved.includes("/") ? (resolved.split("/").pop() ?? resolved) : resolved;
 }
 
 const GPT_NATIVE_SISYPHUS_RE = /gpt-5[.-](?:(?:3[.-])?codex|[4-9]|\d{2,})/i;

@@ -1,5 +1,18 @@
+import { resolveModelForFamilyDetection } from "./upstream-model-registry"
+
+/**
+ * Every detector below routes through here, so resolving the observed upstream at
+ * this one point fixes all of them at once.
+ *
+ * Detection is textual: it reads the last path segment of a model id. That is
+ * correct for `openai/gpt-5.6-sol` and useless for a proxy alias like
+ * `onara/oracle`, which names an agent role rather than a vendor. When a response
+ * has told us what actually served the request, that id is the one to inspect;
+ * otherwise the configured id is used unchanged and behavior is exactly as before.
+ */
 function extractModelName(model: string): string {
-  return model.includes("/") ? (model.split("/").pop() ?? model) : model
+  const resolved = resolveModelForFamilyDetection(model)
+  return resolved.includes("/") ? (resolved.split("/").pop() ?? resolved) : resolved
 }
 
 export function isGptModel(model: string): boolean {
