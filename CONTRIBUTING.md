@@ -157,7 +157,9 @@ For QA isolation, run:
 source script/agent/qa-sandbox.sh
 ```
 
-This exports an isolated, throwaway environment with its own `XDG_*` directories and a fresh `CODEX_HOME` under a `mktemp` directory. It also sets `OPENCODE_DISABLE_AUTOUPDATE=1` and `OPENCODE_DISABLE_MODELS_FETCH=1`. QA never reads or writes the host's real `~/.config/opencode` or `~/.codex`. This mirrors the conventions used by the `opencode-qa` and `codex-qa` skills.
+This exports an isolated, throwaway environment with its own `XDG_*` directories, a redirected `HOME`, and a fresh `CODEX_HOME` under a `mktemp` directory. It also sets `OPENCODE_DISABLE_AUTOUPDATE=1` and `OPENCODE_DISABLE_MODELS_FETCH=1`. QA never reads or writes the host's real `~/.config/opencode`, `~/.codex`, or `~/.omo`. This mirrors the conventions used by the `opencode-qa` and `codex-qa` skills.
+
+`HOME` is redirected on purpose: the plugin reads its own config from `$HOME/.omo/omo.json[c]`, which is not an XDG path, so isolating `XDG_*` alone would leave a QA run writing to your real configuration. The helper relinks `$HOME/.opencode/bin` into the sandbox so installed opencode wrappers that resolve the binary through that path keep working.
 
 For containerized environments (Codespaces, Dev Containers, Docker), see [`.devcontainer/README.md`](.devcontainer/README.md). It documents injecting provider credentials (via `.env`, Codespaces secrets, or `remoteEnv`) and bind-mounting your `~/.codex`, `~/.claude`, and `~/.config/opencode` config into the container so OpenCode, Codex, and Claude Code all work inside it.
 

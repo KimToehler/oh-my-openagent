@@ -7,8 +7,15 @@
 #
 # It mirrors the opencode-qa (oqa_mk_isolated_xdg) and codex-qa (isolated
 # CODEX_HOME) skill conventions: every path lands under a fresh mktemp dir, so
-# the running machine's ~/.config/opencode and ~/.codex are untouched. Remove
-# the sandbox afterwards with: rm -rf "$OMO_QA_ROOT"
+# the running machine's ~/.config/opencode, ~/.codex, and ~/.omo are untouched.
+# Remove the sandbox afterwards with: rm -rf "$OMO_QA_ROOT"
+#
+# HOME is redirected too, and that is load-bearing rather than tidiness: the
+# plugin's own config chain is $HOME/.omo/omo.json[c], which is NOT an XDG path.
+# Isolating only XDG_* leaves it resolving to the operator's real config, and a
+# QA run that pins agent/category models to a mock then overwrites it. That is
+# not hypothetical - it destroyed a real ~/.omo/omo.jsonc; see
+# docs/troubleshooting/harness-findings.md (2026-08-28).
 #
 # Intentionally does NOT set -e: sourcing must not change the caller's shell.
 
@@ -27,6 +34,20 @@ export OPENCODE_DISABLE_MODELS_FETCH=1
 # Codex: isolated CODEX_HOME (must exist before codex runs, or it hard-errors).
 export CODEX_HOME="$OMO_QA_ROOT/codex"
 mkdir -p "$CODEX_HOME"
+
+# OMO plugin config: $HOME/.omo/omo.json[c] is not an XDG path, so it is only
+# isolated by moving HOME itself. Mirrors oqa_mk_isolated_xdg in
+# .agents/skills/opencode-qa/scripts/lib/common.sh, including its relink of
+# $HOME/.opencode/bin: some installed opencode wrappers resolve the real binary
+# through that path and break once HOME moves.
+_omo_real_home="$HOME"
+export HOME="$OMO_QA_ROOT/home"
+mkdir -p "$HOME"
+if [ -d "$_omo_real_home/.opencode/bin" ]; then
+  mkdir -p "$HOME/.opencode"
+  ln -s "$_omo_real_home/.opencode/bin" "$HOME/.opencode/bin" 2>/dev/null || true
+fi
+unset _omo_real_home
 
 # Credentials, set once: inject keys from the gitignored .env (see .env.example).
 # ${BASH_SOURCE[0]:-$0} resolves this file under both bash and zsh (sourced $0).
