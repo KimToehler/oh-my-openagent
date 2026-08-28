@@ -2779,3 +2779,30 @@ $ cat ~/.omo/omo.jsonc          # after the QA run
 **Suggested real fix:** `qa-sandbox.sh` must export an isolated `HOME` (with the `.opencode/bin` relink that `oqa_preserve_home_opencode_bin` already implements), or its header must stop claiming parity with `oqa_mk_isolated_xdg` and state plainly that `$HOME/.omo/**` is NOT isolated. A guard that refuses to write agent/category pins when `HOME` equals the real home would turn a silent destruction into a loud failure.
 
 **Fix status:** unfixed; config restored by hand from `omo.jsonc.bak.pre-lessons-enable-20260822T163914` plus a re-added `lessons` block
+
+## 2026-08-28 — A cancelled blocked subagent keeps emitting "CHILD AWAITING RESPONSE" reminders, urging the parent to resume it
+
+**Severity:** costly — the urged action can be destructive
+**Area:** background tasks
+**Observed in:** oh-my-openagent, after cancelling the QA subagent that had overwritten `~/.omo/omo.jsonc`
+
+**What happened:** a background QA subagent called `report_blocked` and parked. It was cancelled. Ten minutes later the parent received a `[BACKGROUND TASK BLOCKED] (reminder 1 of 1, waiting 10m)` system reminder for that same task, ending in `**CHILD AWAITING RESPONSE:** Answer the child to unblock it.` and a copy-paste `task(task_id=..., prompt=...)` invocation. The two inspection paths disagree about the task's state:
+
+```
+$ background_cancel(taskId="bg_67de996b")
+[ERROR] Cannot cancel task: current status is "cancelled".
+Only running or pending tasks can be cancelled.
+
+$ background_output(task_id="bg_67de996b")
+| Status | **BLOCKED** |
+> **Child needs your answer:** Reply with the requested information using this exact invocation:
+> task(task_id="ses_...", prompt="<your answer>")
+```
+
+**Root cause / hypothesis (unverified):** the blocked-escalation reminder appears to be scheduled off the parked-task record and not reconciled against cancellation, so cancelling clears the run state that `background_cancel` checks while leaving the escalation record that `background_output` and the reminder scheduler read. Not traced in the harness source.
+
+**Why it is costly:** the reminder is an instruction, not a notification, and it arrives with a ready-to-paste invocation. In this case the parked task was cancelled precisely *because* it had destroyed the operator's real `~/.omo/omo.jsonc`, and a replacement task was already running against a fixed sandbox. An agent that trusts the reminder resumes a run that is both superseded and known-harmful. The generic hazard is broader: a cancelled task is cancelled for a reason, and the reminder does not carry that reason.
+
+**Workaround:** before answering any `CHILD AWAITING RESPONSE` reminder, check the task's real state with `background_cancel` (which reports `already cancelled`) rather than `background_output` alone, and confirm no replacement task supersedes it. Do not treat the reminder's suggested invocation as authorization to resume.
+
+**Fix status:** unfixed
