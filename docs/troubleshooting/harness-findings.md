@@ -3066,3 +3066,68 @@ The router message names the class outright: **request-shape error, not an accou
 **Workaround:** probe with `max_tokens: 512` or more and a trivial prompt; parse SSE with `grep`, not `jq`. Better: do not infer routing intent from live traffic at all — read the combo definition. When a probe contradicts known configuration, suspect the probe first.
 
 **Fix status:** unfixed — worth a documented probe recipe in the QA skills, since "ask the router what it served" is a recurring need.
+
+## 2026-08-30 — `[background:… completed, exit 0]` does not match the terminal-status regex, so the unpolled-job warning re-fires forever on finished jobs
+
+**Severity:** papercut
+**Area:** background tasks
+**Observed in:** `~/git/onara`, orchestrating a 26-task review-follow-up plan across parallel lane worktrees
+
+**What happened:** the `unpolled-background-shell-jobs` warning fired three times in one session for jobs that had already completed, whose output I had already read and acted on. Each time I followed the warning's own option A — `ctx_shell(background_action="status", job_id=…)` — and each time the same job was listed again on the next turn. Only `background_action="cancel"` actually cleared them.
+
+**Root cause (verified in source, not a hypothesis):** the tracker retires a polled job only when the parsed status field is in `TERMINAL_STATUSES` (`packages/omo-opencode/src/hooks/unpolled-shell-job/tracker.ts:169`, via `isTerminalStatus`). That parse uses `STATUS_FIELD_PATTERN` (`tracker.ts:44`):
+
+```
+/(?:^|\[background:\s*\S+\s+|\bstatus:\s*)([a-z][a-z _-]*?)(?:\]|$|\n)/im
+```
+
+The capture group must be followed by `]`, end-of-line, or newline. lean-ctx's real terminal wording is `[background:shell_… completed, exit 0]` — there is a `, exit 0` between `completed` and the `]`, so the group never matches. Confirmed by running the actual regex against the exact strings I received:
+
+```
+"[background:shell_1cf6ef5020f57041 completed, exit 0]"   captured: undefined  -> terminal: false
+"[background:shell_6805685d6b4cee28 failed, exit 1]"      captured: undefined  -> terminal: false
+"[background:shell_abc completed]"                        captured: "completed" -> terminal: true
+```
+
+So the *hypothetical* clean form parses and the *actual* form does not. `tracker.ts:167-168` then treats the unparseable status as "still running" — a deliberate fail-safe ("an unparseable status is treated as still running, so an unrecognised wording leaves the guard armed rather than silently disarming it"). That default is right; it is the wording drift that is wrong.
+
+`not found` fails for a second reason: the reply is `[background:shell_… not found — already finished or cancelled]`, whose captured token would be `not found` → normalises to `notfound`, which IS in the set — but the `—` em-dash tail again prevents the group from reaching a `]`.
+
+**Why this is only a papercut:** `cancel` calls `clearJob` unconditionally (`tracker.ts:169`), so the documented escape hatch works. The cost is a wasted turn per occurrence plus the message's own advice being wrong in its most-recommended branch — option A is presented first and option C explicitly says a status call "clears it on a terminal status or `not found`", which is exactly what does not happen.
+
+**Workaround:** use `background_action="cancel"` for an already-consumed job, not `status`. `cancel` on a finished job is harmless and returns `not found`.
+
+**Suggested fix:** make the terminal test tolerant of a trailing clause — e.g. allow `,` as a terminator in `STATUS_FIELD_PATTERN`, or match the status token then ignore the remainder of the bracket. Worth pinning with the *observed* lean-ctx strings above as fixtures, since `tracker.test.ts` presumably uses the clean form that already passes.
+
+**Fix status:** unfixed
+
+## 2026-08-30 — An answered blocked task can still expire, discarding an in-flight lane's uncommitted work
+
+**Severity:** costly
+**Area:** background tasks
+**Observed in:** `~/git/onara`, wave-2 lane `bg_6620fbc1` of a parallel review-follow-up plan
+
+**What happened:** a background lane called `report_blocked` with two legitimate design questions. I answered via `task(task_id="ses_…", prompt=…)`; the harness confirmed `[BACKGROUND TASK ANSWER ACCEPTED] Task bg_6620fbc1 resumed with parent answer` and the task reported `running`. It then produced substantial correct work — a new `ModalityLegRows.kt`, changes across 7 files. Later the same task was reported:
+
+```
+**Failed:**
+- `bg_6620fbc1`: … [CANCELLED] - Reason: Plan conflicts with current code and TDD proof: …
+```
+
+with the **original, already-answered block reason** as the failure text, and on the following turn:
+
+```
+- `bg_6620fbc1`: … [CANCELLED] - Blocked task expired unanswered
+```
+
+It had been answered — twice, both times acknowledged. All of its work was uncommitted at the moment it died.
+
+**Contrast with the 2026-08-28 entry** ("a cancelled blocked subagent keeps emitting CHILD AWAITING RESPONSE"): there, an *unanswered* park was cancelled and the stale reminder urged a resume. Here the park was **answered and acknowledged**, the task resumed and did real work, and the expiry fired anyway carrying the stale reason. Same subsystem, opposite direction.
+
+**Root cause / hypothesis (partially verified):** the resume path does claim the escalation — `manager.ts:1651` calls `this.blockedEscalation.claim(existingTask.id)`, and `claim` clears both the reminder and expiry timers (`blocked-escalation.ts:49-56`). So the intended disarm exists. What I could **not** establish from source is why it did not take effect here; the reported failure text is `task.error` set at `manager.ts:2687` inside `expireBlockedTask`, which returns early unless `isTaskBlocked(task)` — implying the task was considered blocked *again* at expiry time. A second `report_blocked` from the resumed lane, whose park then expired while inheriting the original reason, is consistent with everything observed and would make the wording — not the expiry — the primary defect. I did not confirm it. Labelling this a hypothesis deliberately.
+
+**Why it is costly:** the expiry notice is indistinguishable from a genuine never-answered park, and it arrives attached to the *first* question rather than whatever the lane was actually stuck on. An orchestrator that trusts it concludes the answer was never delivered. In this case the work survived only because uncommitted changes persist in the lane worktree and I inspected `git status` instead of the notification — the surviving diff turned out to be better than the approach I had originally rejected, so trusting the report would have discarded a correct implementation.
+
+**Workaround:** when a lane reports `[CANCELLED] Blocked task expired unanswered`, do not treat it as "no work happened". Check the worktree (`git log` + `git status --porcelain`) before re-dispatching, and resume from the surviving diff rather than restarting the task. More generally: for background lanes, **git state is the ground truth and the notification is a hint** — this is the third distinct notification-vs-reality mismatch in this session alone (see also the `[ALL BACKGROUND TASKS FINISHED - 2 FAILED]` report for two tasks that were both still `running`).
+
+**Fix status:** unfixed — the disarm-on-resume path exists and looks correct, so the actionable half is the *reporting*: an expiry that follows an accepted answer should not surface the original block reason, and ideally should be labelled distinctly from a never-answered park.
