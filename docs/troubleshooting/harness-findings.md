@@ -2684,6 +2684,27 @@ Verified by effect in both cases that the adopted session never ran: no new comm
 
 **Fix status:** unfixed
 
+**Update (2026-08-31, third observation — reproduces on a NORMALLY-COMPLETED session, not just an aborted one):** Observed again in the `onara` repo while running a two-lane plan review. Two reviewer lanes were dispatched together and both **completed normally** (`reason: session-idle-event`, results collected successfully). Minutes later, both were resumed for a delta re-review in the same `task()` batch. The `oracle` lane resumed correctly (`Agent: oracle`, `Status: running`). The `momus` lane, dispatched in the *same* batch, was adopted as `Agent: continue`, `Status: interrupt`, and died with the documented `Agent "continue" not found`.
+
+```
+task(task_id="ses_fa91f400affeDG0GdvCKNhPkWp", ...)   # oracle
+  -> Background Task ID: bg_77b3d0ad   Agent: oracle    Status: running        # healthy
+
+task(task_id="ses_fa91f820cffdFObRI0784Ub1KK", ...)   # momus, same batch
+  -> Background Task ID: bg_afd4569c   Agent: continue  Status: interrupt
+  -> [INTERRUPT] Agent "continue" not found.
+```
+
+Two things this adds to the entry above:
+
+1. **The precondition is broader than recorded.** The workaround says "do not resume a session that has been aborted or stale-cancelled" — but this session was neither. It completed cleanly and its result was collected. So a normally-finished session can *also* lose its agent binding, and the existing workaround does not cover the case. Resuming any older session is a gamble; two sessions of the same age, resumed in one batch, behaved differently.
+
+2. **`background_cancel` cannot clean up the corpse.** `background_cancel(taskId="bg_afd4569c")` returns `Cannot cancel task: current status is "interrupt". Only running or pending tasks can be cancelled.` The failed task then stays in the registry and fires an `[ACTION REQUIRED]` notification, which reads as a live problem needing a decision when the orchestrator has already routed around it. Minor, but it costs a turn to re-read and dismiss.
+
+**Practical detection rule (cheap, and it is the reliable one):** the returned `Agent:` field is the tell. A healthy resume echoes the ORIGINAL agent name (`oracle`, `momus`); a poisoned one says `continue`. Check that field on every resume before waiting on the task — it is visible immediately at the call site, unlike the `interrupt` status which can arrive later. If it says `continue`, discard the id and respawn fresh; do not count that lane's verdict, since an adopted session has "no original model, no fallback chain, no category, and no loaded skill content" and would be reviewing under an unknown model.
+
+**Fix status:** unfixed (reproduced 3×, now including a cleanly-completed session)
+
 ## 2026-08-27 — Blocked reply contract was unpinned and terminal parks expired without a parent-visible wake
 
 **Severity:** costly
