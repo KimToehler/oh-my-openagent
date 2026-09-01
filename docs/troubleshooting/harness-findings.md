@@ -3122,6 +3122,8 @@ So the *hypothetical* clean form parses and the *actual* form does not. `tracker
 
 **Fix status:** unfixed
 
+**Update (2026-09-01, `~/git/onara`, composition-program-generation wave):** reproduced exactly, twice in one session, and the workaround is confirmed. Four already-consumed jobs were listed; I called `background_action="status"` on all four, receiving three `[background:… completed, exit 0]` and one `[background:… not found or expired]`. **All four were listed again on the very next turn.** A subsequent `cancel` on the same four returned `[background:… not found — already finished or cancelled]` and they did not reappear. This confirms both halves of the analysis above: the `, exit 0` tail defeats the terminal parse, and `not found` with the em-dash tail defeats it too. Note the message's option C is actively misleading — it states a `status` call "clears it on a terminal status or `not found`", and neither clears it. Recommend swapping options A and B in the warning text until the regex is fixed, since the first-listed option is the one that does not work.
+
 ## 2026-08-30 — An answered blocked task can still expire, discarding an in-flight lane's uncommitted work
 
 **Severity:** costly
@@ -3152,3 +3154,40 @@ It had been answered — twice, both times acknowledged. All of its work was unc
 **Workaround:** when a lane reports `[CANCELLED] Blocked task expired unanswered`, do not treat it as "no work happened". Check the worktree (`git log` + `git status --porcelain`) before re-dispatching, and resume from the surviving diff rather than restarting the task. More generally: for background lanes, **git state is the ground truth and the notification is a hint** — this is the third distinct notification-vs-reality mismatch in this session alone (see also the `[ALL BACKGROUND TASKS FINISHED - 2 FAILED]` report for two tasks that were both still `running`).
 
 **Fix status:** unfixed — the disarm-on-resume path exists and looks correct, so the actionable half is the *reporting*: an expiry that follows an accepted answer should not surface the original block reason, and ideally should be labelled distinctly from a never-answered park.
+
+## 2026-09-01 — A file edit reported "applied successfully" landed in the MAIN checkout instead of the target worktree
+
+**Severity:** costly
+**Area:** tools
+**Observed in:** `~/git/onara`, merging a 6-todo feature branch built across 7 parallel lane worktrees
+
+**What happened:** while fixing a merge-seam compile error I called `mcp_Edit` with an **absolute** path inside a worktree (`/Users/tim/git/onara/.worktrees/composition-program-generation/backend_kt/src/.../PeriodizationModels.kt`) to add a one-line `@Serializable` annotation. The tool returned `Edit applied successfully.` The subsequent `./gradlew compileKotlin` failed with the *identical* error, and re-reading the file showed the annotation absent. Re-applying the same change via a Python script (which asserted the replacement and printed the on-disk result) worked first time.
+
+The stray write surfaced ~40 minutes later, when `git merge` aborted:
+
+```
+error: Your local changes to the following files would be overwritten by merge:
+	backend_kt/src/test/kotlin/com/onara/tasks/ProgramGenerationTaskTest.kt
+Please commit your changes or stash them before you merge.
+```
+
+`git status` in the **main checkout** showed three modified files — including `PeriodizationModels.kt` carrying exactly the `@Serializable` line I had "applied" to the worktree.
+
+**Evidence:** the three dirty main-tree files were all partial fragments of this feature's work (bare imports, a constructor stub), each a strict **subset** of what was already committed on the branch:
+
+```
+$ diff <(git show composition-program-generation:$f) "$f" | head -3
+133d132
+< /** One phase of a compiled custom composition, preserving child and same-day order for generation. */
+< data class CompositionPreviewBlock(
+```
+
+i.e. every difference is a line present on the branch and missing from the main tree — no unique work was stranded. Two of the three files were never touched by me directly in this session, so at least one subagent wrote through as well.
+
+**Root cause / hypothesis (unverified):** something in the edit path resolves against the session's original project root (`/Users/tim/git/onara`) rather than the absolute path given, or a cached file handle from a same-named path in the main tree wins. I did not read the tool source, so this is a hypothesis. What is *certain* is the mismatch between the success report and the on-disk result — the tool reported success for a write that did not reach the named file.
+
+**Why it is costly:** it is silent in three ways at once. The edit reports success; the target worktree is unchanged so the original error persists and reads as "my fix was wrong" rather than "my fix went elsewhere"; and the main checkout accumulates dirt that only surfaces at merge time, long after the causing turn. Because the debris looks like plausible in-progress work on files the feature genuinely touches, the tempting recovery — `git checkout -- .` — risks discarding real work. Here it happened to be safe, but only a per-file `diff` against the branch proved that.
+
+**Workaround:** after any edit that matters, **verify on disk** rather than trusting the success line (re-read the file, or `git diff --stat` in the intended worktree). Before merging a branch built in worktrees, check the main checkout with `git status --porcelain` and, if dirty, diff each file against the branch (`diff <(git show <branch>:$f) "$f"`) to establish whether anything is unique before cleaning. Back up with both a file copy and a labelled `git stash` — uncommitted work has no other recovery path.
+
+**Fix status:** unfixed
