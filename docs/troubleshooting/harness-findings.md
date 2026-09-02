@@ -2767,6 +2767,26 @@ Three things these add:
 **Update:** (verified 2026-09-02 against `dev` @ 4e68569cb) Still open, and I confirmed the agent name is genuinely fictitious rather than a sentinel the runtime understands. `resume()` passes the literal `agent: "continue"` into `adoptRunningSession()` at `packages/omo-opencode/src/features/background-agent/manager.ts:1434`; that value is stored verbatim as `task.agent` at `:719` and registered through `setSessionAgent()` at `:730`. Cross-check: `grep '"continue"'` across the whole background-agent feature returns that one line and nothing else, and there is no `agent === "continue"` branch, no continuation-marker constant, and no registration under `src/agents/` or `src/config/` — so nothing downstream special-cases it. What HAS landed since the entry was written is a real guard chain in front of adoption: session existence at `:1406-1413`, liveness probe at `:1415-1421`, transcript validation at `:1422-1427`, plus a separate stale-task reconciliation path for already-tracked tasks at `:1463-1483`. Those validate the SESSION, never the AGENT, so they do not close this. `git log -15 -- manager.ts` shows nine adoption/resume commits (`2934be9e0`, `c40e4fa26`, `866c45f55`, `e690b6ca0`, `3d3985f27`, `29d878800`, `3014085e3`, `67339856a`, `42a60fec3`); every subject concerns rollback, liveness, or dispatch — none names the agent identity.
 
 **Fix status (2026-09-02):** still unfixed, confirmed with a negative cross-check. Severity revised `costly` -> `blocker`: five recorded reproductions across aborted, cleanly-completed reviewer, and twice-completed `plan` sessions, and recurrence outranks the original guess. The fix is contained — carry the original `task.agent` through the adoption path, or reject adoption when the agent is unresolvable, instead of inventing a name.
+
+**Update (2026-09-02, FIXED):** root-caused and fixed. `resume()` now recovers the agent and model the orphaned session actually ran under, instead of inventing a name.
+
+The mechanism, confirmed against source: the literal `agent: "continue"` at `manager.ts:1434` was passed into `adoptRunningSession()`, stored verbatim as `task.agent` (`:719`), registered via `setSessionAgent()` (`:730`), and then sent as the prompt body's `agent` field (`:1601`). Nothing downstream special-cased it, so OpenCode rejected it as an unregistered agent. The earlier hypothesis that it was a placeholder never expected to dispatch was correct.
+
+Three things the original entry did not capture:
+
+1. **The fabrication had a second live site.** `sync-continuation.ts:207` passed `resumeAgent ?? "continue"` into the same `adoptRunningSession()` on the wall-clock-yield path, poisoning adopted tasks through a different door. Two further `"continue"` literals in that file (`:117` toast label, `:194` poll label) never reach dispatch and were left alone.
+2. **The sync path already had the recovery logic.** `resolveResumeContext()` (`sync-continuation.ts:55-92`) walks the transcript for agent, model and variant. The background path was the odd one out. That resolver had its own latent bug: it did not skip compaction messages, so it could return `resumeAgent: "compaction"` - the same defect class under a different fictitious name. Fixed in the same change.
+3. **`validateSessionHasOutput()` cannot be reused as the fetch.** It short-circuits on an `observedOutputSessions` cache set during normal polling, so on a cleanly-completed session - four of the five reproductions - it returns `true` without fetching anything. The fix does its own transcript fetch on the adoption path.
+
+The fix reuses `resolvePromptContextFromSessionMessages()`, which `manager.ts` already imported: it is newest-first, skips compaction messages and compaction agent names, merges agent and model independently, and falls back to a compaction checkpoint. A disk-backed twin covers the case where the server fetch fails.
+
+**When the agent is unrecoverable, adoption is now REFUSED** rather than falling back to a registered agent. Disclosure was already being emitted (`background-continuation.ts:43`) and all five reproductions read past it, so disclosure is not an adequate control; a silent substitution would let a reviewer or `plan` lane return an authoritative-looking verdict under the wrong persona. The error tells the caller to respawn fresh, which was the entry's own recommended workaround.
+
+Also corrected: the `:2293` agent-not-found handler now names the real agent and prescribes respawn. It deliberately does NOT gain the launch path's fallback retry - the dispatched prompt is never persisted on the task (`prompt` is `"[already prompted]"` for adopted sessions), so a retry would replay a placeholder. Persisting the resume prompt is left as a separate change.
+
+**Live QA:** proven on a real `opencode serve` across a mid-turn `SIGKILL` restart. Fixed build adopted `agent: explore` (the child's real agent) and the session gained messages (`midpre=2 midpost=4`). With the fix reverted and the bundle rebuilt, the same probe observed `agent: continue` and `midpost=2` - unchanged, meaning the lane never ran, exactly the reported symptom. The probe's normal-mode assertion was confirmed RED against the unfixed build. Evidence: `.omo/evidence/20260902-adopt-agent-identity/`.
+
+**Fix status:** fixed. Agent identity is carried through adoption; unrecoverable agents refuse instead of substituting.
 ## 2026-08-27 — Blocked reply contract was unpinned and terminal parks expired without a parent-visible wake
 
 **Severity:** costly
@@ -3384,3 +3404,38 @@ Three fixes were implemented, unit-tested, run against a real-harness probe, and
 **Workaround:** for a fix to a *reported* defect, derive the test from the report's observable symptom, not from the mechanism you believe causes it. Construct the failing state through the real production path (call `report_blocked`, do not hand-set `status`); if a test needs to force a field to make the new code reachable, that is the signal it is testing the wrong state. Then prove the probe red against the unfixed build - the negative control here reproduced the incident line for line, and would have failed the original fix immediately. For a widened parser, generate the adversarial direction explicitly: the fixtures that matter are the ones that put hostile input where the anchor can reach it.
 
 **Fix status:** not a code defect; a process finding. Both underlying blockers fixed in `7918492a8` and `8479eaa22`.
+
+## 2026-09-02 — A fresh git worktree cannot initialize this repo's submodules, and `bun install`'s prepare script fails as a result
+
+**Severity:** costly
+**Area:** repo tooling / dev environment
+**Observed in:** oh-my-openagent, creating a task worktree under `.worktrees/`
+
+**What happened:** `git worktree add` followed by `bun install` in the new worktree fails during the `prepare` script, aborting the install before dependencies land. The failure is not obviously about submodules:
+
+```
+$ bun install
+fatal: Unable to find current revision in submodule path 'packages/shared-skills/upstreams/open-design'
+Error: [materialize-shared-upstreams] git submodule init failed
+error: script "build:materialize-frontend" exited with code 1
+error: prepare script from "oh-my-opencode" exited with 1
+```
+
+`bun install` still reports `exit 0` on the second run while having installed nothing new, so the failure is easy to miss; the tell is that root `node_modules` stays at its pre-install entry count.
+
+**Root cause:** confirmed, not hypothesis. The `prepare` script runs `build:materialize-frontend`, which requires the four `packages/shared-skills/upstreams/*` submodules. A new worktree gets its own `.git/worktrees/<name>/modules/...` submodule dirs, and those start without the objects the recorded revisions point at. `git submodule update --init --recursive` alone does NOT fix it: the object is missing from the worktree's module, so the checkout fails with `Unable to find current revision`. In the `open-design` case `git cat-file -t <rev>` reported `commit` while `git rev-parse HEAD` reported an unborn HEAD - the object existed after a fetch but no checkout had been performed.
+
+**Workaround (per submodule):** fetch from the main checkout's already-populated module, then check out the recorded revision explicitly.
+
+```bash
+p=packages/shared-skills/upstreams/<name>
+rev=$(git ls-tree HEAD "$p" | awk '{print $3}')
+git -C "$p" fetch /path/to/main/checkout/.git/modules/$p
+git -C "$p" checkout --detach "$rev"
+```
+
+Repeat for all four (`open-design`, `designpowers`, `taste-skill`, `ui-ux-pro-max`), then re-run `bun run build:materialize-frontend` to confirm, then `bun install`.
+
+**Why it is costly:** it blocks the very first step of the repo's own mandated worktree workflow, and the error text points at `build:materialize-frontend` rather than at worktree submodule state. A previous session misattributed the resulting three phantom `omo-senpi` TS2307 errors (`typebox`, `@earendil-works/pi-tui`) to a missing package-local `node_modules`; the real cause was this aborted install. Note `typebox` is absent from the main checkout too, so its absence alone is not the signal - the entry count of root `node_modules` is.
+
+**Fix status:** unfixed; workaround only. A `postinstall`/setup step that performs the fetch-then-checkout fallback when a submodule revision is unresolvable would remove the manual step.
