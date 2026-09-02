@@ -40,8 +40,12 @@ and was still violated three times in one session. Facts stated as reference get
   the helper away.
   - A call with `run_in_background: true` whose output contains a `shell_<hex>` id
     registers that job for the session.
-  - A call with `background_action: "status"` clears the job **only if the parsed status
-    field** reports a terminal value. The status is extracted from the field, never
+  - A call with `background_action: "status"` **or `"wait"`** clears the job **only if the
+    parsed status field** reports a terminal value. Both are handled by the same branch
+    (`recordToolCall` keys on `background_action` being present, not on its value), so a
+    `wait` that returns `completed, exit 0` deregisters the job exactly like a terminal
+    `status` poll, while a `wait timed out … still running` reply correctly leaves it
+    tracked. The status is extracted from the field, never
     matched against the free-form body: a running gradle/npm job's log tail routinely
     contains `FAILED` / `completed`, and scanning the whole output for those words retired
     the job on its first poll — silently disarming the guard for exactly the long, noisy
@@ -71,18 +75,27 @@ and was still violated three times in one session. Facts stated as reference get
 - `message.ts` builds the warning. It offers three resolutions (bounded wait / cancel /
   confirm-already-finished) rather than only "poll each one".
 
-  The wait path pairs the loop with **one terminal `status` call**, because the loop alone
-  does not deregister the job. The tracker only observes `ctx_shell` calls
-  (`tool-execute-after.ts` → `recordToolCall`); consuming a job's result by reading a
-  marker file, log, or verdict file with any other tool is invisible to it, so the job
-  stays outstanding and the hook re-fires on work the agent already finished and acted on.
-  That false positive was observed twice in one session. The message previously taught the
-  bounded loop as a complete resolution while only mentioning the clearing call as a
-  separate option, which is what produced it. Clearing on genuinely-observed completion is
-  not implementable from the hook's inputs: `session.idle` carries no job status, and the
-  tracker sees non-`ctx_shell` tool calls only as unrelated events. `tracker.test.ts`
-  pins this ("keeps a job tracked when its result was consumed without a terminal poll")
-  so the gap is characterized rather than rediscovered.
+  The message leads with `background_action="wait"`, which both supervises the job and
+  deregisters it in one call. An earlier revision omitted `wait` entirely and taught a
+  marker-file loop plus a follow-up `status` call; that omission is what produced repeated
+  status-call spirals, and it made the guard look unfixable for waited jobs when in fact
+  `wait` already cleared them.
+
+  **Scope of the residual gap — do not overstate it.** The tracker only observes
+  `ctx_shell` calls (`tool-execute-after.ts` → `recordToolCall`), so consuming a job's
+  result by reading a marker file, log, or verdict file *with any other tool* is invisible
+  to it: the job stays outstanding and the hook re-fires on work the agent already
+  finished. That false positive was observed twice in one session, and only that case is
+  unobservable from the hook's inputs — `session.idle` carries no job status, and
+  non-`ctx_shell` tool calls arrive as unrelated events. `tracker.test.ts` pins it
+  ("keeps a job tracked when its result was consumed without a terminal poll").
+
+  This does **not** extend to `background_action="wait"`, which is a `ctx_shell` call
+  carrying the job id and is handled like `status`. Three tests pin that
+  (terminal-clears, timeout-keeps, not-found-clears) so the distinction cannot be
+  re-blurred. If waited jobs appear to warn anyway, suspect a stale plugin bundle in the
+  running process before suspecting the tracker: terminal parsing of the `, exit N` clause
+  landed in `7788a7d9a`, and a session started before that commit runs without it.
 
   The wait path prescribes a **bounded loop that breaks on completion**, because the
   earlier phrasing — a list of `background_action="status"` calls — reliably produced a
@@ -102,12 +115,13 @@ and was still violated three times in one session. Facts stated as reference get
   belongs in `task(run_in_background=true)`, which notifies. Telling an agent how to
   clean up a detached job without telling it not to detach next time treats the symptom.
 
-  When the job genuinely must be owned by this agent, `background_action="wait"` is now
-  the supervision path: it blocks server-side until the job is terminal or
-  `wait_timeout_ms` elapses (default 45 s, max 50 s, silently clamped). That makes each
-  check-in cheap — roughly 6 calls for a 5-minute job instead of ~30 — but it does **not**
-  make the job notify, so a `wait` that returns on timeout must be called again, and a
-  turn must still never end with a detached job outstanding.
+  When the job genuinely must be owned by this agent, `background_action="wait"` is the
+  supervision path: it blocks server-side until the job is terminal or `wait_timeout_ms`
+  elapses (default 45 s, max 50 s, silently clamped). That makes each check-in cheap —
+  roughly 6 calls for a 5-minute job instead of ~30 — and a terminal reply also
+  deregisters the job, so no follow-up `status` call is needed. It does **not** make the
+  job notify, so a `wait` that returns on timeout must be called again, and a turn must
+  still never end with a detached job outstanding.
 
 - `hook.ts` runs on `session.idle` and dispatches an **internal continuation prompt**
   (`dispatchInternalPrompt`, `mode: "async"`), the same mechanism `goal` and
@@ -137,7 +151,7 @@ and was still violated three times in one session. Facts stated as reference get
 
 ## Testing
 
-`bun test packages/omo-opencode/src/hooks/unpolled-shell-job/` — 36 tests across
+`bun test packages/omo-opencode/src/hooks/unpolled-shell-job/` — 54 tests across
 `tracker.test.ts` (registration, status parsing, adoption, retirement, TTL/cap,
 per-session isolation) and `hook.test.ts` (dispatch shape, cooldown, settle gate,
 event filtering, dedupe-discard retry).
