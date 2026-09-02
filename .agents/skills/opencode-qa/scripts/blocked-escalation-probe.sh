@@ -22,6 +22,13 @@
 #   3. exactly ONE reminder arrives, never two
 #   4. ~120s in, the task goes terminal with "expired unanswered"
 #
+# --dismiss inverts assertions 2-4 to cover the OPPOSITE branch: the parent answers the
+# blocked wake by CANCELLING the child instead of ignoring it, and no reminder may ever
+# arrive. That branch was the reported defect - a park leaves the task terminal with
+# blockedAt set, so the retiring cancel lands on cancelTask's early return, and before
+# the fix the escalation stayed armed on a task nobody could resume. The default mode
+# cannot see it: it never cancels, so it proves only that the timers fire.
+#
 # What it does NOT assert: that the child session was aborted at expiry (the F5
 # finding-7 path). That branch only runs when the park's own abort FAILED, which this
 # probe has no way to induce against a healthy server - the park always succeeds
@@ -47,11 +54,13 @@ EXPIRY_MS=120000
 EVIDENCE_DIR=""
 SELF_TEST=0
 KEEP_SANDBOX=0
+DISMISS=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --evidence-dir) EVIDENCE_DIR="$2"; shift 2 ;;
     --keep-sandbox) KEEP_SANDBOX=1; shift ;;
+    --dismiss) DISMISS=1; shift ;;
     --self-test) SELF_TEST=1; shift ;;
     *) oqa_log "unknown argument: $1"; exit 2 ;;
   esac
@@ -175,7 +184,41 @@ fi
 MOCK_PORT_N="$(oqa_free_port)"
 MOCK_LOG_FILE="$SANDBOX/mock-requests.log"
 SCRIPT_FILE="$SANDBOX/script.json"
-cat >"$SCRIPT_FILE" <<'JSON'
+if [ "$DISMISS" = "1" ]; then
+  # The parent answers the blocked wake by DISMISSING the child. `capture` lifts the
+  # task id out of the blocked notification at runtime (`**ID:** \`bg_...\``), because
+  # it is minted mid-run and cannot be written into a static script.
+  cat >"$SCRIPT_FILE" <<'JSON'
+[
+  {
+    "tool": "task",
+    "when": "REPORT_BLOCKED_PROBE",
+    "unless": "Task launched",
+    "args": {
+      "description": "blocked child",
+      "prompt": "You cannot proceed. Call report_blocked immediately with reason 'probe: needs a deploy target' and needs 'which environment'.",
+      "category": "quick",
+      "run_in_background": true
+    }
+  },
+  {
+    "tool": "report_blocked",
+    "when": "report_blocked",
+    "unless": "parked",
+    "args": { "reason": "probe: needs a deploy target", "needs": "which environment" }
+  },
+  {
+    "tool": "background_cancel",
+    "when": "BACKGROUND TASK BLOCKED",
+    "unless": "Dismissed blocked task",
+    "capture": { "blockedTaskId": "\\*\\*ID:\\*\\* `(bg_[A-Za-z0-9]+)`" },
+    "args": { "taskId": "{{blockedTaskId}}" }
+  },
+  { "text": "Child dismissed; parent standing by." }
+]
+JSON
+else
+  cat >"$SCRIPT_FILE" <<'JSON'
 [
   {
     "tool": "task",
@@ -197,6 +240,7 @@ cat >"$SCRIPT_FILE" <<'JSON'
   { "text": "Parent standing by; deliberately NOT answering the child." }
 ]
 JSON
+fi
 
 MOCK_PORT="$MOCK_PORT_N" MOCK_SCRIPT_FILE="$SCRIPT_FILE" MOCK_LOG="$MOCK_LOG_FILE" \
   node "$SCRIPT_DIR/lib/mock-model.mjs" >"$SANDBOX/mock.out" 2>&1 &
@@ -331,8 +375,12 @@ assert_plugin_used_sandbox || exit 1
 
 # ---- watch the timeline ----------------------------------------------------
 START="$(date +%s)"
-BLOCKED_AT=""; REMINDER_AT=""; EXPIRY_AT=""
+BLOCKED_AT=""; REMINDER_AT=""; EXPIRY_AT=""; DISMISSED_AT=""
+# Dismiss mode asserts ABSENCE, so it cannot break early on a marker. It must outlast
+# both deadlines to prove neither fired: expiry is the later one at EXPIRY_MS, plus a
+# margin for the wake to surface.
 DEADLINE=$(( START + 260 ))
+[ "$DISMISS" = "1" ] && DEADLINE=$(( START + (EXPIRY_MS / 1000) + 45 ))
 while [ "$(date +%s)" -lt "$DEADLINE" ]; do
   # Fail fast on a PARENT session error, so the loop does not wait the full 260s for
   # timers that can never fire. Scoped to the parent and to non-abort errors on
@@ -352,6 +400,9 @@ while [ "$(date +%s)" -lt "$DEADLINE" ]; do
   if [ -z "$REMINDER_AT" ] && grep -q 'reminder 1 of 1, waiting' "$SSE_FILE" 2>/dev/null; then
     REMINDER_AT=$(( $(date +%s) - START )); oqa_log "observed: reminder at +${REMINDER_AT}s"
   fi
+  if [ -z "$DISMISSED_AT" ] && grep -aq 'Dismissed blocked task' "$SSE_FILE" 2>/dev/null; then
+    DISMISSED_AT=$(( $(date +%s) - START )); oqa_log "observed: parent dismissed the child at +${DISMISSED_AT}s"
+  fi
   # Expiry is observed in the PLUGIN log, not the SSE stream. Unlike failBlockedTask,
   # expireBlockedTask notifies nobody: it mutates the task and schedules removal
   # without markForNotification/enqueueNotificationForParent, so no wake and no
@@ -363,10 +414,18 @@ while [ "$(date +%s)" -lt "$DEADLINE" ]; do
   # shared multi-megabyte file appended to by every concurrent opencode process, so
   # that race is routine: it reported "task never expired" on a run whose expiry had
   # fired on time. Redirecting keeps grep's own exit status authoritative.
+  # Scoped to THIS run's parent session id, not just the marker text. The plugin log is
+  # a shared file appended to by every concurrent opencode process AND by `bun test`
+  # (blocked-escalation.test.ts logs the identical line for its fixture tasks). Matching
+  # the bare marker reported "expiry at +0s" from a unit-test run in another terminal,
+  # which in --dismiss mode reads as a real failure. The line-count offset alone does not
+  # save you: the log rotates at 50MB, which resets the offset mid-run.
   if [ -z "$EXPIRY_AT" ] && [ -f "$PLUGIN_LOG" ] \
-     && grep -aq 'Blocked task expired unanswered' <(tail -n "+$((PLUGIN_LOG_LINES_BEFORE + 1))" "$PLUGIN_LOG"); then
+     && grep -aq "Blocked task expired unanswered.*$PARENT_SESSION" <(tail -n "+$((PLUGIN_LOG_LINES_BEFORE + 1))" "$PLUGIN_LOG"); then
     EXPIRY_AT=$(( $(date +%s) - START )); oqa_log "observed: expiry at +${EXPIRY_AT}s"
-    break
+    # Dismiss mode treats an expiry as a FAILURE signal, not a finish line, and must keep
+    # watching for a late reminder rather than stopping on the first marker it sees.
+    [ "$DISMISS" = "1" ] || break
   fi
   sleep 2
 done
@@ -383,19 +442,29 @@ REAL_DB_AFTER="$(sqlite3 "$REAL_DB" 'SELECT count(*) FROM session' 2>/dev/null)"
 # ---- verdict ---------------------------------------------------------------
 fails=0
 [ -n "$BLOCKED_AT" ]  || { oqa_log "FAIL: no blocked wake observed"; fails=$((fails+1)); }
-[ -n "$REMINDER_AT" ] || { oqa_log "FAIL: no reminder wake observed"; fails=$((fails+1)); }
-[ -n "$EXPIRY_AT" ]   || { oqa_log "FAIL: task never expired"; fails=$((fails+1)); }
-[ "$REMINDER_COUNT" = "1" ] || { oqa_log "FAIL: expected exactly 1 reminder, saw $REMINDER_COUNT"; fails=$((fails+1)); }
-if [ -n "$REMINDER_AT" ] && [ "$REMINDER_AT" -lt 45 ]; then
-  oqa_log "FAIL: reminder fired at +${REMINDER_AT}s, far below the ${REWAKE_MS}ms deadline"; fails=$((fails+1))
-fi
-# Lower bound, symmetrical with the reminder floor. Without it an expiry regression
-# firing at +65s against a 120000ms knob still passes on ordering alone.
-if [ -n "$EXPIRY_AT" ] && [ "$EXPIRY_AT" -lt 100 ]; then
-  oqa_log "FAIL: expiry fired at +${EXPIRY_AT}s, far below the ${EXPIRY_MS}ms deadline"; fails=$((fails+1))
-fi
-if [ -n "$EXPIRY_AT" ] && [ -n "$REMINDER_AT" ] && [ "$EXPIRY_AT" -le "$REMINDER_AT" ]; then
-  oqa_log "FAIL: expiry (+${EXPIRY_AT}s) did not follow the reminder (+${REMINDER_AT}s)"; fails=$((fails+1))
+
+if [ "$DISMISS" = "1" ]; then
+  # The dismissal must actually have happened, or "no reminder" proves nothing: a run
+  # where the parent never cancelled would also show zero reminders.
+  [ -n "$DISMISSED_AT" ] || { oqa_log "FAIL: parent never dismissed the child"; fails=$((fails+1)); }
+  [ "$REMINDER_COUNT" = "0" ] || { oqa_log "FAIL: a dismissed task still reminded the parent ($REMINDER_COUNT times)"; fails=$((fails+1)); }
+  [ -z "$REMINDER_AT" ] || { oqa_log "FAIL: reminder wake at +${REMINDER_AT}s after the task was dismissed"; fails=$((fails+1)); }
+  [ -z "$EXPIRY_AT" ] || { oqa_log "FAIL: dismissed task still ran to expiry at +${EXPIRY_AT}s"; fails=$((fails+1)); }
+else
+  [ -n "$REMINDER_AT" ] || { oqa_log "FAIL: no reminder wake observed"; fails=$((fails+1)); }
+  [ -n "$EXPIRY_AT" ]   || { oqa_log "FAIL: task never expired"; fails=$((fails+1)); }
+  [ "$REMINDER_COUNT" = "1" ] || { oqa_log "FAIL: expected exactly 1 reminder, saw $REMINDER_COUNT"; fails=$((fails+1)); }
+  if [ -n "$REMINDER_AT" ] && [ "$REMINDER_AT" -lt 45 ]; then
+    oqa_log "FAIL: reminder fired at +${REMINDER_AT}s, far below the ${REWAKE_MS}ms deadline"; fails=$((fails+1))
+  fi
+  # Lower bound, symmetrical with the reminder floor. Without it an expiry regression
+  # firing at +65s against a 120000ms knob still passes on ordering alone.
+  if [ -n "$EXPIRY_AT" ] && [ "$EXPIRY_AT" -lt 100 ]; then
+    oqa_log "FAIL: expiry fired at +${EXPIRY_AT}s, far below the ${EXPIRY_MS}ms deadline"; fails=$((fails+1))
+  fi
+  if [ -n "$EXPIRY_AT" ] && [ -n "$REMINDER_AT" ] && [ "$EXPIRY_AT" -le "$REMINDER_AT" ]; then
+    oqa_log "FAIL: expiry (+${EXPIRY_AT}s) did not follow the reminder (+${REMINDER_AT}s)"; fails=$((fails+1))
+  fi
 fi
 
 {
@@ -403,7 +472,9 @@ fi
   printf 'EXPIRY_MS=%s\n' "$EXPIRY_MS"
   printf 'PARENT_SESSION=%s\n' "$PARENT_SESSION"
   printf 'CHILD_SESSION=%s\n' "$CHILD_SESSION"
+  printf 'MODE=%s\n' "$([ "$DISMISS" = "1" ] && printf 'dismiss' || printf 'default')"
   printf 'BLOCKED_AT_S=%s\n' "${BLOCKED_AT:-none}"
+  printf 'DISMISSED_AT_S=%s\n' "${DISMISSED_AT:-none}"
   printf 'REMINDER_AT_S=%s\n' "${REMINDER_AT:-none}"
   printf 'EXPIRY_AT_S=%s\n' "${EXPIRY_AT:-none}"
   printf 'REMINDER_COUNT=%s\n' "$REMINDER_COUNT"

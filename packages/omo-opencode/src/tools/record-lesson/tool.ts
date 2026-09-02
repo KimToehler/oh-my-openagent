@@ -50,6 +50,12 @@ function createRenderInput(args: RecordLessonArgs, deps: RecordLessonDeps, lesso
 }
 
 async function executeRecordLesson(args: RecordLessonArgs, deps: RecordLessonDeps): Promise<string> {
+  if (!args.title) return "Error: title is required."
+  if (!args.what_went_wrong) return "Error: what_went_wrong is required."
+  if (!args.rule_for_next_time) return "Error: rule_for_next_time is required."
+  if (!args.globs) return "Error: globs is required (1-8 entries). A lesson without globs would fire in every project."
+  if (!args.citations) return "Error: citations is required (1-5 entries)."
+
   const normalizedArgs: RecordLessonArgs = { ...args, globs: args.globs.map((glob) => glob.trim()) }
   const lessonsDirResult = resolveLessonsDir({ env: deps.env, config: deps.config, projectDir: deps.projectDir })
   if (!lessonsDirResult.ok) return lessonsDirResult.error

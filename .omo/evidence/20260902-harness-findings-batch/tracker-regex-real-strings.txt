@@ -1,0 +1,8 @@
+string | OLD -> terminal? | NEW -> terminal?
+"[background:shell_de62a206c9573559 completed, exit 0]"  | null         not | completed    TERM
+"[background:shell_167bb7100eee780a completed, exit 0]"  | null         not | completed    TERM
+"[background:shell_3bbb7a7a9bbaadf6 completed, exit 0]"  | null         not | completed    TERM
+"[background:shell_abc failed, exit 1]"                  | null         not | failed       TERM
+"[background:shell_1231134ea9cf1e99 started]"            | started      not | started      not
+"status: completed\nexit code: 0\n"                      | completed    TERM | completed    TERM
+"[background:shell_abc arbitrary prose completed, exit 0]" | null         not | arbitraryprosecompleted not

@@ -77,6 +77,78 @@ async function execute(tool: ReturnType<typeof createRecordLessonTool>, args = V
 }
 
 describe("createRecordLessonTool", () => {
+  test("#given missing globs argument #when recording #then readable error names the field instead of throwing", async () => {
+    // given
+    const memory = createMemoryFs()
+    const args = { ...VALID_ARGS, globs: undefined as never }
+
+    // when
+    const result = await execute(createTool(memory), args)
+
+    // then
+    expect(result).toStartWith("Error:")
+    expect(result).toContain("globs")
+    expect(result).not.toContain("undefined is not an object")
+    expect(memory.files.size).toBe(0)
+  })
+
+  test("#given missing what_went_wrong argument #when recording #then readable error names the field instead of throwing", async () => {
+    // given
+    const memory = createMemoryFs()
+    const args = { ...VALID_ARGS, what_went_wrong: undefined as never }
+
+    // when
+    const result = await execute(createTool(memory), args)
+
+    // then
+    expect(result).toStartWith("Error:")
+    expect(result).toContain("what_went_wrong")
+    expect(result).not.toContain("replaceAll")
+    expect(memory.files.size).toBe(0)
+  })
+
+  test("#given missing rule_for_next_time argument #when recording #then readable error names the field instead of throwing", async () => {
+    // given
+    const memory = createMemoryFs()
+    const args = { ...VALID_ARGS, rule_for_next_time: undefined as never }
+
+    // when
+    const result = await execute(createTool(memory), args)
+
+    // then
+    expect(result).toStartWith("Error:")
+    expect(result).toContain("rule_for_next_time")
+    expect(memory.files.size).toBe(0)
+  })
+
+  test("#given missing title argument #when recording #then readable error names the field instead of throwing", async () => {
+    // given
+    const memory = createMemoryFs()
+    const args = { ...VALID_ARGS, title: undefined as never }
+
+    // when
+    const result = await execute(createTool(memory), args)
+
+    // then
+    expect(result).toStartWith("Error:")
+    expect(result).toContain("title")
+    expect(memory.files.size).toBe(0)
+  })
+
+  test("#given missing citations argument #when recording #then readable error names the field instead of throwing", async () => {
+    // given
+    const memory = createMemoryFs()
+    const args = { ...VALID_ARGS, citations: undefined as never }
+
+    // when
+    const result = await execute(createTool(memory), args)
+
+    // then
+    expect(result).toStartWith("Error:")
+    expect(result).toContain("citations")
+    expect(memory.files.size).toBe(0)
+  })
+
   test("#given valid lesson evidence #when recorded #then one scoped artifact is written and identified", async () => {
     // given
     const memory = createMemoryFs()

@@ -48,16 +48,45 @@ describe("unpolled shell job tracker", () => {
     expect(getOutstandingJobs(SESSION)).toHaveLength(0)
   })
 
-  it("clears a job once a status poll reports it completed", () => {
+  it.each([
+    ["bracketed completed status with an exit clause", "[background:shell_24ed9238e5ae5551 completed, exit 0]"],
+    ["bracketed failed status with an exit clause", "[background:shell_24ed9238e5ae5551 failed, exit 1]"],
+    ["bracketed completed status", "[background:shell_24ed9238e5ae5551 completed]"],
+    ["line-based completed status", "status: completed\nexit code: 0\n"],
+  ])("clears a job for %s", (_label, output) => {
     recordToolCall(detachedStart("shell_24ed9238e5ae5551"))
     recordToolCall({
       sessionID: SESSION,
       tool: "lean-ctx_ctx_shell",
       args: { background_action: "status", job_id: "shell_24ed9238e5ae5551" },
-      output: 'status: completed\nexit code: 0\n',
+      output,
     })
 
     expect(getOutstandingJobs(SESSION)).toHaveLength(0)
+  })
+
+  it("keeps a job outstanding for a bracketed running status", () => {
+    recordToolCall(detachedStart("shell_24ed9238e5ae5551"))
+    recordToolCall({
+      sessionID: SESSION,
+      tool: "lean-ctx_ctx_shell",
+      args: { background_action: "status", job_id: "shell_24ed9238e5ae5551" },
+      output: "[background:shell_24ed9238e5ae5551 running]",
+    })
+
+    expect(getOutstandingJobs(SESSION)).toHaveLength(1)
+  })
+
+  it("does not treat arbitrary bracketed prose before an exit clause as terminal", () => {
+    recordToolCall(detachedStart("shell_24ed9238e5ae5551"))
+    recordToolCall({
+      sessionID: SESSION,
+      tool: "lean-ctx_ctx_shell",
+      args: { background_action: "status", job_id: "shell_24ed9238e5ae5551" },
+      output: "[background:shell_24ed9238e5ae5551 arbitrary prose completed, exit 0]",
+    })
+
+    expect(getOutstandingJobs(SESSION)).toHaveLength(1)
   })
 
   it.each([
@@ -72,6 +101,27 @@ describe("unpolled shell job tracker", () => {
       sessionID: SESSION,
       tool: "lean-ctx_ctx_shell",
       args: { background_action: "status", job_id: "shell_3d5ba29a2ac4b779" },
+      output,
+    })
+
+    expect(getOutstandingJobs(SESSION)).toHaveLength(1)
+  })
+
+  // The `^` alternative in STATUS_FIELD_PATTERN anchors at the start of ANY line under the
+  // `m` flag. A bare `,` terminator therefore let a log-tail line parse as the status field
+  // and retire a job that was still running, which is the fail-open TERMINAL_STATUSES warns
+  // about. The terminator requires the `exit` clause so these stay unparseable.
+  it.each([
+    ["a terminal word plus comma opening the body", "failed, 3 tests\nstatus: running"],
+    ["a completed clause before the status header", "completed, moving to next module\nstatus: running"],
+    ["an exited clause before the status header", "exited, restarting worker\nstatus: running"],
+    ["a cancelled clause before the status header", "cancelled, retrying with backoff\nstatus: running"],
+  ])("keeps a running job outstanding despite %s", (_label, output) => {
+    recordToolCall(detachedStart("shell_1122334455667788"))
+    recordToolCall({
+      sessionID: SESSION,
+      tool: "lean-ctx_ctx_shell",
+      args: { background_action: "status", job_id: "shell_1122334455667788" },
       output,
     })
 

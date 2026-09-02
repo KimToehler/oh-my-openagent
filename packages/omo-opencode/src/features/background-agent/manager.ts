@@ -2744,6 +2744,19 @@ The task was re-queued on a fallback model after a retryable failure.
   ): Promise<boolean> {
     const task = this.tasks.get(taskId)
     if (!task || (task.status !== "running" && task.status !== "pending") || this.completingTaskIds.has(task.id)) {
+      // A parked task is ALREADY terminal: report_blocked parks by calling cancelTask, which
+      // sets status "cancelled" while deliberately keeping blockedAt. So the cancel that is
+      // meant to retire a parked task lands here, not on the main path, and skipping the
+      // cleanup leaves the escalation armed on a task nobody can resume. Disarm it here too.
+      //
+      // Two exclusions. `report_blocked` is the park itself and must keep its own timers.
+      // `completingTaskIds` means another cancellation is mid-flight for this task, possibly
+      // that very park, so clearing now would disarm timers it is still arming.
+      if (task && (options?.source ?? "cancel") !== "report_blocked" && !this.completingTaskIds.has(task.id)) {
+        this.blockedEscalation.cancel(taskId)
+        task.blockedAt = undefined
+        task.blockedReason = undefined
+      }
       this.blockedNotificationTaskIds.delete(taskId)
       return false
     }
@@ -2793,6 +2806,19 @@ The task was re-queued on a fallback model after a retryable failure.
         task.error = reason
       }
     }
+    // A park is implemented AS a cancellation (report_blocked calls cancelTask with
+    // source "report_blocked" after setting blockedAt and arming escalation), so the
+    // blocked state and its timers must survive that path. Every OTHER cancellation
+    // is terminal for a blocked task: leaving blockedAt set there keeps the reminder
+    // armed, and notifyBlockedReminder gates only on blockedAt, so a cancelled child
+    // would keep urging the parent to resume it.
+    if (source !== "report_blocked") {
+      this.blockedEscalation.cancel(taskId)
+      task.blockedAt = undefined
+      task.blockedReason = undefined
+      this.blockedNotificationTaskIds.delete(taskId)
+    }
+
     if (wasRunning && task.rootSessionId) {
       this.unregisterRootDescendant(task.rootSessionId)
     }

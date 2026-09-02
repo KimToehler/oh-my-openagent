@@ -1,0 +1,23 @@
+REAL_DB_BEFORE=3526
+PARENT_SESSION=ses_f9e10144effeyzFxCsj0aoEFpb
+observed: blocked wake at +10s
+observed: parent dismissed the child at +10s
+REWAKE_MS=60000
+EXPIRY_MS=120000
+PARENT_SESSION=ses_f9e10144effeyzFxCsj0aoEFpb
+CHILD_SESSION=ses_f9e100ddeffeq7DANKQlG3PgFE
+MODE=dismiss
+BLOCKED_AT_S=10
+DISMISSED_AT_S=10
+REMINDER_AT_S=none
+EXPIRY_AT_S=none
+REMINDER_COUNT=0
+REAL_DB_BEFORE=3526
+REAL_DB_AFTER=3527
+REAL_DB_COUNT_NOTE=count may move if the operator uses opencode during the run; identity check below is authoritative
+PARENT_IN_REAL_DB=0
+CHILD_IN_REAL_DB=0
+OPENCODE_VERSION=1.18.20
+
+ESCALATION PROBE PASS
+/Users/tim/git/oh-my-openagent/.agents/skills/opencode-qa/scripts/lib/common.sh: line 151: 81074 Terminated: 15          MOCK_PORT="$MOCK_PORT_N" MOCK_SCRIPT_FILE="$SCRIPT_FILE" MOCK_LOG="$MOCK_LOG_FILE" node "$SCRIPT_DIR/lib/mock-model.mjs" > "$SANDBOX/mock.out" 2>&1  (wd: /Users/tim/git/oh-my-openagent)
