@@ -2705,6 +2705,26 @@ Two things this adds to the entry above:
 
 **Fix status:** unfixed (reproduced 3×, now including a cleanly-completed session)
 
+**Update (2026-09-02, fourth and fifth observations — reproduces on the `plan` agent, and twice in one session):** Observed twice more in the `onara` repo, both times resuming a **`plan` (Prometheus)** session that had completed normally (`reason: session-idle-event`, result collected and spliced to disk). Both resumes were for follow-up revisions to the same work plan. Both were adopted as `Agent: continue`, `Status: interrupt`, and died with the documented error. This extends the affected set beyond `momus`/reviewer lanes to the planning agent, which is the one most likely to be resumed — a long plan is precisely the session you least want to re-brief from scratch.
+
+```
+task(task_id="ses_fa1ea5361ffeuHK00K4nB0Kdo8", ...)   # plan, completed normally
+  -> Background Task ID: bg_78617aea   Agent: continue  Status: interrupt
+  -> [INTERRUPT] Agent "continue" not found.
+
+task(task_id="ses_f9f237b5effdpcMP56NPVqxzgz", ...)   # plan, completed normally
+  -> Background Task ID: bg_0996e645   Agent: continue  Status: interrupt
+  -> [INTERRUPT] Agent "continue" not found.
+```
+
+Three things these add:
+
+1. **The `Agent:` detection rule from the previous update HELD in both cases** — `Agent: continue` was visible immediately at the call site, before any status change. It is the reliable tell; recommend keeping it as the standard pre-wait check on every resume.
+2. **`background_cancel` still cannot clean up the corpse, confirming the previous update.** `background_cancel(taskId="bg_0996e645")` → `Cannot cancel task: current status is "interrupt". Only running or pending tasks can be cancelled.` The dead task then fires `[ALL BACKGROUND TASKS FINISHED - 1 FAILED]` with `**ACTION REQUIRED:**`, which arrives *after* the orchestrator has already respawned and routed around it — so the notification describes a resolved problem as if it needed a decision. Costs a turn to re-read and dismiss, every time.
+3. **The respawn workaround is cheap when plan state is on disk.** Both times, recovery was to spawn a FRESH `plan` agent whose brief said "read the plan from disk in full before doing anything" and restated the binding decisions. The plan file was the durable state; nothing was lost but the conversation. This is a concrete argument for the general habit of writing plan/spec artifacts to disk rather than holding them in a session — the artifact survives the harness defect.
+
+**Fix status:** unfixed (reproduced 5×: aborted sessions, a cleanly-completed reviewer session, and twice on a cleanly-completed `plan` session)
+
 ## 2026-08-27 — Blocked reply contract was unpinned and terminal parks expired without a parent-visible wake
 
 **Severity:** costly
