@@ -246,6 +246,56 @@ describe("BlockedEscalation", () => {
     expect(reminders).toBe(1)
   })
 
+  test("#given a task parked by report_blocked #when it is later cancelled #then the reminder stops", async () => {
+    // given
+    // The reported incident. A park leaves status "cancelled" with blockedAt set, so the
+    // retiring cancel hits cancelTask's early return, NOT its main path. createTask already
+    // produces that parked shape; forcing status to "running" first (as an earlier version
+    // of this test did) constructs a state the park path never produces and passes against
+    // a live defect.
+    jest.useFakeTimers()
+    const manager = createManager({ promptAsync: async () => ({}), abort: async () => ({}) })
+    let reminders = 0
+    Reflect.set(manager, "notifyBlockedReminder", async () => { reminders += 1 })
+    const task = createTask("parked-then-cancelled")
+    addTask(manager, task)
+    await manager.notifyBlockedTask(task.id)
+    expect(task.status).toBe("cancelled")
+    expect(task.blockedAt).toBeDefined()
+
+    // when
+    await manager.cancelTask(task.id, { source: "background_cancel", abortSession: false, skipNotification: true })
+    jest.advanceTimersByTime(DEFAULT_BLOCKED_REWAKE_MS)
+    await flushAsyncWork()
+
+    // then
+    expect(task.blockedAt).toBeUndefined()
+    expect(task.blockedReason).toBeUndefined()
+    expect(reminders).toBe(0)
+  })
+
+  test("#given a task parked by report_blocked #when the park itself re-enters cancelTask #then escalation stays armed", async () => {
+    // given
+    // The park calls cancelTask on an already-cancelled task in the recurring-park path.
+    // That re-entry must not disarm the timers the park just armed.
+    jest.useFakeTimers()
+    const manager = createManager({ promptAsync: async () => ({}), abort: async () => ({}) })
+    let reminders = 0
+    Reflect.set(manager, "notifyBlockedReminder", async () => { reminders += 1 })
+    const task = createTask("parked-reentrant")
+    addTask(manager, task)
+    await manager.notifyBlockedTask(task.id)
+
+    // when
+    await manager.cancelTask(task.id, { source: "report_blocked", abortSession: false, skipNotification: true })
+    jest.advanceTimersByTime(DEFAULT_BLOCKED_REWAKE_MS)
+    await flushAsyncWork()
+
+    // then
+    expect(task.blockedAt).toBeDefined()
+    expect(reminders).toBe(1)
+  })
+
   test("#given a blocked task #when resume is queued or skipped #then escalation remains armed", async () => {
     // given
     jest.useFakeTimers()

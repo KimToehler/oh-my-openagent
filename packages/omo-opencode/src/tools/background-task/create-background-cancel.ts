@@ -80,9 +80,21 @@ ${resumeSection}`
           return `[ERROR] Task not found: ${taskId}`
         }
 
+        // A parked task is terminal ("cancelled") yet still carries blockedAt, so it keeps
+        // urging the parent to resume it. Refusing here left no way to retire one. Route it
+        // through cancelTask, whose early-return branch disarms the escalation, and report
+        // the dismissal rather than a status error.
         if (task.status !== "running" && task.status !== "pending") {
-          return `[ERROR] Cannot cancel task: current status is "${task.status}".
+          if (task.blockedAt === undefined) {
+            return `[ERROR] Cannot cancel task: current status is "${task.status}".
 Only running or pending tasks can be cancelled.`
+          }
+          await manager.cancelTask(task.id, {
+            source: "background_cancel",
+            abortSession: false,
+            skipNotification: true,
+          })
+          return `Dismissed blocked task ${task.id} (status "${task.status}"). It will no longer ask the parent to resume it.`
         }
 
         const cancelled = await manager.cancelTask(task.id, {
