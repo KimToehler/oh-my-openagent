@@ -262,6 +262,56 @@ describe("unpolled shell job tracker", () => {
     expect(getOutstandingJobs(SESSION)).toHaveLength(0)
   })
 
+  // The `notfound` entry in TERMINAL_STATUSES only ever matched the wording
+  // `[background:<id> not found]`, which lean-ctx does not emit. The replies it actually
+  // sends carry a trailing clause, so the parsed status field came back as
+  // `not found or expired` (normalising to `notfoundorexpired`, not in the set) or, for the
+  // em-dash wording, failed to parse at all because `\u2014` is outside `[a-z _-]`. Either way a
+  // `status` poll never deregistered a reaped job and the warning re-fired forever.
+  it.each([
+    ["a trailing or-expired clause", "[background:shell_99aabbccddeeff00 not found or expired]"],
+    ["an em-dash explanatory clause", "[background:shell_99aabbccddeeff00 not found \u2014 already finished or cancelled]"],
+    ["the bare not-found wording", "[background:shell_99aabbccddeeff00 not found]"],
+  ])("clears a job when a status poll reports %s", (_label, output) => {
+    recordToolCall(detachedStart("shell_99aabbccddeeff00"))
+    recordToolCall({
+      sessionID: SESSION,
+      tool: "lean-ctx_ctx_shell",
+      args: { background_action: "status", job_id: "shell_99aabbccddeeff00" },
+      output,
+    })
+
+    expect(getOutstandingJobs(SESSION)).toHaveLength(0)
+  })
+
+  // The not-found reply is matched against the POLLED job id, not merely against a
+  // bracketed shape. A long-running job's log tail can quote another job's not-found
+  // reply verbatim — an agent cleaning up several jobs produces exactly that text — and a
+  // job-agnostic matcher would retire the still-running job that was only reporting it.
+  it("does not clear a running job whose log tail quotes another job's not-found reply", () => {
+    recordToolCall(detachedStart("shell_1122334455667788"))
+    recordToolCall({
+      sessionID: SESSION,
+      tool: "lean-ctx_ctx_shell",
+      args: { background_action: "status", job_id: "shell_1122334455667788" },
+      output: "status: running\n[background:shell_99aabbccddeeff00 not found or expired]",
+    })
+
+    expect(getOutstandingJobs(SESSION)).toHaveLength(1)
+  })
+
+  it("does not clear a running job whose log tail mentions a file not found", () => {
+    recordToolCall(detachedStart("shell_1122334455667788"))
+    recordToolCall({
+      sessionID: SESSION,
+      tool: "lean-ctx_ctx_shell",
+      args: { background_action: "status", job_id: "shell_1122334455667788" },
+      output: "status: running\nsrc/main.ts: module not found",
+    })
+
+    expect(getOutstandingJobs(SESSION)).toHaveLength(1)
+  })
+
   it("ignores an unrecognised background_action rather than adopting its job id", () => {
     recordToolCall({
       sessionID: SESSION,

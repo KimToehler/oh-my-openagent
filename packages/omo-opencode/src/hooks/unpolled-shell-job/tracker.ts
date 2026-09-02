@@ -31,7 +31,6 @@ const TERMINAL_STATUSES = new Set([
   "canceled",
   "timedout",
   "exited",
-  "notfound",
 ])
 
 /**
@@ -53,6 +52,30 @@ const RUNNING_STATUSES = new Set(["running", "started", "active", "inprogress", 
  * while leaving arbitrary comma-bearing prose unparseable, and therefore still running.
  */
 const STATUS_FIELD_PATTERN = /(?:^|\[background:\s*\S+\s+|\bstatus:\s*)([a-z][a-z _-]*?)(?:,\s*exit\b|\]|$|\n)/im
+
+/**
+ * A reaped id draws `[background:<id> not found ...]`, which is terminal: the job is gone,
+ * so no further poll can ever resolve it and leaving it tracked warns forever.
+ *
+ * This cannot be a TERMINAL_STATUSES entry. Those are matched against the parsed status
+ * field, and every wording lean-ctx actually emits carries a trailing clause that the field
+ * parser either mangles or drops entirely:
+ *
+ *   `[background:shell_x not found or expired]`            → `notfoundorexpired`, not in the set
+ *   `[background:shell_x not found — already finished ...]` → unparseable, `—` is outside `[a-z _-]`
+ *
+ * so the `notfound` entry only ever matched a bare `[background:<id> not found]` wording.
+ * Widening the field parser to reach the clause is not the fix — it reopens the log-tail
+ * fail-open documented on TERMINAL_STATUSES. Instead this matches the not-found reply
+ * directly, anchored to the id that was polled.
+ *
+ * Anchoring to the polled id is load-bearing, not decoration. A running job's log tail can
+ * quote another job's not-found reply verbatim (an agent reaping several jobs prints exactly
+ * that), and a job-agnostic matcher would retire the still-running job that merely reported
+ * it. Requiring the bracket to name the polled id keeps the unparseable-means-running
+ * default intact for every other wording.
+ */
+const NOT_FOUND_REPLY_PATTERN = /\[background:\s*(\S+?)\s+not\s+found\b/i
 
 /**
  * Jobs older than this are dropped on the next write.
@@ -120,6 +143,11 @@ function isTerminalStatus(output: string | undefined): boolean {
   return TERMINAL_STATUSES.has(status.trim().replace(/[ _-]/g, "").toLowerCase())
 }
 
+function isNotFoundReply(output: string | undefined, jobId: string): boolean {
+  const named = NOT_FOUND_REPLY_PATTERN.exec(output ?? "")?.[1]
+  return named !== undefined && named === jobId
+}
+
 function isRunningStatus(output: string | undefined): boolean {
   const status = STATUS_FIELD_PATTERN.exec(output ?? "")?.[1]
   if (status === undefined) return false
@@ -175,9 +203,10 @@ export function recordToolCall({ sessionID, tool, args, output }: ObservedToolCa
     const polledJobId = asString(args?.job_id)
     if (polledJobId === undefined) return
     // A cancel always retires the job; a status only retires it once the parsed status
-    // field reports terminal. An unparseable status is treated as still running, so an
-    // unrecognised wording leaves the guard armed rather than silently disarming it.
-    if (backgroundAction === "cancel" || isTerminalStatus(output)) {
+    // field reports terminal, or the reply says this exact id is gone. An unparseable
+    // status is treated as still running, so an unrecognised wording leaves the guard
+    // armed rather than silently disarming it.
+    if (backgroundAction === "cancel" || isTerminalStatus(output) || isNotFoundReply(output, polledJobId)) {
       clearJob(sessionID, polledJobId)
       return
     }

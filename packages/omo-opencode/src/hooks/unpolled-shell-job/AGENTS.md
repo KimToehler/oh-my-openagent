@@ -46,6 +46,16 @@ and was still violated three times in one session. Facts stated as reference get
     contains `FAILED` / `completed`, and scanning the whole output for those words retired
     the job on its first poll — silently disarming the guard for exactly the long, noisy
     builds it exists for. An unparseable status is treated as **still running** (fail-safe).
+  - A `status` reply of `[background:<id> not found ...]` also clears the job, matched
+    separately from the status field and anchored to the id that was polled. A reaped id can
+    never resolve, so leaving it tracked warns forever. This cannot live in
+    `TERMINAL_STATUSES`: every wording lean-ctx actually emits carries a trailing clause, so
+    the field parser yields `notfoundorexpired` (not in the set) or, for the em-dash variant
+    `not found — already finished or cancelled`, nothing at all — `—` is outside `[a-z _-]`.
+    The `notfound` entry therefore only ever matched a bare wording that is not sent.
+    Widening the field parser to reach the clause is **not** the fix; that reopens the
+    log-tail fail-open above. Anchoring to the polled id is also load-bearing: a running
+    job's log tail can quote another job's not-found reply verbatim.
   - A call with `background_action: "cancel"` always clears it.
   - A `status` poll naming an unknown job adopts it, so a reworded start message degrades
     to still-guarded rather than untracked — but **only when the parsed status positively
@@ -53,7 +63,8 @@ and was still violated three times in one session. Facts stated as reference get
     an unreadable payload into a permanent phantom that every cleanup poll re-creates, which
     is exactly what the MCP payload bug above produced. Retired ids are remembered and
     refused, so a late "job not found" reply cannot resurrect a reaped job into an endless
-    warning.
+    warning. Adoption is gated on a positive running status, so a not-found reply for an id
+    that was never tracked is ignored rather than adopted.
   - Entries are pruned by TTL (2h) and capped per session, because `session.deleted` is
     **not** guaranteed — `client.session.abort()` does not reliably emit it, and aborted
     subagents are the heaviest users of detached shells.
