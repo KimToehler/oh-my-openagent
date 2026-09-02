@@ -3274,6 +3274,17 @@ So a job cleared through `status` never deregisters, and the warning re-fires fo
 Deliberately NOT fixed in the same batch: the `7788a7d9a` change is already committed and its evidence recorded, and the branch is going into review. Bundling a second regex change into a reviewed branch after the fact is how the first `cancelTask` attempt went wrong. Contained fix for a follow-up: match a `not found` prefix rather than requiring exact-token equality, add both literal reply strings as fixtures, and correct the warning text.
 
 **Severity:** `costly`. It is the same wrong-result class as the exit-clause half - a finished job reads as outstanding - and it burns a turn every time it recurs.
+
+**Update (2026-09-02, fixed):** fixed on branch `fix/tracker-notfound`. The contained fix proposed above turned out to be the wrong shape, and observing the defect fire again in the session that fixed it is what showed why.
+
+Matching a `not found` prefix inside the status FIELD would have required widening `STATUS_FIELD_PATTERN` to reach past the trailing clause, and that reopens the log-tail fail-open `7918492a8` had just closed. The not-found reply is therefore matched separately from the status field, by a new `NOT_FOUND_REPLY_PATTERN` = `/\[background:\s*(\S+?)\s+not\s+found\b/i`, and `notfound` is removed from `TERMINAL_STATUSES` where it never matched anything real.
+
+The match is anchored to the id that was actually polled, and that anchor is load-bearing rather than defensive. Three cancels in one turn of the fixing session emitted three `[background:<id> not found ...]` lines into the shared log; a running job whose tail quotes another job's not-found reply would be retired by a job-agnostic matcher. Both hazards are pinned by fixtures: a quoted foreign not-found line and a `module not found` compile error, each alongside `status: running`. Mutation-verified - removing the matcher turns 3 tests red, dropping the id anchor turns 1 red, dropping the bracket anchor turns 3 red.
+
+The false claim in the warning text is corrected in the same change: option C now says a `status` call clears the job "whether it reports a terminal status or that the id is already gone", which is true of the new code.
+
+**Caveat on the earlier recommendation:** the 2026-09-01 update above suggested swapping options A and B in the warning until the regex was fixed. That was not done and is now moot. Anyone reading this entry as a live workaround should stop at this line.
+
 ## 2026-08-30 — An answered blocked task can still expire, discarding an in-flight lane's uncommitted work
 
 **Severity:** costly
