@@ -8,7 +8,7 @@ import {
   getSessionAgent,
   subagentSessions,
 } from "../claude-code-session-state"
-import { setPromptReservation } from "../../shared/prompt-async-gate/reservations"
+import { setPromptReservation } from "@oh-my-opencode/utils/prompt-async-gate/reservations"
 import { readContinuationMarker } from "../run-continuation-state"
 import { BackgroundManager } from "./manager"
 import type { AdoptRunningSessionInput, BackgroundTask, BackgroundTaskCompletionReason } from "./types"

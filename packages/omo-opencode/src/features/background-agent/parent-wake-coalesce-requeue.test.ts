@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test"
 import { releaseAllPromptAsyncReservationsForTesting } from "../../hooks/shared/prompt-async-gate"
-import { DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS } from "../../shared/prompt-async-gate/timing"
+import { DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS } from "@oh-my-opencode/utils/prompt-async-gate/timing"
 import type { PendingParentWake } from "./parent-wake-dedupe"
 import {
   COALESCE_REQUEUE_FLUSH_DELAY_MS,

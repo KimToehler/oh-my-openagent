@@ -1,5 +1,8 @@
-import { spawn } from "bun"
 import { log } from "../../shared"
+// The runtime shim, never `import { spawn } from "bun"`. A direct Bun import
+// bundles to `globalThis.Bun`, which is undefined under Node and makes the whole
+// dist bundle fail to load. `dist-bundle-bun-globals.test.ts` pins that.
+import { spawn } from "../../shared/bun-spawn-shim"
 
 export type DirtyWorktreeStatus =
   | { readonly kind: "available"; readonly paths: ReadonlySet<string> }
@@ -72,7 +75,7 @@ export async function readDirtyWorktreeStatus(directory: string): Promise<DirtyW
 
     if (result === "timed_out") {
       log("[background-agent] Dirty-worktree read timed out:", { directory })
-      startedChild.kill()
+      startedChild.kill("SIGKILL")
       return UNAVAILABLE
     }
 

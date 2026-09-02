@@ -3,7 +3,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
 import { resolveSessionEventID } from "../../shared/event-session-id"
 import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../shared/prompt-async-gate"
-import type { InternalPromptDispatchResult } from "../../shared/prompt-async-gate/types"
+import type { InternalPromptDispatchResult } from "@oh-my-opencode/utils/prompt-async-gate/types"
 import { shouldPromptAfterSessionIdle } from "../shared/session-idle-settle"
 
 import { buildUnpolledShellJobMessage } from "./message"

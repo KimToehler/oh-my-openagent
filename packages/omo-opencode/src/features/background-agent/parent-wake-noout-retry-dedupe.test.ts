@@ -3,7 +3,7 @@ import { releaseAllPromptAsyncReservationsForTesting } from "../../hooks/shared/
 import {
   DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS,
   DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS,
-} from "../../shared/prompt-async-gate/timing"
+} from "@oh-my-opencode/utils/prompt-async-gate/timing"
 import { ParentWakeNotifier } from "./parent-wake-notifier"
 
 type ParentWakeNotifierClientForTest = ConstructorParameters<typeof ParentWakeNotifier>[0]["client"]

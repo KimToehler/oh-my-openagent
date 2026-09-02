@@ -8,9 +8,11 @@ import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../
 import {
   DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS,
   DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS,
-} from "../../shared/prompt-async-gate/timing"
-import type { InternalPromptDispatchResult } from "../../shared/prompt-async-gate/types"
-import type { PromptDispatchClient } from "@oh-my-opencode/utils/prompt-async-gate/types"
+} from "@oh-my-opencode/utils/prompt-async-gate/timing"
+import type {
+  InternalPromptDispatchResult,
+  PromptDispatchClient,
+} from "@oh-my-opencode/utils/prompt-async-gate/types"
 import { getErrorText } from "./error-classifier"
 import {
   createEmptyAssistantTurnRetryDedupeKey,
