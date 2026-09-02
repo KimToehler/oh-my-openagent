@@ -3305,6 +3305,23 @@ The false claim in the warning text is corrected in the same change: option C no
 
 **Caveat on the earlier recommendation:** the 2026-09-01 update above suggested swapping options A and B in the warning until the regex was fixed. That was not done and is now moot. Anyone reading this entry as a live workaround should stop at this line.
 
+**Update (2026-09-02, correction — the `wait` half was never broken, and I said twice that it was):** while clearing jobs after the fix above, I twice told the user that jobs consumed via `background_action="wait"` cannot be deregistered, calling it a known limit of the hook's inputs. That was wrong, and I asserted it a second time without checking. Executing the tracker against the exact replies my own `wait` calls had returned:
+
+```
+[background:shell_fcd9eaf4eeb588ea completed, exit 0]                 -> outstanding: []
+[background:shell_73d4ec0671b40bf5 wait timed out ... still running]  -> outstanding: [shell_73d4ec0671b40bf5]
+```
+
+Both correct. `recordToolCall` branches on `args.background_action !== undefined`, not on its value, so `"wait"` has always taken the same clearing path as `"status"` (`tracker.ts`, the `backgroundAction !== undefined` block).
+
+**Where the false claim came from:** `tracker.test.ts` has a test named `keeps a job tracked when its result was consumed without a terminal poll`. That test is real and its case IS unobservable - it waits on a marker file and reads it with `ctx_read`, so no `ctx_shell` call ever reaches the tracker. I generalized it from "consumption via a non-ctx_shell tool" to "consumption via wait", which is not analogous: `wait` is a `ctx_shell` call carrying the job id and terminal output.
+
+**Why the warnings fired anyway, and it was not the tracker:** the running opencode process started at 11:23:13; `7788a7d9a`, which taught `STATUS_FIELD_PATTERN` to parse the trailing `, exit N` clause, was committed at 12:30:30 - 67 minutes later. The live session was therefore running a pre-fix bundle in which `[background:<id> completed, exit 0]` parsed to `undefined` and left the job tracked. Reproduced by running the old regex against that literal string. A plugin fix does not reach a session that started before it was built; that is worth checking before concluding a guard is broken.
+
+**Fixed in `88d2cb9b2`:** three tests now pin `wait` (terminal clears, timeout keeps, not-found clears), mutation-verified by restricting the clearing branch to `"status"` only, which turns two of them red. The warning text itself had a real defect exposed by this: it never mentioned `wait` at all, teaching a marker-file loop plus a follow-up `status` call, so an agent paid two calls per job where one would do - and the omission is what made the guard look unfixable here. `wait` is now option A. The AGENTS.md claim that clearing on observed completion is "not implementable from the hook's inputs" is narrowed to the marker-file case it actually covers.
+
+**Lesson, restated because I had already recorded a version of it:** the recorded lesson from the earlier fix in this same session was that a probe never observed red is not evidence. The same discipline applies to a claim about behavior: an assertion never executed is not a finding. I had the tracker source and a one-line test available both times I made the claim.
+
 ## 2026-08-30 — An answered blocked task can still expire, discarding an in-flight lane's uncommitted work
 
 **Severity:** costly
