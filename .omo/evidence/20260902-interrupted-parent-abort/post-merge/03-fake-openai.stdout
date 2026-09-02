@@ -1,0 +1,4 @@
+fake-openai listening on 49349
+[2026-09-02T20:50:56.305Z] branch=restart-parent-midturn call=1
+[2026-09-02T20:50:56.386Z] branch=child-midturn call=2
+[2026-09-02T20:51:04.514Z] FINAL_COUNTS title=0 parent-tool-call=0 parent-hold=0 restart-parent=0 restart-parent-midturn=1 child-midturn=1 midturn-resume=0 restart-resume=0 active-control=0 absent-control=0 child=0 wake=0 default=0

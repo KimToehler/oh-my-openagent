@@ -1,0 +1,4 @@
+MODE=fixed (expect child lane terminalized AND parent left interrupted)
+terminalized=1
+no_wake_after_interrupt=PASS (wakes=0 sessions_created=0)
+VERDICT=PASS
