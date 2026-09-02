@@ -3237,6 +3237,19 @@ So the *hypothetical* clean form parses and the *actual* form does not. `tracker
 **Update (2026-09-02, fixed):** fixed locally in `7788a7d9a` on branch `fix/harness-findings-batch`. One character class at `packages/omo-opencode/src/hooks/unpolled-shell-job/tracker.ts:44`: the capture terminator `(?:\]|$|\n)` became `(?:,|\]|$|\n)`. Verified against strings this QA session itself received from `ctx_shell`, not hand-written fixtures - `[background:shell_de62a206c9573559 completed, exit 0]` and `[background:shell_abc failed, exit 1]` both go from capturing `null` to capturing a terminal status, while `[background:... started]` and `status: completed\nexit code: 0` are unchanged, and `arbitrary prose completed, exit 0` still does not read as terminal. Table: `.omo/evidence/20260902-harness-findings-batch/tracker-regex-real-strings.txt`. Six fixtures added to `tracker.test.ts`, failing-first confirmed.
 
 **Fix status (2026-09-02):** fixed in `7788a7d9a`. Severity `costly` (as re-scored earlier today) retained for the record - the same miss made a `failed, exit 1` job read as still running, which was the more consequential half.
+
+**Update (2026-09-02, second defect, still open):** `7788a7d9a` fixed the exit-clause half and left a second one open in the same function. Found when the `<unpolled-background-shell-jobs>` warning fired TWICE on the same five job ids, after I had already cleared each one with `background_action="status"`.
+
+`TERMINAL_STATUSES` does contain `notfound` (`packages/omo-opencode/src/hooks/unpolled-shell-job/tracker.ts:34`), and `isTerminalStatus` strips spaces, underscores and hyphens before the lookup at `:109`. Neither of the two real clear-attempt replies survives that normalization:
+
+- `[background:shell_x not found or expired]` captures `not found or expired`, normalizes to `notfoundorexpired`, which is not in the set.
+- `[background:shell_x not found — already finished or cancelled]` captures `null` outright, because the em dash is outside the `[a-z _-]` character class.
+
+So a job cleared through `status` never deregisters, and the warning re-fires forever on jobs that are already gone. `cancel` clears reliably because it takes a different path. Note the `opencode-qa`-adjacent guidance in the warning text itself asserts that `status` "clears it on a terminal status or `not found`" - that claim is false against this code, so the docs and the implementation disagree.
+
+Deliberately NOT fixed in the same batch: the `7788a7d9a` change is already committed and its evidence recorded, and the branch is going into review. Bundling a second regex change into a reviewed branch after the fact is how the first `cancelTask` attempt went wrong. Contained fix for a follow-up: match a `not found` prefix rather than requiring exact-token equality, add both literal reply strings as fixtures, and correct the warning text.
+
+**Severity:** `costly`. It is the same wrong-result class as the exit-clause half - a finished job reads as outstanding - and it burns a turn every time it recurs.
 ## 2026-08-30 — An answered blocked task can still expire, discarding an in-flight lane's uncommitted work
 
 **Severity:** costly
