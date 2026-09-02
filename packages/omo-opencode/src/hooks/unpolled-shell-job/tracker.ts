@@ -40,8 +40,19 @@ const TERMINAL_STATUSES = new Set([
  */
 const RUNNING_STATUSES = new Set(["running", "started", "active", "inprogress", "pending"])
 
-/** lean-ctx reports `[background:shell_... running]` or a `status: running` line. */
-const STATUS_FIELD_PATTERN = /(?:^|\[background:\s*\S+\s+|\bstatus:\s*)([a-z][a-z _-]*?)(?:,|\]|$|\n)/im
+/**
+ * lean-ctx reports `[background:shell_... running]`, `[background:shell_... completed, exit 0]`,
+ * or a `status: running` line.
+ *
+ * The comma terminator is deliberately narrowed to `,\s*exit\b` rather than a bare `,`.
+ * The leading `^` alternative anchors at the start of ANY line under the `m` flag, not just
+ * the status line, so a bare comma lets a log-tail line like `failed, 3 tests` parse as the
+ * status field and retire a job that is still running. That is the exact fail-open documented
+ * on TERMINAL_STATUSES above. Requiring the `exit` clause keeps the real terminal wordings
+ * (`completed, exit 0`, `failed, exit 1`, `cancelled, exit 143`, `timed out, exit 124`)
+ * while leaving arbitrary comma-bearing prose unparseable, and therefore still running.
+ */
+const STATUS_FIELD_PATTERN = /(?:^|\[background:\s*\S+\s+|\bstatus:\s*)([a-z][a-z _-]*?)(?:,\s*exit\b|\]|$|\n)/im
 
 /**
  * Jobs older than this are dropped on the next write.
