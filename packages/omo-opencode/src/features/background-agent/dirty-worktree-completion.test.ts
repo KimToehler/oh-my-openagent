@@ -1,5 +1,6 @@
+import { spawn } from "bun"
 import { describe, test, expect } from "bun:test"
-import { mkdtemp } from "node:fs/promises"
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import {
@@ -136,6 +137,120 @@ describe("buildBackgroundTaskNotificationText - lane that completed over a dirty
       status: "completed",
       sessionId: "session-clean",
       completionReason: "idle-status",
+      uncommittedFileCount: 0,
+    }
+
+    //#when
+    const rendered = renderCompletion(task)
+
+    //#then
+    expect(rendered).not.toContain("uncommitted")
+  })
+})
+
+describe("readDirtyWorktreeStatus against a real repository", () => {
+  test("#given a lane that created a new directory of five files #when the worktree status is read #then every file is counted, not the collapsed directory entry", async () => {
+    //#given
+    const repo = await mkdtemp(join(tmpdir(), "omo-dirty-untracked-"))
+    const run = async (...args: string[]): Promise<void> => {
+      const child = spawn(["git", "-C", repo, ...args], { stdout: "ignore", stderr: "ignore" })
+      await child.exited
+    }
+    await run("init", "-q", ".")
+    await run("config", "user.email", "qa@example.com")
+    await run("config", "user.name", "qa")
+    await mkdir(join(repo, "brandnew"), { recursive: true })
+    for (const name of ["f1.ts", "f2.ts", "f3.ts", "f4.ts", "f5.ts"]) {
+      await writeFile(join(repo, "brandnew", name), "export const x = 1\n")
+    }
+
+    //#when
+    const status = await readDirtyWorktreeStatus(repo)
+
+    //#then
+    // Plain `--porcelain` collapses this to a single `?? brandnew/` entry, which
+    // would report one dirtied file instead of five.
+    if (status.kind !== "available") throw new Error("expected an available status")
+    expect(status.paths.size).toBe(5)
+    expect(status.paths.has("brandnew/f3.ts")).toBe(true)
+
+    await rm(repo, { recursive: true, force: true })
+  })
+
+  test("#given a lane that added files into a directory already untracked at baseline #when the delta is counted #then the newly added files are still surfaced", async () => {
+    //#given
+    const repo = await mkdtemp(join(tmpdir(), "omo-dirty-baseline-"))
+    const run = async (...args: string[]): Promise<void> => {
+      const child = spawn(["git", "-C", repo, ...args], { stdout: "ignore", stderr: "ignore" })
+      await child.exited
+    }
+    await run("init", "-q", ".")
+    await mkdir(join(repo, "scratch"), { recursive: true })
+    await writeFile(join(repo, "scratch", "pre-existing.ts"), "export const a = 1\n")
+    const baseline = await readDirtyWorktreeStatus(repo)
+
+    //#when
+    await writeFile(join(repo, "scratch", "lane-wrote-this.ts"), "export const b = 2\n")
+    const completion = await readDirtyWorktreeStatus(repo)
+
+    //#then
+    // Under directory collapse both reads would be the single entry `scratch/`,
+    // the delta would be zero, and the lane would report nothing at all.
+    if (baseline.kind !== "available" || completion.kind !== "available") {
+      throw new Error("expected available statuses")
+    }
+    expect(countNewDirtyPaths(baseline.paths, completion.paths)).toBe(1)
+
+    await rm(repo, { recursive: true, force: true })
+  })
+})
+
+describe("uncommitted-work reporting on non-completed lanes", () => {
+  test("#given a lane that was cancelled while holding uncommitted work #when its summary line is rendered #then the stranded file count is stated", () => {
+    //#given
+    const task: BackgroundTaskNotificationTask = {
+      id: "task-interrupted",
+      description: "migrate the parser",
+      status: "cancelled",
+      sessionId: "session-interrupted",
+      error: "Parent session was interrupted",
+      uncommittedFileCount: 3,
+    }
+
+    //#when
+    const rendered = renderCompletion(task)
+
+    //#then
+    // The interrupted lane is the likeliest to have stranded work, and was
+    // previously the only status that reported none.
+    expect(rendered).toContain("left 3 uncommitted files")
+  })
+
+  test("#given a cancelled lane that left exactly one file #when its summary line is rendered #then the count is singular", () => {
+    //#given
+    const task: BackgroundTaskNotificationTask = {
+      id: "task-one-file",
+      description: "tweak a config",
+      status: "cancelled",
+      sessionId: "session-one-file",
+      uncommittedFileCount: 1,
+    }
+
+    //#when
+    const rendered = renderCompletion(task)
+
+    //#then
+    expect(rendered).toContain("left 1 uncommitted file")
+    expect(rendered).not.toContain("uncommitted files")
+  })
+
+  test("#given a cancelled lane that left a clean tree #when its summary line is rendered #then no uncommitted annotation appears", () => {
+    //#given
+    const task: BackgroundTaskNotificationTask = {
+      id: "task-cancelled-clean",
+      description: "read some files",
+      status: "cancelled",
+      sessionId: "session-cancelled-clean",
       uncommittedFileCount: 0,
     }
 

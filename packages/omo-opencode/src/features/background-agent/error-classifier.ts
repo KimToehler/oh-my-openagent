@@ -6,6 +6,29 @@ export function isAbortedSessionError(error: unknown): boolean {
   return message.toLowerCase().includes("aborted")
 }
 
+/**
+ * Error names OpenCode emits when a turn ends because the USER interrupted it.
+ * Verified on the wire during the 2026-09-02 interrupted-parent probe, which
+ * captured `{"name":"MessageAbortedError","data":{"message":"Aborted"}}`.
+ */
+const USER_INTERRUPT_ERROR_NAMES: ReadonlySet<string> = new Set([
+  "MessageAbortedError",
+  "AbortError",
+])
+
+/**
+ * Narrow counterpart to `isAbortedSessionError`, for callers whose action is
+ * DESTRUCTIVE. The loose predicate is a substring test over provider-supplied
+ * prose, so `"connection aborted"` from a transport satisfies it. That is
+ * tolerable when the consequence is a log line or a single task's fallback; it
+ * is not tolerable when the consequence is cancelling a whole subtree of lanes.
+ * Match the structured error name instead of its wording.
+ */
+export function isUserInterruptSessionError(error: unknown): boolean {
+  const name = extractErrorName(error)
+  return name !== undefined && USER_INTERRUPT_ERROR_NAMES.has(name)
+}
+
 export function getErrorText(error: unknown): string {
   if (!error) return ""
   if (typeof error === "string") return error

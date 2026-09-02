@@ -1,4 +1,5 @@
 import { spawn } from "bun"
+import { log } from "../../shared"
 
 export type DirtyWorktreeStatus =
   | { readonly kind: "available"; readonly paths: ReadonlySet<string> }
@@ -37,18 +38,57 @@ export function countNewDirtyPaths(
   return count > 0 ? count : undefined
 }
 
-export async function readDirtyWorktreeStatus(directory: string): Promise<DirtyWorktreeStatus> {
-  try {
-    const process = spawn(["git", "-C", directory, "status", "--porcelain", "-z"], {
-      stdout: "pipe",
-      stderr: "ignore",
-    })
-    const [exitCode, output] = await Promise.all([process.exited, new Response(process.stdout).text()])
+const UNAVAILABLE: DirtyWorktreeStatus = { kind: "unavailable" }
 
-    if (exitCode !== 0) return { kind: "unavailable" }
-    return { kind: "available", paths: parsePorcelainPaths(output) }
+/** A dirty-tree read is cosmetic, so it must never outlive a lane's completion. */
+const READ_TIMEOUT_MS = 5_000
+
+/**
+ * `--untracked-files=all` is load-bearing, not a preference. Plain `--porcelain`
+ * collapses a new directory to one `?? dir/` entry, so a lane that created five
+ * files reports one, and a lane that added files to a directory already
+ * untracked at baseline reports zero. That is silence in exactly the case this
+ * annotation exists to surface. Matches `packages/memory-core/src/git/repo.ts`.
+ */
+export async function readDirtyWorktreeStatus(directory: string): Promise<DirtyWorktreeStatus> {
+  let timeoutHandle: ReturnType<typeof setTimeout> | undefined
+
+  try {
+    const startedChild = spawn(
+      ["git", "-C", directory, "status", "--porcelain", "-z", "--untracked-files=all"],
+      { stdout: "pipe", stderr: "ignore" },
+    )
+
+    const read = Promise.all([
+      startedChild.exited,
+      new Response(startedChild.stdout).text(),
+    ]).then(([exitCode, output]) => ({ exitCode, output }) as const)
+
+    const timedOut = new Promise<"timed_out">((resolve) => {
+      timeoutHandle = setTimeout(() => resolve("timed_out"), READ_TIMEOUT_MS)
+    })
+
+    const result = await Promise.race([read, timedOut])
+
+    if (result === "timed_out") {
+      log("[background-agent] Dirty-worktree read timed out:", { directory })
+      startedChild.kill()
+      return UNAVAILABLE
+    }
+
+    if (result.exitCode !== 0) {
+      log("[background-agent] Dirty-worktree read failed:", {
+        directory,
+        exitCode: result.exitCode,
+      })
+      return UNAVAILABLE
+    }
+
+    return { kind: "available", paths: parsePorcelainPaths(result.output) }
   } catch (error) {
-    if (error instanceof Error) return { kind: "unavailable" }
-    throw error
+    log("[background-agent] Dirty-worktree read threw:", { directory, error })
+    return UNAVAILABLE
+  } finally {
+    if (timeoutHandle !== undefined) clearTimeout(timeoutHandle)
   }
 }
