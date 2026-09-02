@@ -116,6 +116,12 @@ export interface BackgroundTask {
   todoGateFirstObservedAt?: Date
   /** Todos left non-terminal when the gate grace expired; surfaced in the completion notification. */
   unfinishedTodoCount?: number
+  /** Dirty paths that appeared after this task launched; surfaced in the completion notification. */
+  uncommittedFileCount?: number
+  /** Baseline dirty worktree paths captured at the child session launch boundary. */
+  dirtyWorktreeBaseline?: Set<string>
+  /** Child session directory used for baseline and completion status reads. */
+  dirtyWorktreeDirectory?: string
   /** Path that completed the task, surfaced in the completion notification. */
   completionReason?: BackgroundTaskCompletionReason
 }

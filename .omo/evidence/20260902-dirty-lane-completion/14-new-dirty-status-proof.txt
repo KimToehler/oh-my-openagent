@@ -1,0 +1,1 @@
+Binary file /Users/tim/git/oh-my-openagent/.worktrees/bg-lane-fixes/.omo/evidence/20260902-dirty-lane-completion/11-git-status-after-new-dirty.z matches

@@ -1,0 +1,6 @@
+data: {"id":"evt_062d8a232001HJlpWlE9FuWsB0","type":"server.connected","properties":{}}
+
+data: {"id":"evt_062d8a2350019BCMkC04RwywAg","type":"session.created","properties":{"sessionID":"ses_f9d275dcbffeFM8mZ2LWXTnGBC","info":{"id":"ses_f9d275dcbffeFM8mZ2LWXTnGBC","slug":"shiny-moon","version":"1.18.20","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.B5EzBiVdEL/proj","path":"","title":"dirty-lane-parent","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788364759605,"updated":1788364759605}}}}
+
+data: {"id":"evt_062d8a239001biKjRfao9qM6Li","type":"tui.toast.show","properties":{"title":"Configuration migration failed","message":"Migration validation failed for /private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.B5EzBiVdEL/home/.omo/omo.jsonc: : Unrecognized key: \"background_task\" ../../../../../../../../var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.B5EzBiVdEL/home/.omo/omo.jsonc: Invalid omo config at /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.B5EzBiVdEL/home/.omo/omo.jsonc: ","variant":"error","duration":5000}}
+

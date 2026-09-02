@@ -71,6 +71,11 @@ import {
 } from "./constants"
 import { formatDuration } from "./duration-formatter"
 import {
+  countNewDirtyPaths,
+  readDirtyWorktreeStatus,
+  type DirtyWorktreeStatusReader,
+} from "./dirty-worktree"
+import {
   extractErrorMessage,
   extractErrorName,
   extractErrorStatusCode,
@@ -250,6 +255,7 @@ export interface BackgroundManagerConfig {
   onSubagentSessionDeleted?: OnSubagentSessionDeleted
   onShutdown?: () => void | Promise<void>
   enableParentSessionNotifications?: boolean
+  dirtyWorktreeStatusReader?: DirtyWorktreeStatusReader
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   log?: typeof log
 }
@@ -291,6 +297,7 @@ export class BackgroundManager {
   private rootDescendantCounts: Map<string, number>
   private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
+  private readonly dirtyWorktreeStatusReader: DirtyWorktreeStatusReader
   private modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   private logger: typeof log
   private loggedSessionStatusUnavailable = false
@@ -328,6 +335,7 @@ export class BackgroundManager {
     this.rootDescendantCounts = new Map()
     this.preStartDescendantReservations = new Set()
     this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
+    this.dirtyWorktreeStatusReader = options?.dirtyWorktreeStatusReader ?? readDirtyWorktreeStatus
     this.modelFallbackControllerAccessor = options?.modelFallbackControllerAccessor
     this.logger = options?.log ?? log
     this.parentWakeNotifier = new ParentWakeNotifier(
@@ -868,6 +876,11 @@ export class BackgroundManager {
     })
     const parentDirectory = parentSession?.data?.directory ?? this.directory
     log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
+    const dirtyWorktreeStatus = await this.dirtyWorktreeStatusReader(parentDirectory)
+    if (dirtyWorktreeStatus.kind === "available") {
+      task.dirtyWorktreeBaseline = new Set(dirtyWorktreeStatus.paths)
+      task.dirtyWorktreeDirectory = parentDirectory
+    }
 
     const createResult = await this.client.session.create({
       body: {
@@ -2987,6 +3000,15 @@ The task was re-queued on a fallback model after a retryable failure.
     return Array.from(this.tasks.values()).filter(t => t.status !== "running")
   }
 
+  private async annotateNewDirtyWorktreePaths(task: BackgroundTask): Promise<void> {
+    if (!task.dirtyWorktreeBaseline || !task.dirtyWorktreeDirectory) return
+
+    const completionStatus = await this.dirtyWorktreeStatusReader(task.dirtyWorktreeDirectory)
+    if (completionStatus.kind === "available") {
+      task.uncommittedFileCount = countNewDirtyPaths(task.dirtyWorktreeBaseline, completionStatus.paths)
+    }
+  }
+
   /**
    * Safely complete a task with race condition protection.
    * Returns true if task was successfully completed, false if already completed by another path.
@@ -3038,6 +3060,7 @@ The task was re-queued on a fallback model after a retryable failure.
       }
 
       task.completionReason = reason
+      await this.annotateNewDirtyWorktreePaths(task)
       this.markForNotification(task)
 
       const idleTimer = this.idleDeferralTimers.get(task.id)
@@ -3116,6 +3139,7 @@ The task was re-queued on a fallback model after a retryable failure.
       attempts: cloneAttempts(task),
       sessionId: task.sessionId,
       unfinishedTodoCount: task.unfinishedTodoCount,
+      uncommittedFileCount: task.uncommittedFileCount,
       completionReason: task.completionReason,
     })
 
