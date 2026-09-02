@@ -92,6 +92,43 @@ oqa_mk_isolated_xdg() {
   export OPENCODE_DISABLE_MODELS_FETCH=1
 }
 
+# Assert the omo plugin actually LOADED, and do it before trusting any result
+# that depends on an omo hook.
+#
+# Do NOT use `GET /config` for this. It echoes back CONFIGURED plugins, not
+# loaded ones: point a config at a plugin file that does not exist and /config
+# still lists it, the server still starts, and every hook is still absent. The
+# check would pass exactly when it needs to fail. Measured:
+#
+#   registration            /config plugin count    plugin-log ENTRY lines
+#   real dist/index.js      1                       1
+#   nonexistent path        1                       0     <-- /config lies here
+#   unregistered            0                       0
+#
+# The plugin's own startup line is emitted only when the module initializes, so
+# that is the signal. Same one blocked-escalation-probe.sh already relies on.
+#
+# Usage: oqa_assert_plugin_loaded <plugin-log-path> [line-offset-before-run]
+oqa_assert_plugin_loaded() {
+  local plugin_log="$1" offset="${2:-0}" entries
+  if [ ! -f "$plugin_log" ]; then
+    oqa_log "FAIL: no omo plugin log at $plugin_log - the plugin never started."
+    oqa_log "      A sandbox server runs happily with NO omo plugin: sessions are"
+    oqa_log "      created, tools execute, and every hook is silently absent. Any"
+    oqa_log "      'the hook did not fire' result from this run is UNPROVEN."
+    return 1
+  fi
+  entries="$(tail -n "+$((offset + 1))" "$plugin_log" 2>/dev/null | grep -c "ENTRY - plugin loading")"
+  if [ "${entries:-0}" -lt 1 ]; then
+    oqa_log "FAIL: omo plugin never loaded (no 'ENTRY - plugin loading' in $plugin_log)."
+    oqa_log "      Check the registration is at \$XDG_CONFIG_HOME/opencode/ (NOT"
+    oqa_log "      \$HOME/.config/opencode), that dist/index.js exists, and that a"
+    oqa_log "      sibling opencode.jsonc is not overriding the .json."
+    return 1
+  fi
+  oqa_pass "omo plugin loaded ($entries ENTRY line(s))"
+}
+
 # Print a free TCP port on 127.0.0.1.
 oqa_free_port() {
   if command -v python3 >/dev/null 2>&1; then
@@ -250,6 +287,39 @@ oqa__self_check() {
     oqa_pass "isolated HOME preserves HOME-based opencode shim"
   else
     oqa_log "FAIL: HOME-based opencode shim returned '$shim_result'"; fails=$((fails+1))
+  fi
+
+  # The plugin-loaded assertion is only worth having if it goes RED when the
+  # plugin is absent, so exercise both directions against synthetic logs. A
+  # checker that cannot fail is the same silent-pass hazard it exists to catch.
+  local fake_log missing_log
+  fake_log="$(mktemp -t oqa-plugin-log.XXXXXX)"
+  printf '%s\n' "some unrelated line" "ENTRY - plugin loading" "more output" > "$fake_log"
+  if oqa_assert_plugin_loaded "$fake_log" >/dev/null 2>&1; then
+    oqa_pass "oqa_assert_plugin_loaded accepts a log containing the load marker"
+  else
+    oqa_log "FAIL: oqa_assert_plugin_loaded rejected a log with the marker"; fails=$((fails+1))
+  fi
+  printf '%s\n' "server started" "no plugin here" > "$fake_log"
+  if oqa_assert_plugin_loaded "$fake_log" >/dev/null 2>&1; then
+    oqa_log "FAIL: oqa_assert_plugin_loaded passed a log WITHOUT the marker"; fails=$((fails+1))
+  else
+    oqa_pass "oqa_assert_plugin_loaded rejects a log without the load marker"
+  fi
+  # The offset argument must scope to THIS run: a marker from an earlier run
+  # sitting above the offset must not count as proof for the current one.
+  printf '%s\n' "ENTRY - plugin loading" "later run with no plugin" > "$fake_log"
+  if oqa_assert_plugin_loaded "$fake_log" 1 >/dev/null 2>&1; then
+    oqa_log "FAIL: oqa_assert_plugin_loaded counted a marker from before the offset"; fails=$((fails+1))
+  else
+    oqa_pass "oqa_assert_plugin_loaded ignores markers from previous runs"
+  fi
+  rm -f "$fake_log"
+  missing_log="$(mktemp -u -t oqa-absent-log.XXXXXX)"
+  if oqa_assert_plugin_loaded "$missing_log" >/dev/null 2>&1; then
+    oqa_log "FAIL: oqa_assert_plugin_loaded passed with no log file at all"; fails=$((fails+1))
+  else
+    oqa_pass "oqa_assert_plugin_loaded rejects a missing plugin log"
   fi
 
   if [ "$fails" -eq 0 ]; then

@@ -86,6 +86,61 @@ mkdir -p "$OMO_QA_PROJ"
 # ${BASH_SOURCE[0]:-$0} resolves this file under both bash and zsh (sourced $0).
 _omo_self="${BASH_SOURCE[0]:-$0}"
 _omo_repo_root="$(cd "$(dirname "$_omo_self")/../.." && pwd)"
+
+# Register THIS repo's built plugin, because a sandbox that isolates perfectly
+# but loads no omo plugin is the worst QA surface there is: the server is
+# healthy, sessions run, tools execute, and every omo hook is silently absent.
+# A probe then reports "the hook did not fire", which reads as evidence about
+# the feature when it is evidence about the harness. That inversion produced
+# four INCONCLUSIVE verdicts on a vulnerability that reproduced immediately once
+# the plugin was actually loaded (harness-findings.md, 2026-09-02).
+#
+# Three details are load-bearing:
+#   - XDG, not $HOME/.config. Once XDG_CONFIG_HOME is exported, opencode reads
+#     $XDG_CONFIG_HOME/opencode - so writing to $HOME/.config/opencode lands at
+#     a path nothing reads. That mistake is what made the original report
+#     conclude, wrongly, that only project-level registration works.
+#   - .json, not .jsonc. A .jsonc in the same directory WINS outright, and the
+#     probes each write their own .jsonc there. Using .json means a probe's own
+#     config cleanly supersedes this default instead of half-merging with it.
+#   - dist/index.js, the same path the probes use. Config levels MERGE rather
+#     than override, so a second, differently-pathed omo entry (say src/index.ts)
+#     loads omo TWICE - and detectDuplicateOmoPlugin() responds by disabling the
+#     plugin entirely, recreating the very silence this exists to prevent.
+#     Identical paths dedupe to one entry and are safe.
+_omo_plugin_entry="$_omo_repo_root/dist/index.js"
+mkdir -p "$XDG_CONFIG_HOME/opencode"
+printf '{"plugin":["file://%s"]}\n' "$_omo_plugin_entry" > "$XDG_CONFIG_HOME/opencode/opencode.json"
+
+# dist/ is a build artifact and nothing here guarantees it is present or current.
+# Both failure modes are silent in the worst way: opencode starts fine and
+# GET /config happily echoes back a plugin path that does not exist, so the
+# obvious "is a plugin configured?" check passes while no hook is loaded. Warn
+# loudly instead. Deliberately does NOT auto-build: sourcing a helper must not
+# silently spend minutes compiling.
+if [ ! -f "$_omo_plugin_entry" ]; then
+  printf '[qa-sandbox] WARNING: %s does not exist.\n' "$_omo_plugin_entry" >&2
+  printf '[qa-sandbox] WARNING: opencode will start and report this plugin in GET /config,\n' >&2
+  printf '[qa-sandbox] WARNING: but NO omo hook will run. Build it first: bun run build\n' >&2
+else
+  # `find packages -name '*.ts'` includes installed package sources under
+  # node_modules. Those are routinely newer than dist and would make every
+  # sandbox claim its build is stale. Only tracked source files are relevant.
+  _omo_stale_source=""
+  while IFS= read -r _omo_source; do
+    if [ "$_omo_repo_root/$_omo_source" -nt "$_omo_plugin_entry" ]; then
+      _omo_stale_source="$_omo_source"
+      break
+    fi
+  done <<EOF
+$(git -C "$_omo_repo_root" ls-files -- 'packages/omo-opencode/src/**/*.ts' 'packages/omo-opencode/src/*.ts')
+EOF
+  if [ -n "$_omo_stale_source" ]; then
+    printf '[qa-sandbox] WARNING: %s is OLDER than tracked source %s.\n' "$_omo_plugin_entry" "$_omo_stale_source" >&2
+    printf '[qa-sandbox] WARNING: QA would exercise the PREVIOUS build. Rebuild: bun run build\n' >&2
+  fi
+  unset _omo_source _omo_stale_source
+fi
 if [ -f "$_omo_repo_root/.env" ]; then
   case "$-" in *a*) _omo_had_allexport=1 ;; *) _omo_had_allexport=0 ;; esac
   set -a
@@ -94,13 +149,14 @@ if [ -f "$_omo_repo_root/.env" ]; then
   [ "$_omo_had_allexport" = "1" ] || set +a
   unset _omo_had_allexport
 fi
-unset _omo_self _omo_repo_root
+unset _omo_self _omo_repo_root _omo_plugin_entry
 
 printf '[qa-sandbox] isolated env ready under %s\n' "$OMO_QA_ROOT"
 printf '[qa-sandbox]   HOME=%s\n' "$HOME"
 printf '[qa-sandbox]   XDG_CONFIG_HOME=%s\n' "$XDG_CONFIG_HOME"
 printf '[qa-sandbox]   CODEX_HOME=%s\n' "$CODEX_HOME"
 printf '[qa-sandbox]   OMO_QA_PROJ=%s\n' "$OMO_QA_PROJ"
+printf '[qa-sandbox]   omo plugin registered: %s/opencode/opencode.json\n' "$XDG_CONFIG_HOME"
 printf '[qa-sandbox] RUN QA FROM $OMO_QA_PROJ (cd "$OMO_QA_PROJ"). Staying in a directory\n'
 printf '[qa-sandbox] under your real home lets the config walk claim ~/.omo as a PROJECT\n'
 printf '[qa-sandbox] layer, which outranks the sandbox and is migration-writable.\n'
