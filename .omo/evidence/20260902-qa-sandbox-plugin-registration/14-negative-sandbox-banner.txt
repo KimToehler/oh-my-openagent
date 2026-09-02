@@ -1,0 +1,12 @@
+[qa-sandbox] isolated env ready under /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.gvgosZKr1N
+[qa-sandbox]   HOME=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.gvgosZKr1N/home
+[qa-sandbox]   XDG_CONFIG_HOME=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.gvgosZKr1N/config
+[qa-sandbox]   CODEX_HOME=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.gvgosZKr1N/codex
+[qa-sandbox]   OMO_QA_PROJ=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.gvgosZKr1N/proj
+[qa-sandbox]   omo plugin registered: /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.gvgosZKr1N/config/opencode/opencode.json
+[qa-sandbox] RUN QA FROM $OMO_QA_PROJ (cd "$OMO_QA_PROJ"). Staying in a directory
+[qa-sandbox] under your real home lets the config walk claim ~/.omo as a PROJECT
+[qa-sandbox] layer, which outranks the sandbox and is migration-writable.
+[qa-sandbox] Then host ~/.config/opencode, ~/.codex, and ~/.omo are untouched.
+[qa-sandbox] Git identity and ~/.ssh do not follow into the sandbox.
+[qa-sandbox] Clean up: rm -rf "/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.gvgosZKr1N"

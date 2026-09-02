@@ -1,0 +1,4 @@
+host_db=/Users/tim/.local/share/opencode/opencode.db
+host_session_count_before=3642
+host_session_count_after=3642
+unchanged=yes
