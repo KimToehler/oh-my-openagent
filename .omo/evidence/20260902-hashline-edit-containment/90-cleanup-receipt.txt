@@ -1,0 +1,18 @@
+cleanup 2026-09-02
+sentinels removed from both trees; /private/tmp/omo-hashline-containment-worktree/opencode.json removed
+sandbox servers stopped (ports 57311/57411/57511/57611)
+host_session_count_after=3596
+main_scoped_status_after:
+worktree_scoped_status_after:
+(empty scoped status lines above = both trees clean of probe files)
+
+ISOLATION PROOF (verified, not assumed):
+  probe session ids checked against the HOST db ~/.local/share/opencode/opencode.db:
+    ses_f9ccbed10ffeNGqgFzuLkZYzvG -> 0 rows
+    ses_f9cca8168ffey22eRL5c6xpTYy -> 0 rows   (case 1)
+    ses_f9cc7aefcffetzAUO1Zjziq84j -> 0 rows   (case 2)
+    ses_f9cce550affeje04yAWBl7P2ma -> 0 rows
+  None of the probe sessions reached the host DB. The raw count moved 3592 -> 3596
+  because THIS orchestration session spawned delegated subagent tasks in the host
+  harness during the same window; those appear by title in the host db and are
+  unrelated to the sandboxed probe.

@@ -3669,7 +3669,48 @@ i.e. every difference is a line present on the branch and missing from the main 
 
 **Fix status (2026-09-02):** mechanism still unattributed; the missing-containment vulnerability is now confirmed independently of the incident. Severity stays `costly`.
 
-**Last verified:** 2026-09-02 (64d608f6d)
+**Update:** (2026-09-02, REPRODUCED against real isolated OpenCode 1.18.20, plugin built from dev @ `f548b2d49`) The vulnerability is no longer a source inference. It was driven end to end in a live harness and the evidence is under `.omo/evidence/20260902-hashline-edit-containment/`.
+
+Case 1, the positive control, edited an absolute path inside the session's own worktree: the worktree file changed, the main checkout did not. Case 2 then ran from that same worktree session and named an absolute path inside the MAIN CHECKOUT. `read` returned `1#VK|MAIN_BASELINE` from the main checkout, `edit` reported `Updated /Users/tim/git/oh-my-openagent/.../.containment-probe.txt`, and on disk that file became `MAIN_ABSOLUTE_APPLIED` while the worktree copy stayed `WORKTREE_BASELINE`. **No permission request of any kind was emitted** - no `external_directory` ask, no denial, no error. Artifacts: `20-case2-disk.txt`, `10-case1-disk.txt`, `05-anchor-proof.txt`, `99-verdict.md`.
+
+So the verdict from the plan's rubric is **"attributed to unconstrained hashline capability, incident still unattributed."** The named target and the mutated file were the SAME file in both cases, so there is no wrong-path routing defect: the tool wrote exactly where it was told. The defect is that nothing checks where it is told to write. The original incident - a worktree lane appearing to modify the main checkout unintentionally - therefore still has no proven mechanism; the surviving candidate is an agent supplying a stale main-checkout absolute path, which this capability then silently honors.
+
+One false signal is worth recording so it is not mistaken for a control later: an earlier attempt saw an `external_directory` permission ask on the LOGICAL `/tmp/...` spelling that vanished under the PHYSICAL `/private/tmp/...` path. That is a macOS symlink artifact, not containment. Case 2 used the physical spelling throughout and was never prompted.
+
+Cases 3 (relative path) and 4 (rename destination escape) remain deferred.
+
+**Fix status (2026-09-02, post-reproduction):** unfixed, and no longer conditional on attribution. Part B of `.omo/plans/hashline-edit-containment.md` is now justified on the reproduced capability alone: resolve and authorize every operand, including the rename destination, before the first read at `hashline-edit-executor.ts:98`. Severity stays `costly` - it needs an absolute path to trigger, so it is not remotely reachable, but it silently corrupts a tree the user is not looking at.
+
+**Last verified:** 2026-09-02 (f548b2d49, live reproduction)
+
+## 2026-09-02 - A sandboxed QA server loads NO omo plugin unless a project-level opencode.json registers it, and every hook silently no-ops
+
+**Severity:** costly
+**Area:** QA harness / opencode-qa isolation
+
+**What happened:** four consecutive delegated attempts to reproduce the `hashline_edit` containment finding all recorded INCONCLUSIVE with the same symptom: a real native `read` in the sandbox returned numbered content with no `LINE#ID` anchor, so there was no anchor to drive `edit` with. Three of the four concluded, reasonably, that anchors were unavailable in that runtime. The real cause was that **the omo plugin was never loaded at all**: `GET /config` on the sandbox server returned `plugin: []`.
+
+With no plugin, `hashline-read-enhancer` never runs, reads carry no anchors, and - this is the dangerous part - every other omo hook is equally absent while the server looks completely healthy. Sessions are created, prompts are answered, tools execute, `/config` returns 200. Nothing announces that the thing under test is not loaded.
+
+Two compounding causes, both worth knowing separately:
+
+1. **Config shape.** `hashline_edit` at the ROOT of `~/.omo/omo.jsonc` is rejected, because `OmoConfigSchema` is `.strict()` (`packages/omo-config-core/src/schema/config.ts:68`). The server logs `Migration validation failed ... Unrecognized key: "hashline_edit"` and continues. The accepted shape nests it under the harness block, which is an opaque record (`config.ts:16`): `{"[opencode]":{"hashline_edit":true}}`.
+2. **Plugin registration location.** Writing the built plugin path into the sandbox's USER-level `$HOME/.config/opencode/opencode.json` did NOT register it - `/config` still returned `plugin: []`. Only a PROJECT-level `opencode.json` inside the session directory worked, after which `/config` reported `plugin: ['file:///.../dist/index.js']` and anchors appeared immediately (`1#MQ|WORKTREE_BASELINE`).
+
+**Why it is costly:** the failure is silent and it inverts the conclusion. A probe that cannot observe its own subject reports "the feature did not happen", which reads as evidence ABOUT the feature rather than evidence about the harness. Here it produced four INCONCLUSIVE verdicts on a vulnerability that reproduces on the first try once the plugin is actually loaded. The same shape would let a QA run report "the hook did not fire" for any omo hook and be believed.
+
+**Workaround:** in any sandboxed opencode QA that exercises omo behavior, assert the plugin is loaded BEFORE asserting anything about its effects:
+
+```
+curl -s "$URL/config" | python3 -c "import json,sys;print(json.load(sys.stdin).get('plugin'))"
+# must be non-empty and contain your built dist path
+```
+
+Register it project-level, inside the session directory, not user-level. Nest omo settings under `[opencode]`. And treat any "the hook did not fire" result as unproven until the plugin list is shown non-empty in the same run - absence of an effect is only evidence when the producer of that effect is present.
+
+**Fix status:** unfixed. The `opencode-qa` skill does not currently include a plugin-loaded precondition check, and neither `qa-sandbox.sh` nor the sandbox HOME registers the built plugin, so every sandboxed run starts with omo absent by default. Contained fix: have `qa-sandbox.sh` write a project-level `opencode.json` pointing at `dist/index.js`, and add the `/config` plugin assertion to the skill's standard preamble.
+
+**Last verified:** 2026-09-02 (f548b2d49, observed directly during the containment reproduction)
 
 
 ## 2026-09-02 - A self-run QA probe validates the branch the author reasoned toward, not the incident the report describes

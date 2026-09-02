@@ -1,0 +1,5 @@
+server=http://127.0.0.1:55961
+session=ses_f9cdc01f9ffeaIP2TnqfByYDUZ
+context_directory=/private/tmp/omo-hashline-containment-worktree
+worktree_root=/private/tmp/omo-hashline-containment-worktree
+registered_hashline_tool=edit (runtime event below confirms)

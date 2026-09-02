@@ -1,0 +1,4 @@
+Bundled 2223 modules in 83ms
+
+  omo-plugin-current.js  7.15 MB  (entry point)
+

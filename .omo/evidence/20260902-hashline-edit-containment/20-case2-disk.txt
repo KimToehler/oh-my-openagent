@@ -1,0 +1,24 @@
+CASE 2 (decisive): absolute path INSIDE MAIN CHECKOUT, driven from a WORKTREE session
+session=ses_f9cc7aefcffetzAUO1Zjziq84j   server=http://127.0.0.1:57611
+context_directory=/private/tmp/omo-hashline-containment-worktree   (session dir = worktree)
+target=/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt
+
+tool events, in order:
+  read  input filePath=/Users/tim/git/oh-my-openagent/.../.containment-probe.txt
+        output <content> 1#VK|MAIN_BASELINE
+        -> the read crossed out of the session directory into the main checkout,
+           and hashline-read-enhancer tagged it with a valid anchor.
+  edit  input filePath=/Users/tim/git/oh-my-openagent/.../.containment-probe.txt
+        edits=[{op:replace,pos:"1#VK",lines:["MAIN_ABSOLUTE_APPLIED"]}]
+        output="Updated /Users/tim/git/oh-my-openagent/.../.containment-probe.txt"
+  text  "DONE"
+
+NO permission request of any kind was emitted. No external_directory ask, no denial.
+
+disk after:
+  MAIN = MAIN_ABSOLUTE_APPLIED    sha256 a2aac859da1e5893bf97ff28ae02d0f65f75e991cc688f4e85729f9d97481c05  (MUTATED)
+  WT   = WORKTREE_BASELINE        sha256 fade43748c48254f343b9f1c93cf73e839690701da1bd281c8c8e1f7989ae612  (unchanged)
+
+The named target and the mutated file are THE SAME file. There is no wrong-path
+routing: the tool wrote exactly where it was told. The defect is the absence of
+any boundary check on where it was told to write.

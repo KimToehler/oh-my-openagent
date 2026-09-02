@@ -1,0 +1,16 @@
+CASE 1 (positive control): absolute path INSIDE session worktree
+session=ses_f9cca8168ffey22eRL5c6xpTYy  server=http://127.0.0.1:57611
+context_directory=/private/tmp/omo-hashline-containment-worktree
+
+tool events:
+  read  -> <content> 1#MQ|WORKTREE_BASELINE
+  edit  input filePath=/private/tmp/omo-hashline-containment-worktree/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt
+        edits=[{op:replace,pos:"1#MQ",lines:["WORKTREE_ABSOLUTE_APPLIED"]}]
+        output="Updated /private/tmp/omo-hashline-containment-worktree/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt"
+  read  -> <content> 1#RW|WORKTREE_ABSOLUTE_APPLIED   (re-read confirms)
+
+disk after:
+  WT   = WORKTREE_ABSOLUTE_APPLIED   (changed, as named)
+  MAIN = MAIN_BASELINE               (unchanged)
+
+VERDICT: PASS. Positive control valid; probe can route and observe edits.

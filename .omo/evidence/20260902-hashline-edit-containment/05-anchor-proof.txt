@@ -1,0 +1,21 @@
+ANCHOR GATE: PASSED
+server=http://127.0.0.1:57611  session=ses_f9ccbed10ffeNGqgFzuLkZYzvG
+worktree(session directory)=/private/tmp/omo-hashline-containment-worktree
+plugin loaded: file:///Users/tim/git/oh-my-openagent/dist/index.js  (project-level /private/tmp/omo-hashline-containment-worktree/opencode.json)
+omo config: $HOME/.omo/omo.jsonc = {"[opencode]":{"hashline_edit":true}}
+
+real native read of /private/tmp/omo-hashline-containment-worktree/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt returned <content>:
+  1#MQ|WORKTREE_BASELINE
+real-format anchor present: 1#MQ|
+
+ROOT CAUSE of attempts 3+4 (both recorded INCONCLUSIVE for "no LINE#ID anchor"):
+ 1. attempt 4: root-level hashline_edit rejected. OmoConfigSchema is .strict()
+    (packages/omo-config-core/src/schema/config.ts:68); [opencode] is an opaque
+    record (config.ts:16). Correct shape is {"[opencode]":{"hashline_edit":true}}.
+ 2. attempts 3+4 BOTH: the omo plugin was never loaded at all. GET /config
+    returned plugin: []. The sandbox HOME has no opencode config registering the
+    built plugin, and a user-level ~/.config/opencode/opencode.json did NOT take
+    effect either - only a PROJECT-level opencode.json inside the session
+    directory (/private/tmp/omo-hashline-containment-worktree) produced plugin: ['file:///.../dist/index.js'].
+    With no plugin, hashline-read-enhancer never ran, so no anchors. The absence
+    was a harness-wiring defect, not runtime behavior.

@@ -1,0 +1,4 @@
+data: {"id":"evt_0632fd4eb001k3e3q36kfOTLfY","type":"server.connected","properties":{}}
+
+data: {"id":"evt_0632fd4ed001y2tL3rRcXMwRbt","type":"tui.toast.show","properties":{"title":"Configuration migration failed","message":"Migration validation failed for /private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.TPyAIUEOvu/home/.omo/omo.jsonc: : Unrecognized key: \"hashline_edit\" ../../../../../../../../var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.TPyAIUEOvu/home/.omo/omo.jsonc: Invalid omo config at /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.TPyAIUEOvu/home/.omo/omo.jsonc: ","variant":"error","duration":5000}}
+
