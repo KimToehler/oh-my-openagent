@@ -1,0 +1,8 @@
+parent_session=ses_f9c610f91ffeBZnv5KJabVhFCd
+child_session=ses_f9c61080cffeOUSiGfBm2qHFgq
+parent_session_error_events=1
+parent_events_mentioning_aborted=2
+terminalize_log_lines=1
+terminalize_lines_for_this_parent=1
+parent_wake_dispatches=0
+sessions_created_after_interrupt=0

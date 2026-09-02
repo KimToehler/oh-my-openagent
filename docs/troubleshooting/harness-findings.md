@@ -2267,7 +2267,15 @@ Confirmed still open, with no compensating mechanism anywhere. Terminal status i
 
 **Fix status (2026-09-02):** still unfixed. Severity stays `blocker`. Contained fix: extend `completionReason` with a dirty-worktree determination made at completion time, and pin it with a test that completes a lane over a dirty tree.
 
-**Last verified:** 2026-09-02 (64d608f6d)
+**FIXED (2026-09-02) in `d0be2ec59`, `b2f8e1ef9`, `441c84d5e`, `3534c3651`.** A lane now takes a `git status --porcelain -z --untracked-files=all` reading at launch and again when it ends, and reports the delta, so pre-existing dirt is excluded and only what the lane itself left is counted. Rendered as `left N uncommitted files` on the summary line.
+
+Four corrections came out of the 5-agent review of the first attempt, and each is worth recording because each was a way of being silent while looking correct:
+- **`--untracked-files=all` is load-bearing.** Plain `--porcelain` collapses a new directory to one `?? dir/` entry, so a lane creating five files reported one, and a lane adding to a directory already untracked at baseline reported ZERO. Verified against real git; pinned by tests that build real repositories.
+- **The reading is bounded and total.** A 5s timeout kills the child, and every failure degrades to no annotation. It sits inside `tryCompleteTask` between the notification reservation and `markForNotification`, so an unbounded or throwing read would have stalled the poll loop for every lane or dropped the parent notification entirely.
+- **The two fixes on that branch did not compose.** The sibling parent-abort fix routes an interrupted lane through `cancelTask`, which never called the annotator, and the template gated the count on `status === "completed"`. The lane most likely to have stranded work was the one lane that said nothing. Both paths now report.
+- The zero-commits half of the original suggested criterion is deliberately NOT implemented: the count is a delta of dirty paths, not a commit comparison. A lane that committed everything but left one scratch file still annotates. That is the intended reading of "distinguishable from a clean tree".
+
+**Last verified:** 2026-09-02 (`6f1d8a19d`, mutation-verified; 961 pass)
 
 ## 2026-08-25 — A `report_blocked` park is invisible to a *busy* parent, which then reports the dead lane as "in flight"
 
@@ -2806,7 +2814,20 @@ Last real disk activity, consistent with in-flight work draining and then silenc
 
 **Fix status (2026-09-02):** still unfixed. Severity stays `costly`.
 
-**Last verified:** 2026-09-02 (64d608f6d)
+**FIXED (2026-09-02) in `cb9e19aa6`, corrected by `441c84d5e`.** `session.error` now terminalizes the interrupted parent's descendant lanes instead of leaving them to the 45-minute reaper. Live probe: `terminalize_lines_for_this_parent=1`, negative control `0`.
+
+The first attempt introduced a worse defect than the one it fixed, and the review caught it in evidence the original QA had already captured and not interpreted. Terminalizing called `cancelTask` WITHOUT `skipNotification`, so cancelling the children woke the parent and restarted the turn the user had just aborted: 3 parent wakes and 6 new `session.created` after the interrupt, against 0 and 0 in the negative control. A stuck status had become an undone interrupt. The probe passed anyway, because it asserted only that lanes died.
+
+Two corrections, both now permanent:
+- `skipNotification: true` on the terminalize path. Re-probed live: `wakes=0 sessions_created=0` (`.omo/evidence/20260902-interrupted-parent-abort/fixed-v2/`).
+- The gate no longer keys on `isAbortedSessionError`, a case-insensitive substring test over provider-supplied prose. That predicate is fine for a log line or one task's fallback, but this call site recursively cancels a whole subtree, so a transport emitting `"connection aborted"` would have destroyed in-flight work. It now matches the structured error NAME (`MessageAbortedError` / `AbortError`), the shape the live probe actually captured on the wire.
+
+The probe itself was strengthened in `6ea6895c0` to require both halves - lanes terminalized AND zero wakes afterwards - so the property that escaped is now asserted rather than assumed.
+
+Residual, unfixed and narrow: an interrupted INTERMEDIATE lane does not cascade to its own grandchildren, because the path returns early when the errored session is itself a tracked task. A lane's own abort is owned by its error path, which handles retry and fallback; cascading from here would cancel work that path may still recover. Top-level parent aborts cover the whole tree.
+
+**Last verified:** 2026-09-02 (`6f1d8a19d`, live probe PASS, mutation-verified)
+
 ## 2026-08-27 — A green test suite hid a feature that never fires on its common path, because the plan's example test only covered the rare branch
 
 **Severity:** costly

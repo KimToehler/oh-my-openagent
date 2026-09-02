@@ -58,6 +58,15 @@ Both must agree before marking a task complete. Prevents premature completion on
 
 The poll loop also waits on a task's own todo list before completing it (`manager.ts` around lines 3365-3368): while `checkSessionTodos` reports incomplete todos, the task stays `running`. That wait is bounded by a grace window, config key `background_task.todoGateGraceMs` (`config/schema/background-task.ts`, default 600000 ms / 10 minutes, `.min(60000)`), constrained by a `superRefine` guard that requires `todoGateGraceMs` to stay below `taskTtlMs`. When a task has been continuously idle with valid session output but non-terminal todos for longer than the grace window, it completes through the normal `tryCompleteTask` path instead of waiting indefinitely, and the completion notification is annotated with the count of unfinished todos (`unfinishedTodoCount` on `BackgroundTask`, `types.ts`).
 
+### Lanes also report the uncommitted work they leave behind
+
+A lane reads `git status --porcelain -z --untracked-files=all` at launch and again when it ends, and reports the DELTA (`uncommittedFileCount` on `BackgroundTask`, `dirty-worktree.ts`), so dirt that predates the lane is excluded. `--untracked-files=all` is load-bearing: plain `--porcelain` collapses a new directory to one `?? dir/` entry, so a lane creating five files would report one, and a lane adding to an already-untracked directory would report nothing at all.
+
+Three properties this path must keep:
+- **The launch read is not awaited.** It spawns `git`, and launch is on the critical path to `running`; awaiting it delayed dispatch enough to leave tasks observably `pending`. The promise takes its `.catch` at the creation site, because only the completion path ever awaits it, so a cancelled or interrupted lane would otherwise leave a rejection unobserved.
+- **The completion read is bounded and total.** It sits inside `tryCompleteTask` between the notification reservation and `markForNotification`, so an unbounded read would stall the poll loop for every lane and a throwing one would drop the parent notification. It has a 5s timeout and contains all failures.
+- **Cancelled lanes report too.** `cancelTask` takes the same reading before retiring the task, and the summary line carries the count on non-completed statuses. An interrupted lane is the likeliest to have stranded work; gating the count on `status === "completed"` made it the one lane that stayed silent.
+
 Todo terminalization is not guaranteed by any producer: nothing obliges a subagent to mark its own todos terminal before going idle, since that depends on the subagent's own judgement rather than a contract the harness can enforce. That is the reason the gate is bounded by time instead of by a stricter producer contract.
 
 Two known limits on the bound:

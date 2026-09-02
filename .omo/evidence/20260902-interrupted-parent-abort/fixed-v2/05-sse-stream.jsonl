@@ -1,0 +1,280 @@
+data: {"id":"evt_0639ef06b001gyxOv4Yn4DKpnR","type":"server.connected","properties":{}}
+
+data: {"id":"evt_0639ef06e00205662q628Wrvc4","type":"session.created","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","info":{"id":"ses_f9c610f91ffeBZnv5KJabVhFCd","slug":"clever-wizard","version":"1.18.20","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","title":"interrupted parent abort","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788377755758,"updated":1788377755758}}}}
+
+data: {"id":"evt_0639ef0b4001tsz3t6lzaEObvh","type":"session.updated","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","info":{"id":"ses_f9c610f91ffeBZnv5KJabVhFCd","slug":"clever-wizard","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","title":"interrupted parent abort","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.20","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788377755758,"updated":1788377755827}}}}
+
+data: {"id":"evt_0639ef158001TQMJ5W92G48FPC","type":"tui.toast.show","properties":{"title":"⚠️ Provider Cache Missing","message":"Model filtering disabled. RESTART OpenCode to enable full functionality.","variant":"warning","duration":6000}}
+
+data: {"id":"evt_0639ef0be001Hkc7uU2UcZS8Wh","type":"message.updated","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","info":{"id":"msg_0639ef0b3001rz3EXewDiuk3Ex","role":"user","sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","time":{"created":1788377755827},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-fake"}}}}
+
+data: {"id":"evt_0639ef167001v9Jr3v2wAM1QsE","type":"message.part.updated","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","part":{"type":"text","text":"SPLIT_CHILD_TASK: restart-midturn","messageID":"msg_0639ef0b3001rz3EXewDiuk3Ex","sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","id":"prt_0639ef0b7001RMMQL18rPha6Yq"},"time":1788377756007}}
+
+data: {"id":"evt_0639ef168001ijVPJyoSplQpsg","type":"session.updated","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","info":{"id":"ses_f9c610f91ffeBZnv5KJabVhFCd","slug":"clever-wizard","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","title":"interrupted parent abort","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.20","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788377755758,"updated":1788377756008}}}}
+
+data: {"id":"evt_0639ef16b001XIk9J4aX5zrqVU","type":"session.status","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","status":{"type":"busy"}}}
+
+data: {"id":"evt_0639ef16d001QzUi183u1bKqP8","type":"message.updated","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","info":{"id":"msg_0639ef16d001chlXnUM7zYXs4U","parentID":"msg_0639ef0b3001rz3EXewDiuk3Ex","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1788377756013},"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd"}}}
+
+data: {"id":"evt_0639ef494001ucz8bmuQ37lMhB","type":"session.updated","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","info":{"id":"ses_f9c610f91ffeBZnv5KJabVhFCd","slug":"clever-wizard","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","title":"interrupted parent abort","agent":"Sisyphus - ultraworker","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788377755758,"updated":1788377756819}}}}
+
+data: {"id":"evt_0639ef495001lGZaVSopVD7TMk","type":"session.diff","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","diff":[]}}
+
+data: {"id":"evt_0639ef4960017s91hvNbvAHMg2","type":"message.updated","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","info":{"role":"user","time":{"created":1788377755827},"agent":"Sisyphus - ultraworker","model":{"providerID":"openai","modelID":"gpt-fake"},"id":"msg_0639ef0b3001rz3EXewDiuk3Ex","sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","summary":{"diffs":[]}}}}
+
+data: {"id":"evt_0639ef6ab001sjAnbyva1AzBcK","type":"plugin.added","properties":{"id":"core/config-reference"}}
+
+data: {"id":"evt_0639ef6ac001JZPPl2raVM1Fn4","type":"plugin.added","properties":{"id":"agent"}}
+
+data: {"id":"evt_0639ef6ac002jYUolA8w6Ctcj7","type":"plugin.added","properties":{"id":"command"}}
+
+data: {"id":"evt_0639ef6ac003iZK36tMKMjRgZf","type":"plugin.added","properties":{"id":"skill"}}
+
+data: {"id":"evt_0639ef6ad0013KYImvAl64v2DV","type":"plugin.added","properties":{"id":"models-dev"}}
+
+data: {"id":"evt_0639ef6ad002cVq6QTy5B66eZE","type":"plugin.added","properties":{"id":"config-agent"}}
+
+data: {"id":"evt_0639ef6ad003OCLp5ZDau5hvbu","type":"plugin.added","properties":{"id":"config-command"}}
+
+data: {"id":"evt_0639ef6ad004GMKTwaokiyhbze","type":"plugin.added","properties":{"id":"config-skill"}}
+
+data: {"id":"evt_0639ef6ad005rtztuVRZvrmQpW","type":"plugin.added","properties":{"id":"alibaba"}}
+
+data: {"id":"evt_0639ef6ae0015ylV7UpIrBc1rM","type":"plugin.added","properties":{"id":"amazon-bedrock"}}
+
+data: {"id":"evt_0639ef6ae002KaBBOFlkoETnRI","type":"plugin.added","properties":{"id":"anthropic"}}
+
+data: {"id":"evt_0639ef6ae003XSBYsPz3YTKUCz","type":"plugin.added","properties":{"id":"azure-cognitive-services"}}
+
+data: {"id":"evt_0639ef7210017rmsXL1aizudLx","type":"plugin.added","properties":{"id":"azure"}}
+
+data: {"id":"evt_0639ef722001eGVoQtoe0OLEd5","type":"plugin.added","properties":{"id":"cerebras"}}
+
+data: {"id":"evt_0639ef722002ozl0GESyQCV8Wt","type":"plugin.added","properties":{"id":"cloudflare-ai-gateway"}}
+
+data: {"id":"evt_0639ef722003yyjSWhyMGp2osl","type":"plugin.added","properties":{"id":"cloudflare-workers-ai"}}
+
+data: {"id":"evt_0639ef722004hFNYKkk622xTNj","type":"plugin.added","properties":{"id":"cohere"}}
+
+data: {"id":"evt_0639ef722005ge5LsFfE7i3nQZ","type":"plugin.added","properties":{"id":"deepinfra"}}
+
+data: {"id":"evt_0639ef722006Bg7xcDfGiWZjJ2","type":"plugin.added","properties":{"id":"gateway"}}
+
+data: {"id":"evt_0639ef7220075UKeKxaFVzkr5F","type":"plugin.added","properties":{"id":"github-copilot"}}
+
+data: {"id":"evt_0639ef722008sTPGZz4M6EYUBl","type":"plugin.added","properties":{"id":"gitlab"}}
+
+data: {"id":"evt_0639ef723001L07Gj0Xc6I5GKB","type":"plugin.added","properties":{"id":"google"}}
+
+data: {"id":"evt_0639ef723002WVJCdLmNlvbp3I","type":"plugin.added","properties":{"id":"google-vertex-anthropic"}}
+
+data: {"id":"evt_0639ef723003yJBQ5Kw1M4qIeW","type":"plugin.added","properties":{"id":"google-vertex"}}
+
+data: {"id":"evt_0639ef72b001zqtDx5ta06CVVB","type":"plugin.added","properties":{"id":"groq"}}
+
+data: {"id":"evt_0639ef72b002QVw62rekIofqBc","type":"plugin.added","properties":{"id":"kilo"}}
+
+data: {"id":"evt_0639ef72c001g12N11jjlsOexn","type":"plugin.added","properties":{"id":"llmgateway"}}
+
+data: {"id":"evt_0639ef72c002xt3J7Xmvv0VW64","type":"plugin.added","properties":{"id":"mistral"}}
+
+data: {"id":"evt_0639ef72c003pxIA7NhxaeYIo1","type":"plugin.added","properties":{"id":"nvidia"}}
+
+data: {"id":"evt_0639ef72d001WXBrawIXSZUfgc","type":"plugin.added","properties":{"id":"opencode"}}
+
+data: {"id":"evt_0639ef72d002sRq4xkMRIaj9Lk","type":"plugin.added","properties":{"id":"snowflake-cortex"}}
+
+data: {"id":"evt_0639ef72d003eY43vkR6bI14qf","type":"plugin.added","properties":{"id":"openai-compatible"}}
+
+data: {"id":"evt_0639ef72d004P9ny20djDcbi0x","type":"plugin.added","properties":{"id":"openai"}}
+
+data: {"id":"evt_0639ef72d0050rdpFwbpuPW903","type":"plugin.added","properties":{"id":"openrouter"}}
+
+data: {"id":"evt_0639ef72d006SsUYfPzlubYIYd","type":"plugin.added","properties":{"id":"perplexity"}}
+
+data: {"id":"evt_0639ef72d007dGmN3BUPIW2Gdw","type":"plugin.added","properties":{"id":"sap-ai-core"}}
+
+data: {"id":"evt_0639ef7670010joZ11yXXFk4z2","type":"catalog.updated","properties":{}}
+
+data: {"id":"evt_0639ef72d008P2IYgvxShOHSO6","type":"plugin.added","properties":{"id":"togetherai"}}
+
+data: {"id":"evt_0639ef767002IXxm6vtDfRpCm1","type":"plugin.added","properties":{"id":"vercel"}}
+
+data: {"id":"evt_0639ef767003k00o1PowOzyrlr","type":"plugin.added","properties":{"id":"venice"}}
+
+data: {"id":"evt_0639ef7670042K20ScyhWR9yk4","type":"plugin.added","properties":{"id":"xai"}}
+
+data: {"id":"evt_0639ef768001DNAhrIYv3xFB3K","type":"plugin.added","properties":{"id":"zenmux"}}
+
+data: {"id":"evt_0639ef768002SYVmNu51pEh3oK","type":"plugin.added","properties":{"id":"dynamic-provider"}}
+
+data: {"id":"evt_0639ef7680038i23iZRBe4INWq","type":"plugin.added","properties":{"id":"config-plugin"}}
+
+data: {"id":"evt_0639ef769001yglRY4yoSIB6Xz","type":"plugin.added","properties":{"id":"config-provider"}}
+
+data: {"id":"evt_0639ef769002hGHFMHAStGRMiy","type":"plugin.added","properties":{"id":"variant"}}
+
+data: {"id":"evt_0639ef769003nuwe8fRhjdYdiO","type":"reference.updated","properties":{}}
+
+data: {"id":"evt_0639ef7770013cU0kjewKbmfRa","type":"integration.updated","properties":{}}
+
+data: {"id":"evt_0639ef79c001lnpJqdZpuQ5bfy","type":"catalog.updated","properties":{}}
+
+data: {"id":"evt_0639ef79f001kAE3Ijx4ZtjaXZ","type":"session.status","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","status":{"type":"busy"}}}
+
+data: {"id":"evt_0639ef7c40016LDpbE24uXKTga","type":"message.part.updated","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","part":{"id":"prt_0639ef7c4001cojtmyI1IoXgFV","messageID":"msg_0639ef16d001chlXnUM7zYXs4U","sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","type":"step-start"},"time":1788377757636}}
+
+data: {"id":"evt_0639ef7c6001dLzw8OuUiBA9Z6","type":"message.part.updated","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","part":{"id":"prt_0639ef7c5001WqLL8mvdCMofnt","messageID":"msg_0639ef16d001chlXnUM7zYXs4U","sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","type":"tool","tool":"task","callID":"call_midturn_child_1","state":{"status":"pending","input":{},"raw":""}},"time":1788377757638}}
+
+data: {"id":"evt_0639ef7ca001d2fi9xbDOcZ4I8","type":"message.part.updated","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","part":{"type":"tool","tool":"task","callID":"call_midturn_child_1","state":{"status":"running","input":{"description":"midturn adoption child","prompt":"SPLIT_CHILD_TASK: hang-midturn","subagent_type":"explore","run_in_background":true,"load_skills":[]},"time":{"start":1788377757642}},"id":"prt_0639ef7c5001WqLL8mvdCMofnt","sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","messageID":"msg_0639ef16d001chlXnUM7zYXs4U","metadata":{"openai":{"itemId":"fc_1"}}},"time":1788377757642}}
+
+data: {"id":"evt_0639ef7f1001GZOz2i4quoAqmW","type":"tui.toast.show","properties":{"title":"New Background Task","message":"Queued (1):\n[Q] midturn adoption child (explore) - Queued ← NEW","variant":"info","duration":3000}}
+
+data: {"id":"evt_0639ef7f40013iqZcrMyhtVWQr","type":"session.created","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","info":{"id":"ses_f9c61080cffeOUSiGfBm2qHFgq","slug":"crisp-planet","version":"1.18.20","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","parentID":"ses_f9c610f91ffeBZnv5KJabVhFCd","title":"midturn adoption child (@explore subagent)","model":{"id":"gpt-fake","providerID":"openai"},"permission":[{"permission":"question","pattern":"*","action":"deny"}],"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788377757683,"updated":1788377757683}}}}
+
+data: {"id":"evt_0639ef8010017FQXwV1aLM6mLV","type":"session.updated","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","info":{"id":"ses_f9c61080cffeOUSiGfBm2qHFgq","slug":"crisp-planet","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","parentID":"ses_f9c610f91ffeBZnv5KJabVhFCd","title":"midturn adoption child (@explore subagent)","agent":"explore","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.20","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"permission":[{"permission":"question","pattern":"*","action":"deny"}],"time":{"created":1788377757683,"updated":1788377757696}}}}
+
+data: {"id":"evt_0639ef802001AV0hIJtNfDzMw6","type":"message.updated","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","info":{"id":"msg_0639ef8000013IyDWnhdQBZAou","role":"user","sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","time":{"created":1788377757696},"tools":{"task":false,"call_omo_agent":false,"question":false,"team_create":false,"team_delete":false,"team_shutdown_request":false,"team_approve_shutdown":false,"team_reject_shutdown":false,"team_send_message":false,"team_task_create":false,"team_task_list":false,"team_task_update":false,"team_task_get":false,"team_status":false,"team_list":false,"write":false,"edit":false},"agent":"explore","model":{"providerID":"openai","modelID":"gpt-fake"}}}}
+
+data: {"id":"evt_0639ef803001iVzWb0Q4kJ3Qcc","type":"message.part.updated","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","part":{"type":"text","text":"<background-subagent-tools>\nIf blocked and parent input is required, call report_blocked with both reason and needs. Use this only for genuine blocks: missing credentials, a decision only the parent can make, missing API, or clarification. Do not use this for waiting on a long-running or detached job - poll instead. This alerts parent and parks this background task until parent resumes it.\n</background-subagent-tools>\n\n<evidence-reporting>\nWhen you report a test, mutation-test, build, or QA result, PASTE the actual tool output verbatim: the command you ran, the real pass/fail lines, the test/assertion counts, and the full failure text. Do not describe, paraphrase, or summarize it.\nA summarized result is not evidence and will be treated as unverified, because an honest summary and a fabricated one are indistinguishable at review. If output is long, paste the decisive lines verbatim and give the artifact path for the rest.\n</evidence-reporting>\n\nSPLIT_CHILD_TASK: hang-midturn\n<!-- OMO_INTERNAL_INITIATOR -->","messageID":"msg_0639ef8000013IyDWnhdQBZAou","sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","id":"prt_0639ef8020017Sx2Sw0rRoUfgt"},"time":1788377757699}}
+
+data: {"id":"evt_0639ef8040017ZlmMSTA3cznRs","type":"session.updated","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","info":{"id":"ses_f9c61080cffeOUSiGfBm2qHFgq","slug":"crisp-planet","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","parentID":"ses_f9c610f91ffeBZnv5KJabVhFCd","title":"midturn adoption child (@explore subagent)","agent":"explore","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.20","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"permission":[{"permission":"question","pattern":"*","action":"deny"}],"time":{"created":1788377757683,"updated":1788377757700}}}}
+
+data: {"id":"evt_0639ef805001jkEMsPVH4DKEw9","type":"session.updated","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","info":{"id":"ses_f9c61080cffeOUSiGfBm2qHFgq","slug":"crisp-planet","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","parentID":"ses_f9c610f91ffeBZnv5KJabVhFCd","title":"midturn adoption child (@explore subagent)","agent":"explore","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.20","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"permission":[{"permission":"task","action":"deny","pattern":"*"},{"permission":"call_omo_agent","action":"deny","pattern":"*"},{"permission":"question","action":"deny","pattern":"*"},{"permission":"team_create","action":"deny","pattern":"*"},{"permission":"team_delete","action":"deny","pattern":"*"},{"permission":"team_shutdown_request","action":"deny","pattern":"*"},{"permission":"team_approve_shutdown","action":"deny","pattern":"*"},{"permission":"team_reject_shutdown","action":"deny","pattern":"*"},{"permission":"team_send_message","action":"deny","pattern":"*"},{"permission":"team_task_create","action":"deny","pattern":"*"},{"permission":"team_task_list","action":"deny","pattern":"*"},{"permission":"team_task_update","action":"deny","pattern":"*"},{"permission":"team_task_get","action":"deny","pattern":"*"},{"permission":"team_status","action":"deny","pattern":"*"},{"permission":"team_list","action":"deny","pattern":"*"},{"permission":"write","action":"deny","pattern":"*"},{"permission":"edit","action":"deny","pattern":"*"}],"time":{"created":1788377757683,"updated":1788377757701}}}}
+
+data: {"id":"evt_0639ef8060014ZBdF17DCAlayH","type":"session.status","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","status":{"type":"busy"}}}
+
+data: {"id":"evt_0639ef807001BIKku8BEmfjRlt","type":"message.updated","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","info":{"id":"msg_0639ef807001R9GNc8kVo1CZ12","parentID":"msg_0639ef8000013IyDWnhdQBZAou","role":"assistant","mode":"explore","agent":"explore","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1788377757703},"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq"}}}
+
+data: {"id":"evt_0639ef80f001St3YFEBxbGYQ69","type":"session.updated","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","info":{"id":"ses_f9c61080cffeOUSiGfBm2qHFgq","slug":"crisp-planet","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","parentID":"ses_f9c610f91ffeBZnv5KJabVhFCd","title":"midturn adoption child (@explore subagent)","agent":"explore","model":{"id":"gpt-fake","providerID":"openai","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"permission":[{"permission":"task","action":"deny","pattern":"*"},{"permission":"call_omo_agent","action":"deny","pattern":"*"},{"permission":"question","action":"deny","pattern":"*"},{"permission":"team_create","action":"deny","pattern":"*"},{"permission":"team_delete","action":"deny","pattern":"*"},{"permission":"team_shutdown_request","action":"deny","pattern":"*"},{"permission":"team_approve_shutdown","action":"deny","pattern":"*"},{"permission":"team_reject_shutdown","action":"deny","pattern":"*"},{"permission":"team_send_message","action":"deny","pattern":"*"},{"permission":"team_task_create","action":"deny","pattern":"*"},{"permission":"team_task_list","action":"deny","pattern":"*"},{"permission":"team_task_update","action":"deny","pattern":"*"},{"permission":"team_task_get","action":"deny","pattern":"*"},{"permission":"team_status","action":"deny","pattern":"*"},{"permission":"team_list","action":"deny","pattern":"*"},{"permission":"write","action":"deny","pattern":"*"},{"permission":"edit","action":"deny","pattern":"*"}],"time":{"created":1788377757683,"updated":1788377757711}}}}
+
+data: {"id":"evt_0639ef810001FGyfk84HeD6nk4","type":"session.diff","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","diff":[]}}
+
+data: {"id":"evt_0639ef810002s01D1wZTBS3I6r","type":"message.updated","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","info":{"role":"user","time":{"created":1788377757696},"tools":{"task":false,"call_omo_agent":false,"question":false,"team_create":false,"team_delete":false,"team_shutdown_request":false,"team_approve_shutdown":false,"team_reject_shutdown":false,"team_send_message":false,"team_task_create":false,"team_task_list":false,"team_task_update":false,"team_task_get":false,"team_status":false,"team_list":false,"write":false,"edit":false},"agent":"explore","model":{"providerID":"openai","modelID":"gpt-fake"},"id":"msg_0639ef8000013IyDWnhdQBZAou","sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","summary":{"diffs":[]}}}}
+
+data: {"id":"evt_0639ef812001gqq71oaVWsjF78","type":"session.status","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","status":{"type":"busy"}}}
+
+data: {"id":"evt_0639ef816001FpiF0p3GuumbYh","type":"message.part.updated","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","part":{"id":"prt_0639ef816001rrYEOk2h9NERv7","messageID":"msg_0639ef807001R9GNc8kVo1CZ12","sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","type":"step-start"},"time":1788377757718}}
+
+data: {"id":"evt_0639ef817001odQjwCoqJ7VNs0","type":"message.part.updated","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","part":{"id":"prt_0639ef816002e8Pyi47WslYBcf","messageID":"msg_0639ef807001R9GNc8kVo1CZ12","sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","type":"tool","tool":"bash","callID":"call_hang_2","state":{"status":"pending","input":{},"raw":""}},"time":1788377757719}}
+
+data: {"id":"evt_0639ef819001ZehRZAp53GMalF","type":"message.part.updated","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","part":{"type":"tool","tool":"bash","callID":"call_hang_2","state":{"status":"running","input":{"command":"i=0; while [ $i -lt 120 ]; do i=$((i+1)); sleep 1; done","description":"hang so the restart kills this child mid-turn"},"time":{"start":1788377757721}},"id":"prt_0639ef816002e8Pyi47WslYBcf","sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","messageID":"msg_0639ef807001R9GNc8kVo1CZ12","metadata":{"openai":{"itemId":"fc_2"}}},"time":1788377757721}}
+
+data: {"id":"evt_0639ef8320011VYEczUt2csB0P","type":"message.part.updated","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","part":{"type":"tool","tool":"bash","callID":"call_hang_2","state":{"metadata":{"output":""},"status":"running","input":{"command":"i=0; while [ $i -lt 120 ]; do i=$((i+1)); sleep 1; done","description":"hang so the restart kills this child mid-turn"},"time":{"start":1788377757746}},"metadata":{"openai":{"itemId":"fc_2"}},"id":"prt_0639ef816002e8Pyi47WslYBcf","sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","messageID":"msg_0639ef807001R9GNc8kVo1CZ12"},"time":1788377757746}}
+
+data: {"id":"evt_0639ef8480011X909gDhfvk21m","type":"session.error","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","error":{"name":"MessageAbortedError","data":{"message":"Aborted"}}}}
+
+data: {"id":"evt_0639ef848002CKMI3pHr0cisfU","type":"session.status","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","status":{"type":"idle"}}}
+
+data: {"id":"evt_0639ef848003N3zNjsXwOoUZGv","type":"session.idle","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd"}}
+
+data: {"id":"evt_0639ef84b0015rmq3NIviHCgpD","type":"session.error","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","error":{"name":"MessageAbortedError","data":{"message":"Aborted"}}}}
+
+data: {"id":"evt_0639ef84c001ZRHPZngFnwqv7u","type":"session.status","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","status":{"type":"idle"}}}
+
+data: {"id":"evt_0639ef84c002ytT7ulRx3K1AyT","type":"session.idle","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq"}}
+
+data: {"id":"evt_0639ef85d001J7N3Aq2doptVb0","type":"message.part.updated","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","part":{"type":"tool","tool":"task","callID":"call_midturn_child_1","state":{"status":"completed","input":{"description":"midturn adoption child","prompt":"SPLIT_CHILD_TASK: hang-midturn","subagent_type":"explore","run_in_background":true,"load_skills":[]},"output":"Background task launched.\n\nBackground Task ID: bg_b1d9c2c1\nDescription: midturn adoption child\nAgent: explore\nStatus: pending\n\nDo NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it.\n\n<task_metadata>\nsession_id: ses_f9c61080cffeOUSiGfBm2qHFgq\nbackground_task_id: bg_b1d9c2c1\nsubagent: explore\n</task_metadata>\n\nto continue: task(task_id=\"ses_f9c61080cffeOUSiGfBm2qHFgq\", load_skills=[], run_in_background=false, prompt=\"...\")","metadata":{"truncated":false,"prompt":"SPLIT_CHILD_TASK: hang-midturn","agent":"explore","requested_subagent_type":"explore","load_skills":[],"description":"midturn adoption child","run_in_background":true,"taskId":"ses_f9c61080cffeOUSiGfBm2qHFgq","sessionId":"ses_f9c61080cffeOUSiGfBm2qHFgq","backgroundTaskId":"bg_b1d9c2c1","model":{"providerID":"openai","modelID":"gpt-fake"}},"title":"midturn adoption child","time":{"start":1788377757642,"end":1788377757789}},"metadata":{"openai":{"itemId":"fc_1"}},"id":"prt_0639ef7c5001WqLL8mvdCMofnt","sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","messageID":"msg_0639ef16d001chlXnUM7zYXs4U"},"time":1788377757789}}
+
+data: {"id":"evt_0639ef85e001X8bvlwGp9bkPX9","type":"message.updated","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","info":{"id":"msg_0639ef16d001chlXnUM7zYXs4U","parentID":"msg_0639ef0b3001rz3EXewDiuk3Ex","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1788377756013,"completed":1788377757790},"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","error":{"name":"MessageAbortedError","data":{"message":"Aborted"}}}}}
+
+data: {"id":"evt_0639ef85f001vCwGU6kPyRkBCO","type":"session.status","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd","status":{"type":"idle"}}}
+
+data: {"id":"evt_0639ef85f0029zC7AvwbiURMLb","type":"session.idle","properties":{"sessionID":"ses_f9c610f91ffeBZnv5KJabVhFCd"}}
+
+data: {"id":"evt_0639ef86b001FzBc2FTNA2TOIo","type":"message.part.updated","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","part":{"type":"tool","tool":"bash","callID":"call_hang_2","state":{"status":"completed","input":{"command":"i=0; while [ $i -lt 120 ]; do i=$((i+1)); sleep 1; done","description":"hang so the restart kills this child mid-turn"},"output":"(no output)\n\n<shell_metadata>\nUser aborted the command\n</shell_metadata>","metadata":{"output":"(no output)\n\n<shell_metadata>\nUser aborted the command\n</shell_metadata>","exit":null,"truncated":false},"title":"i=0; while [ $i -lt 120 ]; do i=$((i+1)); sleep 1; done","time":{"start":1788377757746,"end":1788377757802}},"metadata":{"openai":{"itemId":"fc_2"}},"id":"prt_0639ef816002e8Pyi47WslYBcf","sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","messageID":"msg_0639ef807001R9GNc8kVo1CZ12"},"time":1788377757803}}
+
+data: {"id":"evt_0639ef86b002J5svCFI7no1Z41","type":"message.updated","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","info":{"id":"msg_0639ef807001R9GNc8kVo1CZ12","parentID":"msg_0639ef8000013IyDWnhdQBZAou","role":"assistant","mode":"explore","agent":"explore","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9lySzmIQ2l/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1788377757703,"completed":1788377757803},"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","error":{"name":"MessageAbortedError","data":{"message":"Aborted"}}}}}
+
+data: {"id":"evt_0639ef86d001P17S3vqIpivOba","type":"session.status","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq","status":{"type":"idle"}}}
+
+data: {"id":"evt_0639ef86d002QMK96jl8ats04n","type":"session.idle","properties":{"sessionID":"ses_f9c61080cffeOUSiGfBm2qHFgq"}}
+
+data: {"id":"evt_0639f062d001RAoDZBtlBKM6zP","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f06970012Ms5HD2bKV2PGx","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f07000017IQ2bP6FJxHZ0o","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f076b001xI3R50SPvpgiD6","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f07d5001VaAAIx2bdGMC05","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f08400014ApI69MCzivtdt","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f08aa001tmtoM51Oa65cM7","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f0914001mAJUOhdF1LEBdJ","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f097d001BsIgzCWLZYw051","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f09e70012Wo77Pp5sqQInN","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f0a52001E1tI1tpaoFYx4I","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f0abc001kC0QjKAep41elN","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f0b26001HNrio7wV7M68kc","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f0b8d001vbYluPYiJ2Mp3w","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f0bf7001GQmuKq3Pyx7SaK","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f0c60001R3Y5Ligly61SNc","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f0cc9001162sWe9970Bm5H","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f0d2f001yW5hAQ16qDJrYF","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f0d99001Zthmne342FGW2G","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f0e03001emPorj151JHlGZ","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f0e6d001ATnQO0iIwTIqLx","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f0ed80012wOkrkDxBbsDo8","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f0f42001laYrsqWY5dqB0t","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f0fac001Cs3h6NhjBKB3s4","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f1016001bqutrLN6gTkthR","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f1080001aP8t6ltWJ5pT4l","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f10ea001Yci9pQnKlkoTRH","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f1154001fA65wJusmCLLb3","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f11be001rsEZ6art9o3NN0","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f1229001ZGxWyJqR0dqW6n","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f12920010kndeDi2Zz45mT","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f12fc001lpnRbe7ZgTYsha","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f1366001YA8Izpb5ew4ffC","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f13cf001pkAmthaPXHOqnj","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f1438001CteBDOPv04Rgt5","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f14a2001Vkz6fYlgNMixnf","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f150c001ie0bPRfsbyJ7gS","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f1575001cIYLJrPZiVUaIk","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f15df001SMESE5N8bV209N","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f1648001ldElTWaEjacPX9","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f16b2001IMSvYqn9VtKmWk","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f1718001ZYbdKEFwCr7PEB","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f1782001Pt5Rk67aIpicHF","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0639f17880010IJpeWM3AfJ1iF","type":"server.heartbeat","properties":{}}
+
