@@ -1,0 +1,20 @@
+=== schema rejects required 90-second config ===
+19:  taskTtlMs: z.number().min(300000).optional(),
+
+=== installed dependency topology ===
+worktree_node_modules=
+=== target unit evidence ===
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/features/background-agent/task-poller.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module '@oh-my-opencode/utils' from '/Users/tim/git/oh-my-openagent-wt/bg-stall-delivery-probe/packages/omo-opencode/src/shared/data-path.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [29.00ms]
