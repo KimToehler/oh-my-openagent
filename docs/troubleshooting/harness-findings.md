@@ -2953,6 +2953,16 @@ The fix is NOT unconditional, and the reason is the whole lesson of this entry. 
 This also retroactively justifies the two tests the review flagged as "pinning the wrong behavior". `background-task-notification-template.test.ts:83-110` asserts actionable blocked output for a cancelled task, and it is correct to do so: a parked task legitimately IS a cancelled task carrying blocked metadata. Both tests were left unchanged. Paired coverage now pins both directions at `blocked-escalation.test.ts` - a terminal cancel emits zero reminders, a `report_blocked` park keeps `blockedAt` and still fires exactly one - and the buggy version could not satisfy both simultaneously.
 
 **Fix status (2026-09-02):** fixed in `c9dca1003`, proven on the real harness. Severity `costly` retained for the record.
+
+**Update (2026-09-02, the fix above did NOT fix this):** the claim on the line above is retracted. `c9dca1003` closed a real hole, but not this one, and the "proven on the real harness" wording was not supported: the probe cited for it never cancels anything, so it could only prove the timers fire.
+
+A park leaves the task `status: "cancelled"` with `blockedAt` still set. The cleanup `c9dca1003` added sits after `cancelTask`'s early return at `manager.ts:2745`, which fires for any task that is not `running` or `pending` - so the cancel meant to retire a parked task never reached it. `background_cancel` refused the task before even calling `cancelTask`, which is the `[ERROR] ... current status is "cancelled"` in the transcript above, so no path existed at all. What `c9dca1003` actually fixed is the narrower case of a task blocked while still running, reachable through the circuit breaker and `session.deleted`.
+
+The unit test added alongside it passed against the live defect because it set `task.status = "running"` before cancelling, constructing a state the park path never produces.
+
+Found by a 6-lane `review-work` gate; three lanes reached it independently, one with a reproduction against the branch tip.
+
+**Fix status (2026-09-02, revised):** fixed in `8479eaa22`. The early-return branch now disarms the escalation and clears `blockedAt`/`blockedReason`, excluding the park itself (`source === "report_blocked"`) and any cancellation already in flight; `background_cancel` routes a blocked terminal task through instead of refusing it. Proven on a real harness by `blocked-escalation-probe.sh --dismiss`: the parent dismisses the child at +10s and no reminder or expiry follows (`REMINDER_COUNT=0`, `EXPIRY_AT_S=none`). Negative control with both halves reverted goes red and reproduces this entry exactly (`DISMISSED_AT_S=none`, reminder at +62s, expiry at +123s). Evidence: `.omo/evidence/20260902-harness-findings-batch/blocked-dismiss/`.
 ## 2026-08-28 — A repo's own "no regression" gate reported all 90 pre-existing failures as regressions outside Docker
 
 **Severity:** costly
@@ -3238,6 +3248,20 @@ So the *hypothetical* clean form parses and the *actual* form does not. `tracker
 
 **Fix status (2026-09-02):** fixed in `7788a7d9a`. Severity `costly` (as re-scored earlier today) retained for the record - the same miss made a `failed, exit 1` job read as still running, which was the more consequential half.
 
+**Update (2026-09-02, that fix opened a fail-open; corrected in `7918492a8`):** `7788a7d9a` added a bare `,` to the terminator alternation. That was too wide. The `^` alternative in `STATUS_FIELD_PATTERN` anchors at the start of ANY line under the `m` flag, not the status line, so a bare comma let a log-tail line parse as the status field:
+
+```
+"failed, 3 tests\nstatus: running"            -> parsed "failed"    -> TERMINAL
+"completed, moving to next module\nstatus: running" -> "completed" -> TERMINAL
+"exited, restarting worker\nstatus: running"  -> parsed "exited"    -> TERMINAL
+```
+
+All three are still-running jobs, retired on their first poll. That is exactly the failure the `TERMINAL_STATUSES` comment four lines above warns about, and it is the dangerous direction: the guard disarms silently on the long noisy builds it exists for. The fixtures added with `7788a7d9a` all put the header first, where leftmost-match hides the hole.
+
+`7918492a8` narrows the terminator to `,\s*exit\b`. That keeps every real terminal wording (`completed, exit 0`, `failed, exit 1`, `cancelled, exit 143`, `timed out, exit 124`) and leaves comma-bearing prose unparseable, so it still reads as running. Four fixtures now pin the body-first shapes; reverting to the bare comma turns all four red.
+
+Found by the cross-engine code-quality lane of a `review-work` gate, in a change that had already passed a 28-case regex probe and the full suite. The probe missed it because every fixture in it was header-first.
+
 **Update (2026-09-02, second defect, still open):** `7788a7d9a` fixed the exit-clause half and left a second one open in the same function. Found when the `<unpolled-background-shell-jobs>` warning fired TWICE on the same five job ids, after I had already cleared each one with `background_action="status"`.
 
 `TERMINAL_STATUSES` does contain `notfound` (`packages/omo-opencode/src/hooks/unpolled-shell-job/tracker.ts:34`), and `isTerminalStatus` strips spaces, underscores and hyphens before the lookup at `:109`. Neither of the two real clear-attempt replies survives that normalization:
@@ -3328,3 +3352,24 @@ i.e. every difference is a line present on the branch and missing from the main 
 **Update:** (verified 2026-09-02 against `dev` @ 4e68569cb) Could not confirm the mechanism; the missing guard is confirmed. `hashline_edit` is OMO-owned, accepts an absolute `filePath` at `packages/omo-opencode/src/tools/hashline-edit/tools.ts:14-20`, and writes it unchanged — `args.filePath` is assigned at `hashline-edit-executor.ts:79-83`, read via `bunFile(filePath)` at `:98-99`, written via `bunWrite(filePath, writeContent)` at `:126`. `context.directory` is used only as the formatter's cwd at `:128-130`, never compared against the target, so there is no worktree containment check anywhere on this path. The repo does own a containment helper, but neither instance covers this: `isPathInsideDirectory` at `hooks/write-existing-file-guard/hook.ts:40-43` is used by a handler that deliberately RETURNS on outside-session paths rather than rejecting them at `tool-execute-before-handler.ts:128-133`; the Prometheus validator at `hooks/prometheus-md-only/path-policy.ts:14-38` is scoped to Prometheus planning writes at `hook.ts:40-62`. No `.omo/rules/` entry covers absolute-path or outside-worktree edits. What could NOT be established is whether OMO's `hashline_edit` or the upstream harness edit tool produced the observed write — the entry itself marks its mechanism unverified, and no evidence in source settles it.
 
 **Fix status (2026-09-02):** still unfixed, mechanism unconfirmed. Classification is conditional: (a) an OMO defect if `hashline_edit` performed the write, since it has no containment check; (b) upstream otherwise. Severity stays `costly`. Next step is reproduction, not a fix — drive `hashline_edit` from a worktree context with an absolute path outside it and assert which tree changes; only then decide whether to add validation before `hashline-edit-executor.ts:98`.
+
+
+## 2026-09-02 - A self-run QA probe validates the branch the author reasoned toward, not the incident the report describes
+
+**Severity:** costly
+**Area:** agent workflow / QA discipline
+**Observed in:** oh-my-openagent (`fix/harness-findings-batch`)
+
+Three fixes were implemented, unit-tested, run against a real-harness probe, and reported as done. A `review-work` gate then failed them on two blockers, each of which every self-run gate had passed.
+
+**Blocker 1 - the fix did not reach the reported path.** The incident is a parked task that keeps demanding resume. The author reasoned to "cancellation must clear blocked state", placed the cleanup on `cancelTask`'s main path, and wrote a test for it. The test passed. It passed because it set `task.status = "running"` first - a state the park path never produces, since a park leaves the task `cancelled`. The real cancel takes an early return 50 lines earlier. Both the unit test and the live probe agreed with the author's model of the bug instead of the bug.
+
+**Blocker 2 - the fix opened a fail-open in the guard it repaired.** Widening a regex terminator to a bare `,` let any log-tail line starting `failed,` / `completed,` / `exited,` retire a still-running job. A 28-case probe had been run against this exact question and reported zero over-matches - every fixture in it was header-first, where leftmost-match hides the hole.
+
+**The common shape:** each verification was built by the same person, in the same sitting, from the same mental model as the fix. A test derived from a belief tests the belief. Both defects were live through a green 15,715-test suite, a clean typecheck, mutation testing that confirmed the tests had teeth, and a passing real-harness probe. Mutation testing does not help here - it proves a test pins *what it asserts*, not that the assertion describes the incident.
+
+**What caught them:** six independent review lanes. Three reached blocker 1 separately (one reproducing it against the branch tip); the cross-engine code-quality lane found blocker 2 after the same lane's other engine missed it. The lanes were given the author's own weakest points as open questions, not as assertions.
+
+**Workaround:** for a fix to a *reported* defect, derive the test from the report's observable symptom, not from the mechanism you believe causes it. Construct the failing state through the real production path (call `report_blocked`, do not hand-set `status`); if a test needs to force a field to make the new code reachable, that is the signal it is testing the wrong state. Then prove the probe red against the unfixed build - the negative control here reproduced the incident line for line, and would have failed the original fix immediately. For a widened parser, generate the adversarial direction explicitly: the fixtures that matter are the ones that put hostile input where the anchor can reach it.
+
+**Fix status:** not a code defect; a process finding. Both underlying blockers fixed in `7918492a8` and `8479eaa22`.
