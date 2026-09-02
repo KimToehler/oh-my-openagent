@@ -48,16 +48,45 @@ describe("unpolled shell job tracker", () => {
     expect(getOutstandingJobs(SESSION)).toHaveLength(0)
   })
 
-  it("clears a job once a status poll reports it completed", () => {
+  it.each([
+    ["bracketed completed status with an exit clause", "[background:shell_24ed9238e5ae5551 completed, exit 0]"],
+    ["bracketed failed status with an exit clause", "[background:shell_24ed9238e5ae5551 failed, exit 1]"],
+    ["bracketed completed status", "[background:shell_24ed9238e5ae5551 completed]"],
+    ["line-based completed status", "status: completed\nexit code: 0\n"],
+  ])("clears a job for %s", (_label, output) => {
     recordToolCall(detachedStart("shell_24ed9238e5ae5551"))
     recordToolCall({
       sessionID: SESSION,
       tool: "lean-ctx_ctx_shell",
       args: { background_action: "status", job_id: "shell_24ed9238e5ae5551" },
-      output: 'status: completed\nexit code: 0\n',
+      output,
     })
 
     expect(getOutstandingJobs(SESSION)).toHaveLength(0)
+  })
+
+  it("keeps a job outstanding for a bracketed running status", () => {
+    recordToolCall(detachedStart("shell_24ed9238e5ae5551"))
+    recordToolCall({
+      sessionID: SESSION,
+      tool: "lean-ctx_ctx_shell",
+      args: { background_action: "status", job_id: "shell_24ed9238e5ae5551" },
+      output: "[background:shell_24ed9238e5ae5551 running]",
+    })
+
+    expect(getOutstandingJobs(SESSION)).toHaveLength(1)
+  })
+
+  it("does not treat arbitrary bracketed prose before an exit clause as terminal", () => {
+    recordToolCall(detachedStart("shell_24ed9238e5ae5551"))
+    recordToolCall({
+      sessionID: SESSION,
+      tool: "lean-ctx_ctx_shell",
+      args: { background_action: "status", job_id: "shell_24ed9238e5ae5551" },
+      output: "[background:shell_24ed9238e5ae5551 arbitrary prose completed, exit 0]",
+    })
+
+    expect(getOutstandingJobs(SESSION)).toHaveLength(1)
   })
 
   it.each([

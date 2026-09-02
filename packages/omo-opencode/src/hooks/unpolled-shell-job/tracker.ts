@@ -41,7 +41,7 @@ const TERMINAL_STATUSES = new Set([
 const RUNNING_STATUSES = new Set(["running", "started", "active", "inprogress", "pending"])
 
 /** lean-ctx reports `[background:shell_... running]` or a `status: running` line. */
-const STATUS_FIELD_PATTERN = /(?:^|\[background:\s*\S+\s+|\bstatus:\s*)([a-z][a-z _-]*?)(?:\]|$|\n)/im
+const STATUS_FIELD_PATTERN = /(?:^|\[background:\s*\S+\s+|\bstatus:\s*)([a-z][a-z _-]*?)(?:,|\]|$|\n)/im
 
 /**
  * Jobs older than this are dropped on the next write.
