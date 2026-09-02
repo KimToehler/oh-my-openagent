@@ -200,6 +200,52 @@ describe("BlockedEscalation", () => {
     expect(task.error).toBeUndefined()
   })
 
+  test("#given a blocked task #when cancellation completes before reminder time #then no blocked reminder is emitted", async () => {
+    // given
+    jest.useFakeTimers()
+    const manager = createManager({ promptAsync: async () => ({}), abort: async () => ({}) })
+    let reminders = 0
+    Reflect.set(manager, "notifyBlockedReminder", async () => { reminders += 1 })
+    const task = createTask("cancelled-before-reminder")
+    task.status = "running"
+    task.completedAt = undefined
+    addTask(manager, task)
+    await manager.notifyBlockedTask(task.id)
+
+    // when
+    await manager.cancelTask(task.id, { abortSession: false, skipNotification: true })
+    jest.advanceTimersByTime(DEFAULT_BLOCKED_REWAKE_MS)
+    await flushAsyncWork()
+
+    // then
+    expect(reminders).toBe(0)
+  })
+
+  test("#given a blocked task #when report_blocked parks it via cancelTask #then escalation stays armed and the reminder still fires", async () => {
+    // given
+    // A park IS a cancellation: report_blocked sets blockedAt, arms escalation, then
+    // calls cancelTask with source "report_blocked". Terminal-cancel cleanup must not
+    // run on that path, or the park disarms the timers it just armed.
+    jest.useFakeTimers()
+    const manager = createManager({ promptAsync: async () => ({}), abort: async () => ({}) })
+    let reminders = 0
+    Reflect.set(manager, "notifyBlockedReminder", async () => { reminders += 1 })
+    const task = createTask("parked-via-report-blocked")
+    task.status = "running"
+    task.completedAt = undefined
+    addTask(manager, task)
+    await manager.notifyBlockedTask(task.id)
+
+    // when
+    await manager.cancelTask(task.id, { source: "report_blocked", abortSession: false, skipNotification: true })
+    jest.advanceTimersByTime(DEFAULT_BLOCKED_REWAKE_MS)
+    await flushAsyncWork()
+
+    // then
+    expect(task.blockedAt).toBeDefined()
+    expect(reminders).toBe(1)
+  })
+
   test("#given a blocked task #when resume is queued or skipped #then escalation remains armed", async () => {
     // given
     jest.useFakeTimers()

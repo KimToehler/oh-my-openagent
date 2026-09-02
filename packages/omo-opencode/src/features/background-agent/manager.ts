@@ -2793,6 +2793,19 @@ The task was re-queued on a fallback model after a retryable failure.
         task.error = reason
       }
     }
+    // A park is implemented AS a cancellation (report_blocked calls cancelTask with
+    // source "report_blocked" after setting blockedAt and arming escalation), so the
+    // blocked state and its timers must survive that path. Every OTHER cancellation
+    // is terminal for a blocked task: leaving blockedAt set there keeps the reminder
+    // armed, and notifyBlockedReminder gates only on blockedAt, so a cancelled child
+    // would keep urging the parent to resume it.
+    if (source !== "report_blocked") {
+      this.blockedEscalation.cancel(taskId)
+      task.blockedAt = undefined
+      task.blockedReason = undefined
+      this.blockedNotificationTaskIds.delete(taskId)
+    }
+
     if (wasRunning && task.rootSessionId) {
       this.unregisterRootDescendant(task.rootSessionId)
     }
