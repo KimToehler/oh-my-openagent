@@ -6415,7 +6415,7 @@ describe("BackgroundManager.handleEvent - session.error", () => {
 
     //#then
     expect(task.status).toBe("interrupt")
-    expect(task.error).toBe("Agent \"missing-agent\" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.")
+    expect(task.error).toBe("Agent \"missing-agent\" not found. Make sure the agent is registered in your opencode.json or provided by a plugin. If this task was a resumed session, spawn a FRESH task with a self-contained brief instead of resuming it again.")
     expect(task.completedAt).toBeInstanceOf(Date)
     expect(task.concurrencyKey).toBeUndefined()
     expect(concurrencyManager.getCount(concurrencyKey)).toBe(0)

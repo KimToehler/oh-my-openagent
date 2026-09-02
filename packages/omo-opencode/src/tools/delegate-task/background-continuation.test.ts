@@ -143,13 +143,13 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
   })
 
   test("discloses fidelity loss after adopting an orphaned server session", async () => {
-    //#given - unowned session adopts into a continue task
+    //#given - unowned session adopts under the agent recovered from its transcript
     const mockManager = {
       findBySession: () => undefined,
       resume: async () => ({
         id: "bg_adopted_001",
         description: "adopted task",
-        agent: "continue",
+        agent: "momus",
         status: "running",
         sessionId: "ses_orphaned_123",
       }),
@@ -176,7 +176,8 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
     })
 
     //#then - caller receives adopted-task fidelity disclosure
-    expect(result).toContain("Agent continues with full previous context preserved.\n\nThis continuation adopted an orphaned server session using agent: continue.\nIt has no original model, no fallback chain, no category, and no loaded skill content.\nIt will not auto-fall-back on a model error.\n\nDo NOT call background_output now")
+    expect(result).toContain("Agent continues with full previous context preserved.\n\nThis continuation adopted an orphaned server session, recovering agent: momus from its transcript.\nIt has no fallback chain, no category, and no loaded skill content.\nIt will not auto-fall-back on a model error.\n\nDo NOT call background_output now")
+    expect(result).not.toContain("agent: continue")
   })
 
   test("keeps normal known-task continuation output free of adopted-task disclosure", async () => {

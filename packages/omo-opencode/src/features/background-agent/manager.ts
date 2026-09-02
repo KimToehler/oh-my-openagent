@@ -52,6 +52,10 @@ import { BlockedEscalation, buildBlockedReminderNotification } from "./blocked-e
 import { isTaskBlocked } from "./blocked-state"
 import { writeBackgroundTaskMarker } from "./background-task-marker"
 import {
+  type AdoptedSessionIdentity,
+  resolveAdoptedSessionIdentity,
+} from "./adopted-session-identity"
+import {
   findNearestMessageExcludingCompaction,
   resolvePromptContextFromSessionMessages,
 } from "./compaction-aware-message-resolver"
@@ -1426,13 +1430,27 @@ The fallback retry session is now created and can be inspected directly.
         )
       }
 
+      // Adoption must carry the agent the session actually ran under. Inventing a
+      // name produced a task that looked live and could never dispatch, so refuse
+      // rather than substitute: a silent persona swap would let a reviewer or plan
+      // lane return an authoritative-looking verdict under the wrong agent.
+      const identity = await this.resolveAdoptedSessionIdentity(input.sessionId)
+      if (!identity.agent) {
+        throw new Error(
+          `Task for session ${input.sessionId} cannot be continued: its original agent could not be recovered ` +
+          "from the server transcript, and continuing under a substitute agent would run the session as the wrong persona.\n\n" +
+          `Recovery: spawn a FRESH task with a self-contained brief, carrying forward any on-disk state. ` +
+          `Use \`session_read(session_id="${input.sessionId}")\` to recover the prior context.`,
+        )
+      }
+
       existingTask = this.adoptRunningSession({
         sessionId: input.sessionId,
         parentSessionId: input.parentSessionId,
         parentMessageId: input.parentMessageId,
         description: `Resumed orphaned background session ${input.sessionId}`,
-        agent: "continue",
-        model: undefined,
+        agent: identity.agent,
+        model: identity.model,
         rootSessionId: input.parentSessionId,
         rootDescendantAlreadyReserved: false,
       })
@@ -2295,9 +2313,13 @@ Task ${existingTask.id} resumed with parent answer.
         taskId: task.id,
         errorMessage: errorInfo.message?.slice(0, 100),
       })
+      // No retry here: the dispatched prompt is not persisted on the task
+      // (`prompt` is "[already prompted]" for adopted sessions), so a fallback
+      // re-dispatch would replay a placeholder instead of the real request.
       await this.interruptTaskFromAsyncPromptFailure(
         task,
-        `Agent "${task.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.`,
+        `Agent "${task.agent}" not found. Make sure the agent is registered in your opencode.json or provided by a plugin. ` +
+        "If this task was a resumed session, spawn a FRESH task with a self-contained brief instead of resuming it again.",
         "agent-not-found session.error",
       )
       return
@@ -3220,6 +3242,10 @@ The task was re-queued on a fallback model after a retryable failure.
       ...(variant !== undefined ? { variant } : {}),
       ...(resolvedTools ? { tools: resolvedTools } : {}),
     }
+  }
+
+  private resolveAdoptedSessionIdentity(sessionID: string): Promise<AdoptedSessionIdentity> {
+    return resolveAdoptedSessionIdentity(this.client, sessionID, this.directory)
   }
 
   private async isSessionActive(sessionID: string): Promise<boolean> {
