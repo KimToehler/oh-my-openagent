@@ -96,6 +96,110 @@ describe("BackgroundManager.handleEvent - interrupted parent", () => {
     expect(childB.status).toBe("cancelled")
     expect(unrelated.status).toBe("running")
 
-    manager.shutdown()
+    await manager.shutdown()
+  })
+
+  test("#given a parent session that failed for a NON-interrupt reason #when session.error carries a provider error whose prose merely contains the word aborted #then the child lanes keep running", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    const child = createMockTask({
+      id: "task-child-transport",
+      sessionId: "session-child-transport",
+      parentSessionId: PARENT_SESSION_ID,
+      status: "running",
+    })
+    getTaskMap(manager).set(child.id, child)
+
+    //#when
+    // A transport failure, not a user interrupt. The loose `isAbortedSessionError`
+    // substring test matches this string, which is why the destructive path must
+    // key on the structured error NAME instead.
+    manager.handleEvent(cast<Parameters<BackgroundManager["handleEvent"]>[0]>({
+      type: "session.error",
+      properties: {
+        sessionID: PARENT_SESSION_ID,
+        error: { name: "ProviderTransportError", message: "connection aborted by upstream" },
+      },
+    }))
+
+    await flushBackgroundNotifications()
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(child.status).toBe("running")
+
+    await manager.shutdown()
+  })
+
+  test("#given an interrupted session that is itself a tracked lane #when session.error carries an abort for that lane #then its siblings under the same parent are untouched", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    const interruptedLane = createMockTask({
+      id: "task-self",
+      sessionId: "session-self",
+      parentSessionId: PARENT_SESSION_ID,
+      status: "running",
+      isCurrent: true,
+    })
+    const sibling = createMockTask({
+      id: "task-sibling",
+      sessionId: "session-sibling",
+      parentSessionId: "session-self",
+      status: "running",
+    })
+
+    const taskMap = getTaskMap(manager)
+    taskMap.set(interruptedLane.id, interruptedLane)
+    taskMap.set(sibling.id, sibling)
+
+    //#when
+    manager.handleEvent(cast<Parameters<BackgroundManager["handleEvent"]>[0]>({
+      type: "session.error",
+      properties: {
+        sessionID: "session-self",
+        error: { name: "MessageAbortedError", data: { message: "Aborted" } },
+      },
+    }))
+
+    await flushBackgroundNotifications()
+    await flushBackgroundNotifications()
+
+    //#then
+    // A lane's own abort is handled by the lane's own error path, which owns
+    // retry and fallback. Cascading from here would cancel work that path may
+    // still recover.
+    expect(sibling.status).toBe("running")
+
+    await manager.shutdown()
+  })
+
+  test("#given a parent interrupted by the user #when its lanes are terminalized #then no parent notification is queued, because a wake would restart the turn the user just stopped", async () => {
+    //#given
+    const manager = createBackgroundManager()
+    const child = createMockTask({
+      id: "task-child-nowake",
+      sessionId: "session-child-nowake",
+      parentSessionId: PARENT_SESSION_ID,
+      status: "running",
+    })
+    getTaskMap(manager).set(child.id, child)
+
+    //#when
+    manager.handleEvent(cast<Parameters<BackgroundManager["handleEvent"]>[0]>({
+      type: "session.error",
+      properties: {
+        sessionID: PARENT_SESSION_ID,
+        error: { name: "MessageAbortedError", data: { message: "Aborted" } },
+      },
+    }))
+
+    await flushBackgroundNotifications()
+    await flushBackgroundNotifications()
+
+    //#then
+    expect(child.status).toBe("cancelled")
+    expect(manager.getPendingNotifications(PARENT_SESSION_ID)).toHaveLength(0)
+
+    await manager.shutdown()
   })
 })

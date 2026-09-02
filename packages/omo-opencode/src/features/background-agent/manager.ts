@@ -81,6 +81,7 @@ import {
   extractErrorStatusCode,
   getSessionErrorMessage,
   isAbortedSessionError,
+  isUserInterruptSessionError,
   isRecord,
   isTerminalSessionError,
 } from "./error-classifier"
@@ -880,7 +881,14 @@ export class BackgroundManager {
     // critical path to `running`. Awaiting it here delayed dispatch and left tasks
     // observably `pending`. Completion awaits this promise instead.
     task.dirtyWorktreeDirectory = parentDirectory
-    task.dirtyWorktreeBaselinePromise = this.dirtyWorktreeStatusReader(parentDirectory)
+    // `.catch` at the creation site, not the await site: this promise is awaited
+    // ONLY on the normal-completion path, so a lane that is cancelled, errors, or
+    // is terminalized by a parent abort never observes it. An injected reader may
+    // reject with anything, and an unobserved rejection is fatal under
+    // `OMO_DISABLE_PROCESS_CLEANUP=1`, where no global handler is registered.
+    task.dirtyWorktreeBaselinePromise = Promise.resolve(
+      this.dirtyWorktreeStatusReader(parentDirectory),
+    ).catch(() => ({ kind: "unavailable" }) as const)
 
     const createResult = await this.client.session.create({
       body: {
@@ -2316,7 +2324,7 @@ Task ${existingTask.id} resumed with parent answer.
    * still exists, it was only interrupted.
    */
   private terminalizeChildTasksOnParentAbort(sessionID: string, error: unknown): void {
-    if (!isAbortedSessionError(error)) return
+    if (!isUserInterruptSessionError(error)) return
 
     const ownTask = this.resolveTaskAttemptBySession(sessionID)
     if (ownTask?.isCurrent) return
@@ -2335,6 +2343,7 @@ Task ${existingTask.id} resumed with parent answer.
       void this.cancelTask(child.id, {
         source: "parent-session-abort",
         reason: "Parent session was interrupted",
+        skipNotification: true,
       }).catch((err) => {
         log("[background-agent] Failed to cancel child task on parent abort:", {
           taskId: child.id,
@@ -3000,15 +3009,29 @@ The task was re-queued on a fallback model after a retryable failure.
     return Array.from(this.tasks.values()).filter(t => t.status !== "running")
   }
 
+  /**
+   * Best-effort annotation. It runs inside `tryCompleteTask`, between the
+   * notification reservation and `markForNotification`, so a throw here would
+   * drop the parent notification entirely and a hang would stall the poll loop
+   * for every lane. A cosmetic count must never gate completion: contain all
+   * failures and degrade to no annotation.
+   */
   private async annotateNewDirtyWorktreePaths(task: BackgroundTask): Promise<void> {
     if (!task.dirtyWorktreeBaselinePromise || !task.dirtyWorktreeDirectory) return
 
-    const baselineStatus = await task.dirtyWorktreeBaselinePromise
-    if (baselineStatus.kind !== "available") return
+    try {
+      const baselineStatus = await task.dirtyWorktreeBaselinePromise
+      if (baselineStatus.kind !== "available") return
 
-    const completionStatus = await this.dirtyWorktreeStatusReader(task.dirtyWorktreeDirectory)
-    if (completionStatus.kind === "available") {
-      task.uncommittedFileCount = countNewDirtyPaths(baselineStatus.paths, completionStatus.paths)
+      const completionStatus = await this.dirtyWorktreeStatusReader(task.dirtyWorktreeDirectory)
+      if (completionStatus.kind === "available") {
+        task.uncommittedFileCount = countNewDirtyPaths(baselineStatus.paths, completionStatus.paths)
+      }
+    } catch (error) {
+      log("[background-agent] Dirty-worktree annotation failed, completing without it:", {
+        taskId: task.id,
+        error,
+      })
     }
   }
 
