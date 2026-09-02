@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test"
 
+import { buildUnpolledShellJobMessage } from "./message"
 import { _resetForTesting, forgetSession, getOutstandingJobs, recordToolCall } from "./tracker"
 
 const SESSION = "ses_test"
@@ -340,6 +341,50 @@ describe("unpolled shell job tracker", () => {
     }
   })
 
+  it("deregisters a job when a wait call returns its terminal result", () => {
+    // `background_action="wait"` is a ctx_shell call carrying the job id, so unlike a
+    // marker-file read it IS observable. A wait that returns terminal is the completion
+    // signal; leaving the job tracked would warn about work the agent just collected.
+    recordToolCall(detachedStart("shell_fcd9eaf4eeb588ea", "bun install"))
+
+    recordToolCall({
+      sessionID: SESSION,
+      tool: "lean-ctx_ctx_shell",
+      args: { background_action: "wait", job_id: "shell_fcd9eaf4eeb588ea" },
+      output: "[background:shell_fcd9eaf4eeb588ea completed, exit 0]\n  install.mjs  19.86 KB\n\n3 packages installed [10.59s]",
+    })
+
+    expect(getOutstandingJobs(SESSION)).toHaveLength(0)
+  })
+
+  it("keeps a job tracked when a wait call times out while the job is still running", () => {
+    // A bounded wait that expires is NOT completion: the job keeps running and the turn
+    // still must not end on it. Retiring here would disarm the guard mid-build.
+    recordToolCall(detachedStart("shell_73d4ec0671b40bf5", "bun test"))
+
+    recordToolCall({
+      sessionID: SESSION,
+      tool: "lean-ctx_ctx_shell",
+      args: { background_action: "wait", job_id: "shell_73d4ec0671b40bf5" },
+      output: "[background:shell_73d4ec0671b40bf5 wait timed out after 45s — still running, not an error; call wait again to keep waiting, or status to peek]",
+    })
+
+    expect(getOutstandingJobs(SESSION).map((job) => job.jobId)).toEqual(["shell_73d4ec0671b40bf5"])
+  })
+
+  it("deregisters a job when a wait call reports the id is already gone", () => {
+    recordToolCall(detachedStart("shell_83fcb925ed785b3a"))
+
+    recordToolCall({
+      sessionID: SESSION,
+      tool: "lean-ctx_ctx_shell",
+      args: { background_action: "wait", job_id: "shell_83fcb925ed785b3a" },
+      output: "[background:shell_83fcb925ed785b3a not found — already finished or cancelled]",
+    })
+
+    expect(getOutstandingJobs(SESSION)).toHaveLength(0)
+  })
+
   it("keeps a job tracked when its result was consumed without a terminal poll", () => {
     // The bounded-loop pattern the warning itself teaches: wait on a marker file,
     // then read the result with a non-ctx_shell tool. The tracker never sees a
@@ -363,6 +408,20 @@ describe("unpolled shell job tracker", () => {
     // Documents current behavior: consumption by effect does not deregister.
     // The tracker only observes ctx_shell calls, so no signal reaches it here.
     expect(getOutstandingJobs(SESSION).map((job) => job.jobId)).toEqual(["shell_1f2e3d4c5b6a7988"])
+  })
+
+  it("offers wait as the primary resolution, since wait both blocks and deregisters", () => {
+    // The warning previously taught a marker-file loop plus a follow-up status call and
+    // never mentioned `wait`, its own cheapest resolution: one call that both supervises
+    // the job and clears it. Omitting it is what produced repeated status-call spirals.
+    const message = buildUnpolledShellJobMessage([
+      { jobId: "shell_09e11136fc3e37b6", command: "./gradlew test", firstSeenAt: 0 },
+    ])
+
+    expect(message).toContain('ctx_shell(background_action="wait", job_id="shell_09e11136fc3e37b6")')
+    // The wait offer must precede the marker-file loop, which is the fallback.
+    expect(message.indexOf('background_action="wait"')).toBeLessThan(message.indexOf("seq 1 50"))
+    expect(message).toContain("deregisters the job")
   })
 
   it("caps the number of tracked jobs per session", () => {
