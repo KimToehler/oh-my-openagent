@@ -1,0 +1,4 @@
+HOME=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.J7maCoLItM/home
+OMO_QA_PROJ=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.J7maCoLItM/proj
+OMO_QA_ROOT=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.J7maCoLItM
+MOCK_PORT=52731

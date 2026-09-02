@@ -1,0 +1,223 @@
+TASK 13 P0 FIXES
+
+HEAD BEFORE: c89f1651e6a8166cf16999b278690c9d587d3f61
+WORKTREE: /Users/tim/git/oh-my-openagent/.worktrees/bg-wake-sse-render
+
+P0-1 RED
++ Received  + 1
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/bg-wake-sse-render/packages/omo-opencode/src/hooks/shared/prompt-async-gate-semantic-dedupe.test.ts:117:22)
+(fail) dispatchInternalPrompt semantic dedupe > #given the same semantic prompt is built with different object key order #when it repeats during the broad hold #then the duplicate is coalesced [0.27ms]
+349 |         postDispatchHoldMs: 0,
+350 |       })
+351 | 
+352 |       // then
+353 |       expect(first.status).toBe("dispatched")
+354 |       expect(second).toEqual({
+                           ^
+error: expect(received).toEqual(expected)
+
+@@ -1,3 +1,3 @@
+  {
++   "coalesceKind": "already-delivered",
+    "position": 0,
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/bg-wake-sse-render/packages/omo-opencode/src/hooks/shared/prompt-async-gate-semantic-dedupe.test.ts:354:22)
+(fail) dispatchInternalPrompt semantic dedupe > #given continuation prompts differ by route metadata #when the broad hold has expired #then semantic dedupe still coalesces intent-level duplicates [0.20ms]
+
+packages/omo-opencode/src/hooks/shared/prompt-async-gate.test.ts:
+1213 |     })
+1214 | 
+1215 |     // then
+1216 |     expect(first.status).toBe("failed")
+1217 |     expect(first).toMatchObject({ dispatchAttempted: true })
+1218 |     expect(second).toEqual({ status: "queued", queuedBy: "test:reject:first", position: 0 })
+                          ^
+error: expect(received).toEqual(expected)
+
+@@ -1,3 +1,3 @@
+  {
++   "coalesceKind": "already-delivered",
+    "position": 0,
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/bg-wake-sse-render/packages/omo-opencode/src/hooks/shared/prompt-async-gate.test.ts:1218:20)
+(fail) dispatchInternalPrompt shared gate behavior > #given promptAsync rejects after dispatch #when a second caller races immediately #then post-dispatch hold still blocks duplicate [0.24ms]
+
+packages/omo-opencode/src/hooks/shared/prompt-async-gate-semantic-dedupe-edge.test.ts:
+89 |       // then
+90 |       if (first.status !== "failed") {
+91 |         throw new Error("expected first dispatch to fail after attempt")
+92 |       }
+93 |       expect(first.dispatchAttempted).toBe(true)
+94 |       expect(second).toEqual({ status: "queued", queuedBy: "test:reject-semantic:first", position: 0 })
+                          ^
+error: expect(received).toEqual(expected)
+
+@@ -1,3 +1,3 @@
+  {
++   "coalesceKind": "already-delivered",
+    "position": 0,
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/bg-wake-sse-render/packages/omo-opencode/src/hooks/shared/prompt-async-gate-semantic-dedupe-edge.test.ts:94:22)
+(fail) dispatchInternalPrompt semantic dedupe edge cases > #given promptAsync rejects after an attempted dispatch #when the same prompt retries after the post-dispatch hold #then semantic dedupe still coalesces it [0.55ms]
+
+ 39 pass
+ 5 fail
+ 109 expect() calls
+Ran 44 tests across 3 files. [199.00ms]
+
+P0-1 GREEN
+bun test v1.3.14 (d1632b29)
+
+ 44 pass
+ 0 fail
+ 114 expect() calls
+Ran 44 tests across 3 files. [188.00ms]
+
+P0-1 ASSERTION DIFF
+
+P0-2 RED
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts:
+52 |     }, COALESCE_REQUEUE_FLUSH_DELAY_MS)
+53 |     jest.advanceTimersByTime(DEFAULT_RETRY_MS)
+54 |     await drainAsyncTimerWork()
+55 | 
+56 |     // then
+57 |     expect(flushes).toEqual([])
+                         ^
+error: expect(received).toEqual(expected)
+
+- []
++ [
++   "default",
++ ]
+
+- Expected  - 1
++ Received  + 3
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/bg-wake-sse-render/packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts:57:21)
+(fail) ParentWakePendingQueue scheduleFlush > #given a default retry is armed #when a longer explicit delay is requested #then the flush moves to the later deadline [0.70ms]
+125 |     }
+126 |     jest.advanceTimersByTime(COALESCE_REQUEUE_FLUSH_DELAY_MS - 1_500)
+127 |     await drainAsyncTimerWork()
+128 | 
+129 |     // then
+130 |     expect(flushes).toEqual(["first-long"])
+                          ^
+error: expect(received).toEqual(expected)
+
+  [
+-   "first-long",
++   "default",
+  ]
+
+- Expected  - 1
++ Received  + 1
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/bg-wake-sse-render/packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts:130:21)
+(fail) ParentWakePendingQueue scheduleFlush > #given repeated longer-delay requests #when the first later deadline arrives #then the flush is not starved and only one timer fires [0.12ms]
+185 |       await drainAsyncTimerWork()
+186 |     }
+187 | 
+188 |     // then
+189 |     expect(promptAsyncCalls).toHaveLength(2)
+190 |     expect(latestWake.coalesceRequeueCount).toBeUndefined()
+                                                  ^
+error: expect(received).toBeUndefined()
+
+Received: 3
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/bg-wake-sse-render/packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.test.ts:190:45)
+(fail) ParentWakePendingQueue scheduleFlush > #given an existing default timer and an already-delivered wake #when real queue cadence drives coalesce retries #then the wake reaches a second real dispatch before the cap [1.78ms]
+
+ 2 pass
+ 3 fail
+ 8 expect() calls
+Ran 5 tests across 1 file. [80.00ms]
+
+P0-2 GREEN
+bun test v1.3.14 (d1632b29)
+
+ 5 pass
+ 0 fail
+ 15 expect() calls
+Ran 5 tests across 1 file. [81.00ms]
+
+P0-2 PRODUCTION DIFF
+
+SCOPED SUITE
+bun test v1.3.14 (d1632b29)
+
+ 939 pass
+ 0 fail
+ 2461 expect() calls
+Ran 939 tests across 87 files. [30.25s]
+
+FULL SUITE
+                                               ^
+error: expect(received).toBe(expected)
+
+Expected: "shared"
+Received: "opencode"
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/bg-wake-sse-render/packages/skills-loader-core/src/features/opencode-skill-loader/loader-deduplication.test.ts:351:42)
+(fail) skill loader MCP parsing > deduplication > treats a project skill literally named shared/ulw-plan as a plain name, not a canonical alias [12.34ms]
+
+  ⚙ read_file filePath=/src/index.ts  
+
+packages/omo-opencode/src/__tests__/perf/plugin-init.test.ts:
+empty-project: cold=40.5ms warm=[20.0, 19.3] median=20.0ms
+in-tree-fixture: cold=37.6ms warm=[17.1, 19.6] median=19.6ms
+
+ 12772 pass
+ 3 skip
+ 5 fail
+ 1 snapshots, 78746 expect() calls
+Ran 12780 tests across 1682 files. [126.55s]
+Classification: 12772 pass, 3 skip, 5 fail. Five failures are expected pre-existing base failures: one script/codex-installer-version.test.ts artifact drift and four ulw-plan skill dedup/resolution failures. No changed-file or branch-introduced failures.
+
+TYPECHECK
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+Exit: 0
+
+OPENCODE QA
+first matching event: {"type":"server.connected"}
+PASS: SSE /event opened and delivered server.connected
+opencode_version=1.18.10
+db_path=/Users/tim/.local/share/opencode/opencode.db
+session_count_before=1557
+session_count_after=1557
+unchanged=yes
+
+INVARIANT PROOF
+- No-delay call: test fires at exactly pendingRetryMs=1000, not 999.
+- Shorter explicit delay: existing 5667ms timer remains armed and original operation fires.
+- No starvation: only first later deadline may replace a timer; repeated later requests cannot extend it again.
+- No timer leak: replacement clears old handle; fire, clearTimer, and shutdown delete timer, deadline, and extension state; tests assert one fire and empty timer map after cleanup.
+- Composite delivery: existing 1000ms timer plus coalesce 5667ms backoff reaches promptAsync call 2 before retry-cap loss.
+
+FROZEN SURFACES
+No diff in isInternalPromptDispatchAccepted or four frozen call sites. Constants unchanged.
+
+NOTE
+Near-duplicate mirror tests differ primarily by import path and can drift again:
+- packages/omo-opencode/src/hooks/shared/prompt-async-gate.test.ts
+- packages/omo-opencode/src/hooks/shared/prompt-async-gate-semantic-dedupe.test.ts
+- packages/omo-opencode/src/hooks/shared/prompt-async-gate-semantic-dedupe-edge.test.ts
+Canonical counterparts live under packages/utils/src/. Track consolidation separately; not fixed here.
+
+WHAT WAS OMITTED
+No secrets, auth headers, environment dumps, or private credentials captured.

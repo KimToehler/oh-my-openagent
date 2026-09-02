@@ -1,0 +1,23 @@
+--- plugin probe ---
+PROBE_CONFIG_HOOK_RAN
+PROBE_HEADER=anthropic/claude-opus-5
+PROBE_HEADER=anthropic/claude-opus-5
+--- curl headers ---
+HTTP/1.1 200 OK
+Content-Type: text/event-stream
+X-9Router-Upstream-Model: anthropic/claude-opus-5
+Date: Fri, 28 Aug 2026 14:48:01 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+
+data: {"id":"chatcmpl-mock","object":"chat.completion.chunk","model":"mock-body-model","choices":[{"index":0,"delta":{"role":"assistant","content":"probe success"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-mock","object":"chat.completion.chunk","model":"mock-body-model","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
+
+--- opencode run ---
+{"type":"step_start","timestamp":1787928485856,"sessionID":"ses_fb7286363ffeKu2mgwvYRu98Wy","part":{"id":"prt_048d79fd9001LGNmeYn3ADbJXh","messageID":"msg_048d79d50001q5ae4xZYP819HP","sessionID":"ses_fb7286363ffeKu2mgwvYRu98Wy","type":"step-start"}}
+{"type":"text","timestamp":1787928485856,"sessionID":"ses_fb7286363ffeKu2mgwvYRu98Wy","part":{"id":"prt_048d79fda001aMhcPYMvkLOkgk","messageID":"msg_048d79d50001q5ae4xZYP819HP","sessionID":"ses_fb7286363ffeKu2mgwvYRu98Wy","type":"text","text":"probe success","time":{"start":1787928485850,"end":1787928485851}}}
+{"type":"step_finish","timestamp":1787928485856,"sessionID":"ses_fb7286363ffeKu2mgwvYRu98Wy","part":{"id":"prt_048d79fdc001vpKOiF5dZXaXBd","reason":"stop","messageID":"msg_048d79d50001q5ae4xZYP819HP","sessionID":"ses_fb7286363ffeKu2mgwvYRu98Wy","type":"step-finish","tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0}}

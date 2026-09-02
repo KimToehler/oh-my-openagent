@@ -67,7 +67,7 @@ Before acting, survey the skills available in this system: scan their descriptio
 
 <tool_usage_rules>
 - Prefer tools over internal knowledge for fresh or user-specific data
-- Use `codegraph_explore` first when codegraph_* tools are available for how/where/what/flow questions and before edits; if absent or inactive/cold-start unavailable, continue with Grep/Read/LSP and the ast-grep skill.
+- For how/where/what/flow questions and before edits: LSP for symbols, the ast-grep skill for structure, Grep/Read for text.
 - Parallelize independent reads (read_file, grep, explore, librarian) to reduce latency
 - After any write/update, briefly restate: What changed, Where (path), Follow-up needed
 </tool_usage_rules>
@@ -78,7 +78,7 @@ Before acting, survey the skills available in this system: scan their descriptio
 
 | Track | Tools | Speed | Purpose |
 |-------|-------|-------|---------|
-| **Direct** | codegraph_explore (primary), Grep, Read, LSP, ast-grep skill (`sg`) | Instant | Quick wins, known locations |
+| **Direct** | LSP, ast-grep skill (`sg`), Grep, Read | Instant | Quick wins, known locations |
 | **Background** | explore, librarian agents | Async | Deep search, external docs |
 
 **ALWAYS run both tracks in parallel:**
@@ -166,7 +166,7 @@ lsp_diagnostics catches type errors only. Logic bugs, missing behavior, broken f
 | Adds/modifies a CLI command | Run it with Bash. Show output. |
 | Changes build output | Run build. Verify output files. |
 | Modifies API behavior | Call the endpoint. Show response. |
-| Renders/changes a page | Use Chrome to drive the page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Screenshot + action log. |
+| Renders/changes a page | Use Chrome to drive the page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Screenshot + action log. NEVER clear cookies, cache, or site data (`Network.clearBrowserCookies`, `Storage.clearCookies`, `chrome.browsingData.remove`, "clear browsing data") on the user's real/main browser profile — it wipes their logged-in state. If you need that profile's login state, clone it first (`rsync -a <profile>/ <tmp-clone>/`) and launch Chrome / agent-browser against the clone as the user-data-dir; run any clearing there only. |
 | Changes UI rendering or a TUI/terminal layout (incl. CJK/Korean/Japanese/Chinese text) | Load the visual-qa skill: capture reference + actual screenshots (web) or the xterm.js web terminal render (TUI; NEVER `tmux capture-pane` - it degrades color and CJK width), run its bundled pixel-diff / column-width script, and get the dual read-only verdict (design-system + functional integrity, and visual fidelity + CJK precision). Record the diff/score artifact. |
 | Drives a desktop GUI | Computer use: OS-level GUI automation against the running app. Action log + screenshot. |
 | Adds tool/hook/feature | Test end-to-end in a real scenario. |

@@ -109,7 +109,7 @@ describe("runSenpiStartupMigration", () => {
     // given
     const fileSystem = memoryFileSystem()
     fileSystem.files.set("/home/alice/.config/opencode/oh-my-openagent.jsonc", '{"agents":{"finder":{"model":"provider/finder"}}}')
-    fileSystem.files.set("/home/alice/.omo/config.jsonc", '{"codegraph":{"daemon":false}}')
+    fileSystem.files.set("/home/alice/.omo/config.jsonc", '{"[opencode]":{"disabled_hooks":["startup-toast"]}}')
 
     // when
     const result = withProcessPlatform("win32", () => runSenpiStartupMigration(migrationOptions(fileSystem)))
@@ -123,8 +123,7 @@ describe("runSenpiStartupMigration", () => {
         "2026-07-codex-config-jsonc",
         "2026-08-reasoning-unification",
       ],
-      "[opencode]": { agents: { finder: { model: "provider/finder" } } },
-      codegraph: { daemon: false },
+      "[opencode]": { disabled_hooks: ["startup-toast"] },
     })
   })
 
@@ -218,11 +217,11 @@ describe("createConfigStartupComponent", () => {
     expect(logs).toEqual([])
   })
 
-  test("#given a migration target with a conflicting legacy value #when session_start captures a UI #then it reports the skipped-conflict diagnostic once", async () => {
+  test("#given a migration target with a conflicting provider setting #when session_start captures a UI #then it reports the skipped-conflict diagnostic once", async () => {
     // given
     const fileSystem = memoryFileSystem()
-    fileSystem.files.set("/home/alice/.config/opencode/oh-my-openagent.jsonc", '{"agents":{"finder":{"model":"provider/legacy"}}}')
-    fileSystem.files.set("/home/alice/.omo/omo.jsonc", '{"[opencode]":{"agents":{"finder":{"model":"provider/kept"}}}}')
+    fileSystem.files.set("/home/alice/.config/opencode/oh-my-openagent.jsonc", '{"model_fallback":true}')
+    fileSystem.files.set("/home/alice/.omo/omo.jsonc", '{"[opencode]":{"model_fallback":false}}')
     const migration = runSenpiStartupMigration(migrationOptions(fileSystem))
     const pi = new FakeExtensionAPI()
     const logs: string[] = []
@@ -245,7 +244,7 @@ describe("createConfigStartupComponent", () => {
         type: "info",
       },
       {
-        message: "omo-senpi: configuration migration: skipped: [opencode].agents.finder.model legacy=\"provider/legacy\" kept=\"provider/kept\"",
+        message: "omo-senpi: configuration migration: skipped: [opencode].model_fallback legacy=true kept=false",
         type: "warning",
       },
     ])

@@ -1,0 +1,3 @@
+watching http://127.0.0.1:57300/event?directory=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.12nUSCtGwf/proj for 'message.updated' (<=300s)
+first matching event: {"type":"message.updated"}
+PASS: observed 'message.updated' on http://127.0.0.1:57300

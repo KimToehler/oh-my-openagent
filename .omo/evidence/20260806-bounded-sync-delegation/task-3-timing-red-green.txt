@@ -1,0 +1,121 @@
+# Task 3 Timing Red/Green Evidence
+
+## What was tested
+- RED: added timing tests before production implementation, then ran `bun test packages/omo-opencode/src/tools/delegate-task/timing.test.ts`.
+- GREEN: added inert `MAX_WALL_CLOCK_MS` state and all required accessor/config/reset/set wiring, then reran same test file.
+- Scope/inertness: ran `bun test packages/omo-opencode/src/tools/delegate-task/` twice in same shell session.
+- Type safety: ran `bun run typecheck`.
+- Manual runtime QA: throwaway `/tmp/bounded-sync-delegation-task-3/runtime-check.ts` printed default, override, reset `getTimingConfig()`.
+- Dirty-worktree safety: staged only timing files by explicit paths before commit.
+
+## What was observed
+### RED output
+```text
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/tools/delegate-task/timing.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+SyntaxError: Export named 'getDefaultSyncWallClockTimeoutMs' not found in module '/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/tools/delegate-task/timing.ts'.
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [72.00ms]
+```
+
+Expected missing-export failure observed: `SyntaxError: Export named 'getDefaultSyncWallClockTimeoutMs' not found in module '.../timing.ts'`. No syntax failure.
+
+### GREEN output
+```text
+bun test v1.3.14 (d1632b29)
+
+ 7 pass
+ 0 fail
+ 7 expect() calls
+Ran 7 tests across 1 file. [79.00ms]
+```
+
+### Runtime printouts
+```text
+default {
+  POLL_INTERVAL_MS: 1000,
+  MIN_STABILITY_TIME_MS: 10000,
+  STABILITY_POLLS_REQUIRED: 3,
+  WAIT_FOR_SESSION_INTERVAL_MS: 100,
+  WAIT_FOR_SESSION_TIMEOUT_MS: 60000,
+  MAX_POLL_TIME_MS: 1800000,
+  MAX_WALL_CLOCK_MS: Infinity,
+  SESSION_CONTINUATION_STABILITY_MS: 5000,
+}
+override {
+  POLL_INTERVAL_MS: 1000,
+  MIN_STABILITY_TIME_MS: 10000,
+  STABILITY_POLLS_REQUIRED: 3,
+  WAIT_FOR_SESSION_INTERVAL_MS: 100,
+  WAIT_FOR_SESSION_TIMEOUT_MS: 60000,
+  MAX_POLL_TIME_MS: 1800000,
+  MAX_WALL_CLOCK_MS: 5000,
+  SESSION_CONTINUATION_STABILITY_MS: 5000,
+}
+reset {
+  POLL_INTERVAL_MS: 1000,
+  MIN_STABILITY_TIME_MS: 10000,
+  STABILITY_POLLS_REQUIRED: 3,
+  WAIT_FOR_SESSION_INTERVAL_MS: 100,
+  WAIT_FOR_SESSION_TIMEOUT_MS: 60000,
+  MAX_POLL_TIME_MS: 1800000,
+  MAX_WALL_CLOCK_MS: Infinity,
+  SESSION_CONTINUATION_STABILITY_MS: 5000,
+}
+```
+
+### Full delegate-task suite, run 1
+```text
+bun test v1.3.14 (d1632b29)
+
+ 491 pass
+ 0 fail
+ 1146 expect() calls
+Ran 491 tests across 41 files. [2.04s]
+```
+
+### Full delegate-task suite, run 2
+```text
+bun test v1.3.14 (d1632b29)
+
+ 491 pass
+ 0 fail
+ 1146 expect() calls
+Ran 491 tests across 41 files. [2.09s]
+```
+
+### Typecheck
+```text
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+```
+
+### Dirty-file and index proof
+- Before work: six pre-existing modified files: two under `packages/omo-codex/`, two under `packages/omo-senpi/`, two delegate-task tests.
+- During work, concurrent todo workers committed docs/config work. At commit time, index contained only:
+  - `packages/omo-opencode/src/tools/delegate-task/timing.ts`
+  - `packages/omo-opencode/src/tools/delegate-task/timing.test.ts`
+- Commit: `6291fbe9ab540ff7318b6d1dbde6cb12713ddfa0` `feat(delegate-task): add inert wall-clock timing symbol`.
+- No `git add -A` or `git add .` used.
+
+## Why it is enough
+- Tests prove default, override, reset, and `getTimingConfig()` wiring.
+- Runtime output independently proves default `Infinity`, override `5000`, and reset `Infinity`.
+- Two identical delegate-task suite runs (491 pass, 0 fail, 1146 expectations) prove no process-global timing state leaked across runs.
+- Tests inspect constants only and call no clock APIs, so no real elapsed-time dependency or timing flake exists.
+- Typecheck passed.
+
+## What was omitted
+- No OpenCode process spawned; this leaf timing-module task has no harness lifecycle surface.
+- LSP diagnostics unavailable because workspace TypeScript server could not initialize: `Could not find a valid TypeScript installation`. Repository `bun run typecheck` passed.
+- Optional programming-skill no-excuse script was unavailable at first documented path; actual script crashed under current TypeScript 7 API because `ts.isParameter` is undefined. No source changes made for that unrelated tool issue.

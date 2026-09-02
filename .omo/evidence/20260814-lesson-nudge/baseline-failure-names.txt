@@ -1,0 +1,4 @@
+(fail) resolveSkillContentAsync > #given the shared ulw-plan skill source #when OpenCode skills are resolved #then ulw-plan is path-backed with workflow resources [9.66ms]
+(fail) skill loader MCP parsing > deduplication > prioritizes project Agents ulw-plan over shared ulw-plan [7.08ms]
+(fail) skill loader MCP parsing > deduplication > prioritizes project Claude ulw-plan over shared ulw-plan [9.31ms]
+(fail) skill loader MCP parsing > deduplication > treats a project skill literally named shared/ulw-plan as a plain name, not a canonical alias [14.92ms]

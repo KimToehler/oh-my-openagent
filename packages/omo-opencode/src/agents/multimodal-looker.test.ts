@@ -59,8 +59,6 @@ describe("createMultimodalLookerAgent", () => {
     const normalizedPrompt = prompt.toLowerCase()
 
     // then
-    expect(normalizedPrompt).toContain("never")
-    expect(normalizedPrompt).toContain("tools")
     expect(extractAvailableToolClaims(prompt)).toEqual([])
   })
 

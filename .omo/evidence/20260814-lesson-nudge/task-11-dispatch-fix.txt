@@ -1,0 +1,101 @@
+WHAT WAS TESTED
+
+1. Failing-first targeted regression test:
+   bun test packages/omo-opencode/src/plugin/event-hook-dispatcher.test.ts
+
+2. Passing targeted regression test after adding the dispatcher line:
+   bun test packages/omo-opencode/src/plugin/event-hook-dispatcher.test.ts
+
+3. Full repository suite:
+   bun test
+
+4. Full typecheck:
+   bun run typecheck
+
+5. Before interpreting full-suite counts:
+   git status --porcelain packages/omo-codex/scripts/install-dist/
+   Result: clean. No generated artifact restoration or rerun required.
+
+6. LSP diagnostics were attempted for both changed files. The configured LSP could not initialize because it could not find a valid TypeScript installation. Full project typecheck was used as the binding compiler verification and exited 0.
+
+WHAT WAS OBSERVED
+
+Pre-edit source confirmation:
+- createLessonNudgeHook returns a bare async function.
+- createSessionHooks declares, constructs, and returns lessonNudge.
+- event-hook-dispatcher.ts had no lessonNudge dispatch and no generic iteration fallback.
+- No non-factory runtime consumer of hooks.lessonNudge existed.
+
+RED proof before dispatcher fix:
+
+bun test v1.3.14 (d1632b29)
+
+Expected number of calls: 1
+Received number of calls: 0
+(fail) createEventHookDispatcher > #given a session hook that is registered as a bare handler > #when a session.idle event is dispatched > #then it invokes the lesson nudge hook with that event
+
+Expected: []
+Received: ["lessonNudge"]
+(fail) session hook dispatch coverage > #given every member returned by createSessionHooks > #when the event dispatcher source is inspected > #then each member is dispatched or explicitly allowlisted to another tier
+
+2 pass
+2 fail
+4 expect() calls
+Ran 4 tests across 1 file.
+EXIT_CODE=1
+
+GREEN proof after dispatcher fix:
+
+bun test v1.3.14 (d1632b29)
+
+4 pass
+0 fail
+5 expect() calls
+Ran 4 tests across 1 file.
+EXIT_CODE=0
+
+Dispatcher fix at packages/omo-opencode/src/plugin/event-hook-dispatcher.ts:64:
+await runEventHookSafely("lessonNudge", hooks.lessonNudge, input);
+
+Full suite result:
+- 13019 pass
+- 3 skip
+- 5 fail
+- 1 snapshot
+- 80443 expect() calls
+- 13027 tests across 1707 files
+
+Pass-count comparison:
+- Committed dev baseline: 13001 pass / 5 fail
+- Branch pre-fix baseline: 13015 pass / 5 fail / 3 skip
+- Final: 13019 pass / 5 fail / 3 skip
+- Delta from branch pre-fix: +4 pass, 0 new failures, unchanged skip count
+- Delta from committed dev: +18 pass, 0 new failures
+
+Unchanged five-failure set:
+1. #given the generated Codex installer #when release versions are synchronized #then its embedded package version matches the root release version
+2. resolveSkillContentAsync > #given the shared ulw-plan skill source #when OpenCode skills are resolved #then ulw-plan is path-backed with workflow resources
+3. skill loader MCP parsing > deduplication > prioritizes project Claude ulw-plan over shared ulw-plan
+4. skill loader MCP parsing > deduplication > prioritizes project Agents ulw-plan over shared ulw-plan
+5. skill loader MCP parsing > deduplication > treats a project skill literally named shared/ulw-plan as a plain name, not a canonical alias
+
+Typecheck result:
+- bun run typecheck
+- EXIT_CODE=0
+
+Commit:
+- bbc4db98320aad723146fdbcb83f0d9bfc16752f
+- packages/omo-opencode/src/plugin/event-hook-dispatcher.test.ts
+- packages/omo-opencode/src/plugin/event-hook-dispatcher.ts
+
+WHY IT IS ENOUGH
+
+Behavior regression test proves session.idle reaches the bare lessonNudge function exactly once with the original event input. Null-member test proves disabled configuration remains safe. Structural guard derives all createSessionHooks members at runtime and fails when a member is neither present in event dispatcher source nor explicitly allowlisted as consumed by another tier. Full suite preserves the exact known five-failure set and adds four passing tests. Full typecheck proves the bare handler matches EventHookRunner without .event or .handler misuse.
+
+WHAT WAS OMITTED
+
+- No secret-bearing logs, environment dumps, tokens, auth headers, or credentials captured.
+- Full 13027-test output omitted; summary and exact failing test names retained.
+- Full typecheck command expansion omitted beyond final successful command chain and exit code.
+- No bun install or bun run build executed.
+- No generated Codex installer artifacts changed.

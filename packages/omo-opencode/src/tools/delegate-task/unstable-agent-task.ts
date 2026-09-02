@@ -1,7 +1,7 @@
 import type { DelegateTaskArgs, ToolContextWithMetadata, DelegatedModelConfig } from "./types"
 import type { ExecutorContext, ParentContext, SessionMessage } from "./executor-types"
 import { DEFAULT_SYNC_POLL_TIMEOUT_MS, getTimingConfig } from "./timing"
-import { buildTaskPrompt } from "./prompt-builder"
+import { buildDelegatedTaskPrompt } from "./prompt-builder"
 import { cancelUnstableAgentTask } from "./cancel-unstable-agent-task"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { formatDuration } from "./time-formatter"
@@ -29,7 +29,7 @@ export async function executeUnstableAgentTask(
 
   try {
     const tddEnabled = sisyphusAgentConfig?.tdd
-    const effectivePrompt = buildTaskPrompt(args.prompt, agentToUse, tddEnabled)
+    const effectivePrompt = buildDelegatedTaskPrompt(args.prompt, agentToUse, tddEnabled)
     const persistedDescription = getPersistedBackgroundTaskDescription(args, agentToUse)
     const task = await manager.launch({
       description: persistedDescription,

@@ -1,0 +1,9 @@
+Raw captures are raw-observed.txt, mock-curl-headers.txt, plugin-probe.txt, opencode-run.txt, mock-request-bodies.txt, isolation.txt, and run-status.txt.
+Captured provider wire header:
+X-9Router-Upstream-Model: anthropic/claude-opus-5
+Captured plugin config lifecycle:
+PROBE_CONFIG_HOOK_RAN
+Captured fetch wrapper responses:
+PROBE_HEADER=anthropic/claude-opus-5
+PROBE_HEADER=anthropic/claude-opus-5
+The two wrapper captures came from one successful streaming chat turn: title generation plus requested chat completion. Mock responses carried JSON body model mock-body-model; raw mock-request-bodies.txt proves OpenCode made requests. The wrapper records headers only, so it does not independently record response JSON body fields.

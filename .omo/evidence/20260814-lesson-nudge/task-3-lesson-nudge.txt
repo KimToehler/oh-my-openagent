@@ -1,0 +1,99 @@
+Task 3: lessons.nudge schema evidence
+
+PRE-FIX VALIDATE.TEST.TS FAILURES
+Command: bun test packages/omo-opencode/src/config/validate.test.ts
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/config/validate.test.ts:
+168 |         },
+169 |       })
+170 | 
+171 |       const result = validatePluginConfig(fixture.project)
+172 | 
+173 |       expect(result.config.lessons).toEqual({
+                                          ^
+error: expect(received).toEqual(expected)
+
+@@ -4,3 +4,3 @@
+    "max_files": 25,
++   "nudge": true,
+    "storage": "user",
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/config/validate.test.ts:173:37)
+      at withOmoConfig (/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/config/validate.test.ts:46:12)
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/config/validate.test.ts:164:5)
+(fail) validatePluginConfig > #given project lessons settings #when validating #then discards enabled and storage but keeps project limits [1.04ms]
+188 |         "[opencode]": { lessons: { enabled: false, storage: "user", max_files: 25, max_body_chars: 500 } },
+189 |       })
+190 | 
+191 |       const result = validatePluginConfig(fixture.project)
+192 | 
+193 |       expect(result.config.lessons).toEqual({
+                                          ^
+error: expect(received).toEqual(expected)
+
+@@ -4,3 +4,3 @@
+    "max_files": 25,
++   "nudge": true,
+    "storage": "project",
+
+- Expected  - 0
++ Received  + 1
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/config/validate.test.ts:193:37)
+      at withOmoConfig (/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/config/validate.test.ts:46:12)
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/config/validate.test.ts:183:5)
+(fail) validatePluginConfig > #given user lessons settings and project limits #when validating #then honors user enabled and storage with project limits [0.94ms]
+
+ 9 pass
+ 2 fail
+ 28 expect() calls
+Ran 11 tests across 1 file. [101.00ms]
+
+FINAL GREEN TEST OUTPUT
+Command: bun test packages/omo-opencode/src/config/schema/lessons.test.ts packages/omo-opencode/src/config/validate.test.ts
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/config/validate.test.ts:
+(pass) validatePluginConfig > #given no omo config #when validating #then returns plugin defaults [2.93ms]
+(pass) validatePluginConfig > #given a project omo harness block #when validating #then loads the opencode view [1.92ms]
+(pass) validatePluginConfig > #given an invalid ancestor omo harness block #when validating from a child #then reports the schema path [2.28ms]
+(pass) validatePluginConfig > #given user and project omo views #when validating #then preserves plugin merge and disabled-set semantics [2.55ms]
+(pass) validatePluginConfig > #given protected fields in user and project base blocks #when validating #then honors only the user base values [1.26ms]
+(pass) validatePluginConfig > #given project lessons settings #when validating #then discards enabled and storage but keeps project limits [3.48ms]
+(pass) validatePluginConfig > #given user lessons settings and project limits #when validating #then honors user enabled and storage with project limits [1.17ms]
+(pass) validatePluginConfig > #given protected fields in an active user profile and project profile #when validating #then honors only the user profile values [1.15ms]
+(pass) validatePluginConfig > #given unknown opencode keys #when validating #then reports and strips every unknown path without losing known values [0.78ms]
+(pass) validatePluginConfig > #given an OCX profile overlay #when OCX_PROFILE changes #then flips the resolved sisyphus model [0.86ms]
+(pass) validatePluginConfig > #given a model catalog reference in the opencode view #when validating #then resolves the model identifier [0.97ms]
+
+packages/omo-opencode/src/config/schema/lessons.test.ts:
+(pass) LessonsConfigSchema > #given nudge is absent #when parsing #then defaults it to true [0.51ms]
+(pass) LessonsConfigSchema > #given nudge is false #when parsing #then preserves false [0.05ms]
+(pass) LessonsConfigSchema > parses explicit lessons config [0.07ms]
+(pass) LessonsConfigSchema > rejects a configured lessons directory [0.89ms]
+(pass) LessonsConfigSchema > rejects out-of-range max files [0.17ms]
+(pass) LessonsConfigSchema > rejects out-of-range max body chars [0.11ms]
+(pass) LessonsConfigSchema > rejects an unknown storage location [0.09ms]
+
+ 18 pass
+ 0 fail
+ 44 expect() calls
+Ran 18 tests across 2 files. [103.00ms]
+
+MANUAL QA: HAPPY
+Command: bun -e 'import {LessonsConfigSchema} from "./packages/omo-opencode/src/config/schema/lessons"; console.log(LessonsConfigSchema.parse({}))'
+{
+  enabled: false,
+  storage: "user",
+  max_files: 200,
+  max_body_chars: 3000,
+  nudge: true,
+}
+
+MANUAL QA: FAILURE
+Command: bun -e 'import {LessonsConfigSchema} from "./packages/omo-opencode/src/config/schema/lessons"; try { LessonsConfigSchema.parse({nudge: "yes"}); console.log("NO THROW - BUG") } catch(e) { console.log("THREW AS EXPECTED") }'
+THREW AS EXPECTED

@@ -1,0 +1,15 @@
+TEARDOWN RECEIPTS
+
+1) QA script process (pid 59259): EXITED
+2) opencode serve processes: 0 running
+   (the script's serve PID was killed by common.sh's EXIT trap / oqa_cleanup)
+3) mock-model.mjs processes: 0 running
+   (pid 59356 shown Terminated:15 in the run log = killed by the trap)
+4) My sandbox (oqa-xdg.XXXXXX.ucUyyJfToW): REMOVED by the EXIT trap
+5) Pre-existing sandboxes NOT created by this run (timestamps 10:47:52 and 10:53:40,
+   before my 13:00 run) - left untouched, not mine to delete:
+/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.dfPpivIn1a
+/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.O7pvpxn7nd
+6) tmux: error connecting to /private/tmp/tmux-501/default (No such file or directory)
+7) git status --porcelain in the worktree:
+   (empty above = clean; no source change, no tracked artifact regenerated)

@@ -1,0 +1,2 @@
+HOME=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.ffCPgTYlxf/home
+OMO_QA_PROJ=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.ffCPgTYlxf/proj

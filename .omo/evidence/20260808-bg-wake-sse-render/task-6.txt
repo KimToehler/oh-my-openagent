@@ -1,0 +1,94 @@
+TASK 6 - regression tests pinning the completed-task retention guard across the new coalesce-retry window
+
+worktree: /Users/tim/git/oh-my-openagent/.worktrees/bg-wake-sse-lane-6
+branch:   lane/bg-wake-sse-6 (forked from fix/bg-wake-sse-render at 5113f9124)
+file:     packages/omo-opencode/src/features/background-agent/task-completion-retention-guard.test.ts (TEST FILE ONLY, +174 lines, additive)
+
+WHAT WAS TESTED
+Commit 5113f9124 made the parent-wake REPLY path requeue on an "already-delivered" coalesce instead of
+recording the wake as sent, bounded by MAX_COALESCE_REQUEUE_ATTEMPTS = 3 with a 2000ms backoff. That opens a
+new window where a shouldReply wake is still owed AFTER the task completed. Two new cases were added to the
+existing retention-guard suite:
+
+  Case A "#given a wake requeued by an already-delivered coalesce #when the cleanup timer fires #then the task
+  stays retrievable across the retry window"
+    Drives the real BackgroundManager: queues a shouldReply wake via notifyParentSession, then replays the
+    dispatch path's discarded-coalesce branch (delete pending -> bump coalesceRequeueCount -> pendingQueue
+    .requeueWake) and fires the real completion cleanup timer inside that window, twice.
+
+  Case B "#given the coalesce requeue cap is exhausted while the wake is still owed #when cleanup keeps firing
+  #then the task is removed instead of pinned forever"
+    Burns all MAX_COALESCE_REQUEUE_ATTEMPTS requeues, then replays the post-cap branch (record as dispatched
+    rather than requeue), then keeps firing the real cleanup timer with nothing ever consuming the wake.
+
+The fixture style matches the existing file: same createManager/createTask/installFakeTimers harness, same
+Reflect.get accessors, same notifyParentSessionForTest entry point. No new harness was invented. No existing
+case was weakened, rewritten, skipped, or deleted. No `as any` / `@ts-ignore` / `@ts-expect-error`.
+
+WHAT WAS OBSERVED
+
+Case A key assertions (task NOT reaped while the wake is owed):
+    const requeuedWake = requeueParentWakeAfterDiscardedCoalesce(manager, task.parentSessionId)
+    expect(requeuedWake.coalesceRequeueCount).toBe(1)
+    expect(getPendingParentWakes(manager).get(task.parentSessionId)?.shouldReply).toBe(true)
+    await fakeTimers?.run(getRequiredTimer(manager, task.id))
+    expect(getPendingParentWakes(manager).get(task.parentSessionId)?.shouldReply).toBe(true)
+    expect(getTasks(manager).has(task.id)).toBe(true)
+    expect(manager.getTask(task.id)?.id).toBe(task.id)
+
+Case B key assertions (removal ACTUALLY occurs after the cap is exhausted):
+    recordParentWakeDispatchedAfterCoalesceCap(manager, task.parentSessionId)
+    expect(getDispatchedParentWakes(manager).get(task.parentSessionId)?.shouldReply).toBe(true)
+    await fakeTimers?.run(getRequiredTimer(manager, task.id))
+    expect(getTasks(manager).has(task.id)).toBe(true)          // first pass still defers
+    ... keep firing the real cleanup timer ...
+    expect(getDispatchedParentWakes(manager).get(task.parentSessionId)?.shouldReply).toBe(true)  // still owed
+    expect(getCompletionTimers(manager).has(task.id)).toBe(false)
+    expect(getTasks(manager).has(task.id)).toBe(false)         // removal actually happened
+
+MUTATION PROOF (the assertions depend on the guard's real decision, not on the fake clock)
+Three temporary edits to manager.ts, each reverted immediately, each verified with `git status` clean for
+manager.ts afterwards:
+  1. `wakeStillOwed` forced to false     -> BOTH new cases FAIL (plus 3 pre-existing cases). Case A's
+     "not reaped" assertion is therefore produced by the guard, not by timer arithmetic.
+  2. MAX_TASK_REMOVAL_RESCHEDULES 6 -> 10000, TTL intact -> all 6 pass (TTL alone still terminates the pin).
+  3. MAX_TASK_REMOVAL_RESCHEDULES 6 -> 10000 AND `reachedTaskTtl` forced to false -> Case B is the ONLY
+     failure (5 pass / 1 fail). Case B's removal assertion is therefore produced by the guard's own
+     termination bound, and would catch a regression that pins a completed task forever.
+Final state of manager.ts: restored byte-identical (`git status` shows it unmodified; the commit below
+contains only the test file).
+
+COMMANDS AND RESULTS
+  $ bun test packages/omo-opencode/src/features/background-agent/task-completion-retention-guard.test.ts
+    exit 0 -> 6 pass / 0 fail / 49 expect() calls (baseline before this change was 4 pass / 0 fail)
+    artifact: /tmp/lane6-single.txt
+
+  $ bun test packages/omo-opencode/src/features/background-agent/task-completion-retention-guard.test.ts -t "coalesce"
+    exit 0 -> 2 pass / 4 filtered out / 0 fail   (proves both NEW cases are present and green)
+    artifact: /tmp/lane6-new-cases.txt
+
+  $ bun test packages/omo-opencode/src/features/background-agent
+    exit 0 -> 783 pass / 0 fail / 2073 expect() calls across 66 files (baseline 781, +2 as expected)
+    artifact: /tmp/lane6-suite.txt
+
+  $ bun run typecheck
+    exit 0. Zero diagnostics reference task-completion-retention-guard.test.ts (grep count 0).
+    artifact: /tmp/tc-lane6.txt
+
+ENVIRONMENT NOTE
+The fresh worktree had no node_modules at all. `bun install` was run inside THIS worktree; it linked
+node_modules/@oh-my-opencode/utils -> ../../packages/utils (this worktree, not the main checkout), and
+packages/utils/src/prompt-async-gate/types.ts:77 exposes `coalesceKind`, so the tests ran against the
+branch's own gate code.
+
+WHY IT IS ENOUGH
+The two cases pin both directions of the new window on the real BackgroundManager cleanup timer: retention
+holds while a coalesce retry still owes a reply, and retention terminates once the retry budget is spent. The
+mutation proof shows each direction fails when its governing production branch is disabled, so neither
+assertion is vacuous. Residual risk: the tests replay the dispatch path's requeue and post-cap branches
+through the pending queue and dispatched tracker rather than driving sendParentWakePrompt end to end; that end
+to end behavior is already pinned by parent-wake-coalesce-requeue.test.ts (added in 5113f9124).
+
+WHAT WAS OMITTED
+No secrets, tokens, env dumps, or auth headers were produced or captured by any command above. The temp
+artifacts under /tmp contain only bun test and tsgo output.

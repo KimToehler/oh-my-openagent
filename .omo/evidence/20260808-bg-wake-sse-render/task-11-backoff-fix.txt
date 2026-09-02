@@ -1,0 +1,53 @@
+TASK 11: coalesce requeue budget vs semantic dedupe hold
+Date: 2026-08-08T16:34:51Z
+Worktree: /Users/tim/git/oh-my-openagent/.worktrees/bg-wake-sse-render, branch fix/bg-wake-sse-render, base HEAD 00bf3c45c
+
+== WHAT WAS TESTED ==
+bun test packages/omo-opencode/src/features/background-agent packages/utils/src/prompt-async-gate
+bun run typecheck
+Surface: sendParentWakePrompt coalesce-requeue path (secondary defense net for lost parent wakes).
+
+== DEFECT ==
+Old: MAX_COALESCE_REQUEUE_ATTEMPTS=3, COALESCE_REQUEUE_FLUSH_DELAY_MS=2000 (hardcoded).
+Budget = 3 * 2000 = 6000ms < DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS = 15000ms.
+Hold never refreshed on coalesce, so every requeue coalesced, cap exhausted
+inside the hold, wake recorded as dispatched without reaching client.
+
+== FIX (derived, not hardcoded) ==
+COALESCE_REQUEUE_FLUSH_DELAY_MS = ceil((DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS
+  + DEFAULT_PROMPT_ASYNC_POST_DISPATCH_HOLD_MS) / MAX_COALESCE_REQUEUE_ATTEMPTS)
+  = ceil((15000 + 2000) / 3) = ceil(5666.67) = 5667ms
+
+== ARITHMETIC: INVARIANT NOW HOLDS ==
+3 * 5667 = 17001 >= 15000  (budget >= hold, with 2000ms post-dispatch-hold slack)
+Actual worst-case timeline: record written at t0; first coalesce observed >= t0+2001;
+retries at +5667 each: t0+2001+5667=7668 (coalesce, count=1), +5667=13335 (coalesce, count=2),
++5667=19002 > 15000 -> real dispatch. Budget survives the hold by construction.
+Because delay is DERIVED from the imported hold constant, any future edit to
+timing.ts re-derives the delay; the invariant cannot silently drift.
+
+== TESTS ==
+New: invariant test (asserts MAX*DELAY >= HOLD directly)
+New: real-schedule survival test (retries at actual flush delay -> 2nd real dispatch,
+     coalesceRequeueCount < cap; proves the net now catches the wake)
+Updated expectations (expected timing shift, not regression):
+  parent-wake-coalesce-requeue.test.ts flushDelays [2000] and [2000,2000,2000]
+  -> COALESCE_REQUEUE_FLUSH_DELAY_MS references
+parent-wake-midbatch-starvation.test.ts: UNCHANGED (drives flushes manually with
+  a controlled clock at 3000ms cycles; asserts counter lifecycles, not flush delays;
+  3000ms steps remain inside the 15000ms hold so coalesce behavior is identical)
+
+== RESULTS ==
+
+ 870 pass
+ 0 fail
+ 2290 expect() calls
+Ran 870 tests across 77 files. [29.91s]
+
+typecheck:
+bun run typecheck -> exit 0
+
+== WHY IT IS ENOUGH ==
+Invariant asserted directly + behavioral survival test on the production flush
+schedule + full 77-file suite green (870 pass, baseline 868 + 2 new). No secret
+material involved; nothing omitted.

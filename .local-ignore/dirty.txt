@@ -1,0 +1,9 @@
+packages/omo-codex/plugin/components/codegraph/dist/cli.js
+packages/omo-codex/plugin/components/codegraph/dist/serve.js
+packages/omo-codex/scripts/install-dist/install-local.mjs
+packages/omo-senpi/plugin/extensions/memory-run-supervisor.mjs
+packages/omo-senpi/plugin/extensions/omo-init-deep-advisor.js
+packages/omo-senpi/plugin/extensions/omo-member.js
+packages/omo-senpi/plugin/extensions/omo-memory-mcp.js
+packages/omo-senpi/plugin/extensions/omo-task.js
+packages/omo-senpi/plugin/extensions/omo.js

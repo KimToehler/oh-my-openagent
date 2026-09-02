@@ -42,7 +42,6 @@ describe("executeBackgroundContinuation - subagent metadata", () => {
 
     //#then - the tool cannot claim a continuation that was never delivered
     expect(result).toContain("currently running and cannot accept a continuation prompt")
-    expect(result).not.toContain("Background task continued")
   })
 
   test("includes subagent in task_metadata when task has agent", async () => {

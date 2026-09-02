@@ -32,7 +32,6 @@ Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated
 | `thinkMode` | chat.params | Model variant switching for extended thinking |
 | `anthropicContextWindowLimitRecovery` | session.error | Multi-strategy context recovery (truncation, compaction, dedup) |
 | `autoUpdateChecker` | session.created | Check npm for plugin updates |
-| `codegraphBootstrap` | session.created | Bootstrap CodeGraph indexing for the project (pairs with the built-in `codegraph` MCP) |
 | `astGrepSgProvision` | session.created | Provision the ast-grep `sg` binary for the bundled skill |
 | `agentUsageReminder` | chat.message | Remind about available agents |
 | `nonInteractiveEnv` | chat.message | Adjust behavior for `run` command |
@@ -42,7 +41,7 @@ Hook name allowlist for `disabled_hooks`: all configurable hook names enumerated
 | `unpolledShellJob` | event | Warn at idle when the turn would end with a detached `ctx_shell` job never polled to completion (see [`unpolled-shell-job/AGENTS.md`](unpolled-shell-job/AGENTS.md)) |
 | `editErrorRecovery` | tool.execute.after | Retry failed file edits |
 | `delegateTaskRetry` | tool.execute.after | Retry failed task delegations |
-| `startWork` | chat.message | `/start-work` command handler |
+| `ulwExecute` | chat.message | `/ulw-execute` command handler |
 | `prometheusMdOnly` | tool.execute.before | Enforce .md-only writes for Prometheus |
 | `sisyphusJuniorNotepad` | chat.message | Notepad injection for subagents |
 | `questionLabelTruncator` | tool.execute.before | Truncate long Question tool labels |

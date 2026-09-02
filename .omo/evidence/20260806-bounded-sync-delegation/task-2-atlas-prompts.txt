@@ -1,0 +1,471 @@
+################################################################################
+# TASK 2 EVIDENCE - atlas prompts: loosen run_in_background steering (8 variants)
+# Plan: .omo/plans/bounded-sync-delegation.md (todo 2)
+# Branch: dev, main checkout (deliberate user override, no worktree)
+################################################################################
+
+## WHAT WAS TESTED
+The 8 Atlas prompt markdown variants under packages/prompts-core/prompts/atlas/
+are the runtime source of truth (packages/prompts-core/src/atlas-prompts.ts
+imports each .md via Bun's text loader; resolveVariant() picks one per model and
+loadPromptSync() returns its body). Three steering patterns were changed in every
+one of the 8 files:
+  P1  exploration-vs-task-execution guidance: task execution may now be
+      backgrounded, and that is the preferred default; sync is reserved for when
+      the parent's very next step consumes the result.
+  P2  the NEVER-list entry forbidding run_in_background=true for task execution
+      was deleted (it sits under a NEVER heading, so deletion is minimal+correct).
+  P3  a backgrounded category= delegation example was added next to the existing
+      foreground example so the model has a template for both.
+
+Surfaces driven: per-file grep (BEFORE/AFTER), backtick-tolerant regex gate,
+per-file three-pattern audit, `bun test packages/prompts-core/`,
+`bun run typecheck`, and a throwaway bun script that calls the real
+loadPromptSync()/resolveVariant() runtime path and asserts on the RESOLVED
+prompt string a live agent would receive.
+
+## WHAT WAS OBSERVED
+- BEFORE: all 8 files carried the restrictive guidance. The plain-phrase regex
+  matched only 6 lines across 5 files plus glm.md's "implementation tasks"
+  wording; kimi-k2-7.md and kimi-k3.md hid theirs inside a single-line inline
+  NEVER paragraph. Both forms are captured in the RED section below.
+- AFTER: the backtick-tolerant regex returns ZERO matches; the inline-clause
+  regex returns ZERO matches; every one of the 8 files still mentions
+  run_in_background (counts 8..14); the per-file audit shows P1 present, P2
+  leftover=0, and P3 present for each of the 8 individually.
+- `bun test packages/prompts-core/` -> 26 pass, 0 fail, exit 0.
+- `bun run typecheck` -> exit 0.
+- Resolved-prompt QA -> exit 0 for both the default variant (claude-sonnet-4-5,
+  19941 chars) and the glm variant (glm-4.6, 17131 chars): permissive guidance
+  present, backgrounded category example present, zero leftover NEVER entries,
+  and the background-collection mechanics (background_output(task_id="bg_...")
+  and the background_cancel(all=true) warning) still intact.
+
+## WHY IT IS ENOUGH
+This is prompt text with no unit-test seam, so the failing-first proof is the
+captured BEFORE state showing the restrictive guidance present in all 8 files.
+The binary observable is the RESOLVED runtime prompt: the QA script goes through
+the same resolveVariant()+loadPromptSync() path the plugin uses, so what it
+prints is what a real agent receives. Two different model variants were resolved,
+one of them (glm) from the group with divergent wording. The per-file
+three-pattern audit rules out a false pass from the naive regex, which by itself
+would have missed glm.md, kimi-k2-7.md and kimi-k3.md.
+
+## WHAT WAS OMITTED
+- No opencode/codex session was spawned: this change is pure prompt text inside
+  packages/prompts-core, which neither the opencode-qa nor the codex-qa harness
+  scripts exercise more directly than the resolved-prompt path used here. No
+  isolation sandbox was needed because nothing wrote to ~/.config/opencode or
+  ~/.codex.
+- No build/regeneration was run. The .md files are bundled by Bun's text loader
+  at BUILD time, so a `bun run build` is required before a packaged dist picks
+  the new text up. That regeneration is explicitly OUT OF SCOPE for this todo
+  (see stale_state below) and no build beyond the listed verification commands
+  was executed.
+- No secrets, tokens, env dumps or auth headers appear in any captured output.
+
+## ADVERSARIAL CLASSES PROBED
+- dirty_worktree: 4 unrelated files were already modified before this task began
+  (packages/omo-codex/plugin/components/codegraph/dist/cli.js,
+  packages/omo-codex/scripts/install-dist/install-local.mjs,
+  packages/omo-senpi/plugin/extensions/omo-member.js,
+  packages/omo-senpi/plugin/extensions/omo.js). No `git add -A` / `git add .` was
+  used at any point; only the 8 declared paths were staged. The
+  `git status --porcelain` capture below and the post-commit status prove those
+  4 remain unstaged and uncommitted.
+- misleading_success_output: the naive regex
+  "Use run_in_background=true for task execution" matches only 5 of the 8 files
+  and would FALSE-PASS on glm.md, kimi-k2-7.md and kimi-k3.md. Both the
+  backtick-tolerant regex AND a per-file three-pattern audit (VERIFY 3) are
+  recorded, so each of the 8 files carries its own individual proof of edit.
+- stale_state: prompts-core bundles these .md files at build time via Bun's text
+  loader, so an already-built dist/ or an installed package will keep serving the
+  old text until `bun run build` runs. Source-level runtime resolution (the QA
+  script, which imports src/ directly) already reflects the new text. The
+  regeneration is NOT in scope for this todo and was deliberately not run.
+
+################################################################################
+# RAW CAPTURES
+################################################################################
+
+=== TASK 2: atlas prompt run_in_background steering ===
+Captured: 2026-08-06T11:34:57Z
+
+### RED BASELINE (BEFORE) - per-file grep for run_in_background
+CMD: for f in packages/prompts-core/prompts/atlas/*.md; do echo "== $f"; rg -n run_in_background "$f"; done
+
+== packages/prompts-core/prompts/atlas/default.md
+52:task(subagent_type="explore", run_in_background=true, ...)
+56:task(subagent_type="explore", run_in_background=true, ...)
+72:  run_in_background=false,
+80:  run_in_background=false,
+178:task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+179:task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
+180:task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
+181:task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+194:- **Exploration** (`explore`, `librarian`): `run_in_background=true` — non-blocking research
+195:- **Task execution** (`category="..."`): `run_in_background=false` — blocks for verification
+266:  run_in_background=false,
+437:- Use run_in_background=true for task execution
+== packages/prompts-core/prompts/atlas/gemini.md
+79:task(subagent_type="explore", run_in_background=true, ...)
+83:task(subagent_type="explore", run_in_background=true, ...)
+99:  run_in_background=false,
+107:  run_in_background=false,
+205:task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+206:task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
+207:task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
+208:task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+221:- **Exploration** (`explore`, `librarian`): `run_in_background=true` — non-blocking research
+222:- **Task execution** (`category="..."`): `run_in_background=false` — blocks for verification
+290:task(category="[cat]", load_skills=["[skills]"], run_in_background=false, prompt=`[6-SECTION PROMPT]`)
+469:- Use run_in_background=true for task execution
+== packages/prompts-core/prompts/atlas/glm.md
+82:  run_in_background=false,
+89:  run_in_background=false,
+179:task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+180:task(category="deep", load_skills=["programming"], run_in_background=false, prompt="...task B...")
+181:task(category="quick", load_skills=["git-master"], run_in_background=false, prompt="...task C...")
+184:Exploration agents may use `run_in_background=true`; implementation tasks use `run_in_background=false`. Collect background results with `background_output(task_id="bg_...")`. Store every continuation id `ses_...`. Never use `background_cancel(all=true)`.
+237:task(category="...", load_skills=["..."], run_in_background=false, prompt="[6-section prompt]")
+238:task(category="...", load_skills=["..."], run_in_background=false, prompt="[6-section prompt]")
+350:- Use `run_in_background=true` for implementation tasks.
+== packages/prompts-core/prompts/atlas/gpt.md
+62:task(subagent_type="explore", run_in_background=true, ...)
+66:task(subagent_type="explore", run_in_background=true, ...)
+82:  run_in_background=false,
+90:  run_in_background=false,
+188:task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+189:task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
+190:task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
+191:task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+204:- **Exploration** (`explore`, `librarian`): `run_in_background=true` — non-blocking research
+205:- **Task execution** (`category="..."`): `run_in_background=false` — blocks for verification
+266:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+267:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+268:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+404:- Use run_in_background=true for task execution
+== packages/prompts-core/prompts/atlas/kimi-k2-7.md
+48:  run_in_background=false,
+56:  run_in_background=false,
+133:task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+134:task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
+135:task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
+136:task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+139:Background vs foreground: exploration (`explore`, `librarian`) runs `run_in_background=true`; task execution (`category="..."`) runs `run_in_background=false` and blocks for verification. Collect background results with `background_output(task_id="bg_...")`, continue a session with `task(task_id="ses_...")`, cancel disposable background tasks individually, and NEVER `background_cancel(all=true)` — it kills output you have not collected.
+194:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+195:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+196:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+283:**NEVER**: write or edit code yourself; trust a subagent's claim without verification; use `run_in_background=true` for task execution; send a prompt under 30 lines; skip `lsp_diagnostics` after a delegation; batch multiple tasks into one delegation prompt; start a fresh session for a failure (use `task_id`); default to sequential when no NAMED dependency exists; or re-open the parallel/sequential decision mid-batch without new evidence.
+== packages/prompts-core/prompts/atlas/kimi-k3.md
+48:  run_in_background=false,
+56:  run_in_background=false,
+133:task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+134:task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
+135:task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
+136:task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+139:Background vs foreground: exploration (`explore`, `librarian`) runs `run_in_background=true`; task execution (`category="..."`) runs `run_in_background=false` and blocks for verification. Collect background results with `background_output(task_id="bg_...")`, continue a session with `task(task_id="ses_...")`, cancel disposable background tasks individually, and NEVER `background_cancel(all=true)` — it kills output you have not collected.
+194:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+195:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+196:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+283:**NEVER**: write or edit code yourself; trust a subagent's claim without verification; use `run_in_background=true` for task execution; send a prompt under 30 lines; skip `lsp_diagnostics` after a delegation; batch multiple tasks into one delegation prompt; start a fresh session for a failure (use `task_id`); default to sequential when no NAMED dependency exists; or re-open the parallel/sequential decision mid-batch without new evidence.
+== packages/prompts-core/prompts/atlas/kimi.md
+67:task(subagent_type="explore", run_in_background=true, ...)
+71:task(subagent_type="explore", run_in_background=true, ...)
+87:  run_in_background=false,
+95:  run_in_background=false,
+193:task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+194:task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
+195:task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
+196:task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+209:- **Exploration** (`explore`, `librarian`): `run_in_background=true` — non-blocking research
+210:- **Task execution** (`category="..."`): `run_in_background=false` — blocks for verification
+284:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+285:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+286:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+417:- Use run_in_background=true for task execution
+== packages/prompts-core/prompts/atlas/opus-4-7.md
+60:task(subagent_type="explore", run_in_background=true, ...)
+64:task(subagent_type="explore", run_in_background=true, ...)
+80:  run_in_background=false,
+88:  run_in_background=false,
+186:task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+187:task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
+188:task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
+189:task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+202:- **Exploration** (`explore`, `librarian`): `run_in_background=true` — non-blocking research
+203:- **Task execution** (`category="..."`): `run_in_background=false` — blocks for verification
+279:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+280:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+281:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+433:- Use run_in_background=true for task execution
+
+### RED: restrictive NEVER entries present (backtick-tolerant regex)
+CMD: rg -n "Use .?run_in_background=true.? for (task execution|implementation tasks)" packages/prompts-core/prompts/atlas/
+packages/prompts-core/prompts/atlas/opus-4-7.md:433:- Use run_in_background=true for task execution
+packages/prompts-core/prompts/atlas/gemini.md:469:- Use run_in_background=true for task execution
+packages/prompts-core/prompts/atlas/glm.md:350:- Use `run_in_background=true` for implementation tasks.
+packages/prompts-core/prompts/atlas/gpt.md:404:- Use run_in_background=true for task execution
+packages/prompts-core/prompts/atlas/default.md:437:- Use run_in_background=true for task execution
+packages/prompts-core/prompts/atlas/kimi.md:417:- Use run_in_background=true for task execution
+
+### RED: inline NEVER clauses in kimi-k2-7 / kimi-k3 (variant wording)
+packages/prompts-core/prompts/atlas/kimi-k3.md:283:**NEVER**: write or edit code yourself; trust a subagent's claim without verification; use `run_in_background=true` for task execution; send a prompt under 30 lines; skip `lsp_diagnostics` after a delegation; batch multiple tasks into one delegation prompt; start a fresh session for a failure (use `task_id`); default to sequential when no NAMED dependency exists; or re-open the parallel/sequential decision mid-batch without new evidence.
+packages/prompts-core/prompts/atlas/kimi-k2-7.md:283:**NEVER**: write or edit code yourself; trust a subagent's claim without verification; use `run_in_background=true` for task execution; send a prompt under 30 lines; skip `lsp_diagnostics` after a delegation; batch multiple tasks into one delegation prompt; start a fresh session for a failure (use `task_id`); default to sequential when no NAMED dependency exists; or re-open the parallel/sequential decision mid-batch without new evidence.
+
+### GREEN (AFTER) - per-file grep for run_in_background
+CMD: for f in packages/prompts-core/prompts/atlas/*.md; do echo "== $f"; rg -n run_in_background "$f"; done
+
+== packages/prompts-core/prompts/atlas/default.md
+52:task(subagent_type="explore", run_in_background=true, ...)
+56:task(subagent_type="explore", run_in_background=true, ...)
+72:  run_in_background=false,
+80:  run_in_background=false,
+178:task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+179:task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
+180:task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
+181:task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+194:- **Exploration** (`explore`, `librarian`): `run_in_background=true` — non-blocking research
+195:- **Task execution** (`category="..."`): `run_in_background=true` is normal and preferred. Background the delegation whenever your next step does not consume its result, then verify when you collect it.
+196:- Reserve `run_in_background=false` for the case where the very next step you take depends on that result.
+268:  run_in_background=true,
+277:  run_in_background=false,
+== packages/prompts-core/prompts/atlas/gemini.md
+79:task(subagent_type="explore", run_in_background=true, ...)
+83:task(subagent_type="explore", run_in_background=true, ...)
+99:  run_in_background=false,
+107:  run_in_background=false,
+205:task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+206:task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
+207:task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
+208:task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+221:- **Exploration** (`explore`, `librarian`): `run_in_background=true` — non-blocking research
+222:- **Task execution** (`category="..."`): `run_in_background=true` is normal and preferred. Background the delegation whenever your next step does not consume its result, then verify when you collect it.
+223:- Reserve `run_in_background=false` for the case where the very next step you take depends on that result.
+292:task(category="[cat]", load_skills=["[skills]"], run_in_background=true, prompt=`[6-SECTION PROMPT]`)
+295:task(category="[cat]", load_skills=["[skills]"], run_in_background=false, prompt=`[6-SECTION PROMPT]`)
+== packages/prompts-core/prompts/atlas/glm.md
+82:  run_in_background=false,
+89:  run_in_background=false,
+179:task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+180:task(category="deep", load_skills=["programming"], run_in_background=false, prompt="...task B...")
+181:task(category="quick", load_skills=["git-master"], run_in_background=false, prompt="...task C...")
+184:Exploration agents use `run_in_background=true`. Implementation tasks may also use `run_in_background=true`, and that is the preferred default whenever your next step does not consume the result; verify the work when you collect it. Reserve `run_in_background=false` for the case where the very next step you take depends on that result. Collect background results with `background_output(task_id="bg_...")`. Store every continuation id `ses_...`. Never use `background_cancel(all=true)`.
+238:task(category="...", load_skills=["..."], run_in_background=true, prompt="[6-section prompt]")
+240:task(category="...", load_skills=["..."], run_in_background=false, prompt="[6-section prompt]")
+== packages/prompts-core/prompts/atlas/gpt.md
+62:task(subagent_type="explore", run_in_background=true, ...)
+66:task(subagent_type="explore", run_in_background=true, ...)
+82:  run_in_background=false,
+90:  run_in_background=false,
+188:task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+189:task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
+190:task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
+191:task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+204:- **Exploration** (`explore`, `librarian`): `run_in_background=true` — non-blocking research
+205:- **Task execution** (`category="..."`): `run_in_background=true` is normal and preferred. Background the delegation whenever your next step does not consume its result, then verify when you collect it.
+206:- Reserve `run_in_background=false` for the case where the very next step you take depends on that result.
+268:task(category="...", load_skills=[...], run_in_background=true, prompt="[6-SECTION PROMPT]")
+269:task(category="...", load_skills=[...], run_in_background=true, prompt="[6-SECTION PROMPT]")
+271:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+== packages/prompts-core/prompts/atlas/kimi-k2-7.md
+48:  run_in_background=false,
+56:  run_in_background=false,
+133:task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+134:task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
+135:task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
+136:task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+139:Background vs foreground: exploration (`explore`, `librarian`) runs `run_in_background=true`; task execution (`category="..."`) may also run `run_in_background=true`, and that is the preferred default whenever your next step does not consume the result, with verification when you collect it. Reserve `run_in_background=false` for the case where the very next step you take depends on that result. Collect background results with `background_output(task_id="bg_...")`, continue a session with `task(task_id="ses_...")`, cancel disposable background tasks individually, and NEVER `background_cancel(all=true)` — it kills output you have not collected.
+195:task(category="...", load_skills=[...], run_in_background=true, prompt="[6-SECTION PROMPT]")
+196:task(category="...", load_skills=[...], run_in_background=true, prompt="[6-SECTION PROMPT]")
+198:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+== packages/prompts-core/prompts/atlas/kimi-k3.md
+48:  run_in_background=false,
+56:  run_in_background=false,
+133:task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+134:task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
+135:task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
+136:task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+139:Background vs foreground: exploration (`explore`, `librarian`) runs `run_in_background=true`; task execution (`category="..."`) may also run `run_in_background=true`, and that is the preferred default whenever your next step does not consume the result, with verification when you collect it. Reserve `run_in_background=false` for the case where the very next step you take depends on that result. Collect background results with `background_output(task_id="bg_...")`, continue a session with `task(task_id="ses_...")`, cancel disposable background tasks individually, and NEVER `background_cancel(all=true)` — it kills output you have not collected.
+195:task(category="...", load_skills=[...], run_in_background=true, prompt="[6-SECTION PROMPT]")
+196:task(category="...", load_skills=[...], run_in_background=true, prompt="[6-SECTION PROMPT]")
+198:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+== packages/prompts-core/prompts/atlas/kimi.md
+67:task(subagent_type="explore", run_in_background=true, ...)
+71:task(subagent_type="explore", run_in_background=true, ...)
+87:  run_in_background=false,
+95:  run_in_background=false,
+193:task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+194:task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
+195:task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
+196:task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+209:- **Exploration** (`explore`, `librarian`): `run_in_background=true` — non-blocking research
+210:- **Task execution** (`category="..."`): `run_in_background=true` is normal and preferred. Background the delegation whenever your next step does not consume its result, then verify when you collect it.
+211:- Reserve `run_in_background=false` for the case where the very next step you take depends on that result.
+286:task(category="...", load_skills=[...], run_in_background=true, prompt="[6-SECTION PROMPT]")
+287:task(category="...", load_skills=[...], run_in_background=true, prompt="[6-SECTION PROMPT]")
+289:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+== packages/prompts-core/prompts/atlas/opus-4-7.md
+60:task(subagent_type="explore", run_in_background=true, ...)
+64:task(subagent_type="explore", run_in_background=true, ...)
+80:  run_in_background=false,
+88:  run_in_background=false,
+186:task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+187:task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
+188:task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
+189:task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+202:- **Exploration** (`explore`, `librarian`): `run_in_background=true` — non-blocking research
+203:- **Task execution** (`category="..."`): `run_in_background=true` is normal and preferred. Background the delegation whenever your next step does not consume its result, then verify when you collect it.
+204:- Reserve `run_in_background=false` for the case where the very next step you take depends on that result.
+281:task(category="...", load_skills=[...], run_in_background=true, prompt="[6-SECTION PROMPT]")
+282:task(category="...", load_skills=[...], run_in_background=true, prompt="[6-SECTION PROMPT]")
+284:task(category="...", load_skills=[...], run_in_background=false, prompt="[6-SECTION PROMPT]")
+
+### VERIFY 1: backtick-tolerant NEVER regex (expect ZERO matches)
+CMD: rg -n "Use .?run_in_background=true.? for (task execution|implementation tasks)" packages/prompts-core/prompts/atlas/
+rg exit=1 (1 = no matches = PASS)
+
+### VERIFY 1b: inline variant clause used by kimi-k2-7 / kimi-k3 (expect ZERO)
+rg exit=1 (1 = no matches = PASS)
+
+### VERIFY 2: every file still mentions run_in_background (expect all non-zero)
+packages/prompts-core/prompts/atlas/opus-4-7.md:14
+packages/prompts-core/prompts/atlas/kimi.md:14
+packages/prompts-core/prompts/atlas/kimi-k2-7.md:10
+packages/prompts-core/prompts/atlas/gpt.md:14
+packages/prompts-core/prompts/atlas/kimi-k3.md:10
+packages/prompts-core/prompts/atlas/glm.md:8
+packages/prompts-core/prompts/atlas/default.md:13
+packages/prompts-core/prompts/atlas/gemini.md:13
+
+### VERIFY 3 (anti false-pass): per-file proof each of the 8 was really edited
+PATTERN 1 = permissive task-execution guidance | PATTERN 2 = NEVER entry removed | PATTERN 3 = backgrounded category example
+default.md : P1_permissive=1  P2_never_leftover=0 (0=PASS)  P3_bg_example=2
+gemini.md : P1_permissive=1  P2_never_leftover=0 (0=PASS)  P3_bg_example=2
+glm.md : P1_permissive=1  P2_never_leftover=0 (0=PASS)  P3_bg_example=1
+gpt.md : P1_permissive=1  P2_never_leftover=0 (0=PASS)  P3_bg_example=3
+kimi-k2-7.md : P1_permissive=1  P2_never_leftover=0 (0=PASS)  P3_bg_example=3
+kimi-k3.md : P1_permissive=1  P2_never_leftover=0 (0=PASS)  P3_bg_example=3
+kimi.md : P1_permissive=1  P2_never_leftover=0 (0=PASS)  P3_bg_example=3
+opus-4-7.md : P1_permissive=1  P2_never_leftover=0 (0=PASS)  P3_bg_example=3
+
+### VERIFY 4: git diff --stat (all 8 files touched)
+ packages/prompts-core/prompts/atlas/default.md   | 14 ++++++++++++--
+ packages/prompts-core/prompts/atlas/gemini.md    |  8 ++++++--
+ packages/prompts-core/prompts/atlas/glm.md       |  7 ++++---
+ packages/prompts-core/prompts/atlas/gpt.md       | 10 ++++++----
+ packages/prompts-core/prompts/atlas/kimi-k2-7.md | 12 +++++++-----
+ packages/prompts-core/prompts/atlas/kimi-k3.md   | 12 +++++++-----
+ packages/prompts-core/prompts/atlas/kimi.md      | 12 +++++++-----
+ packages/prompts-core/prompts/atlas/opus-4-7.md  | 10 ++++++----
+ 8 files changed, 55 insertions(+), 30 deletions(-)
+
+### GATE: bun test packages/prompts-core/
+CMD: bun test packages/prompts-core/ ; echo exit=$?
+bun test v1.3.14 (d1632b29)
+
+ 26 pass
+ 0 fail
+ 40 expect() calls
+Ran 26 tests across 5 files. [79.00ms]
+TEST_EXIT=0
+
+### GATE: bun run typecheck
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+TYPECHECK_EXIT=0
+
+### MANUAL QA (real surface): resolved runtime prompt via loadPromptSync + resolveVariant
+Script: /tmp/t2-resolve-atlas.ts (throwaway, deleted after this run)
+CMD: bun /tmp/t2-resolve-atlas.ts ; echo exit=$?
+========================================================================
+CASE default: modelID=claude-sonnet-4-5 -> variant=default
+resolved prompt length: 19941 chars
+--- steering section (lines mentioning run_in_background) ---
+52: task(subagent_type="explore", run_in_background=true, ...)
+56: task(subagent_type="explore", run_in_background=true, ...)
+72:   run_in_background=false,
+80:   run_in_background=false,
+178: task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+179: task(category="quick", load_skills=[], run_in_background=false, prompt="...task B...")
+180: task(category="quick", load_skills=[], run_in_background=false, prompt="...task C...")
+181: task(category="quick", load_skills=[], run_in_background=false, prompt="...task D...")
+194: - **Exploration** (`explore`, `librarian`): `run_in_background=true` — non-blocking research
+195: - **Task execution** (`category="..."`): `run_in_background=true` is normal and preferred. Background the delegation whenever your next step does not consume its result, then verify when you collect it.
+196: - Reserve `run_in_background=false` for the case where the very next step you take depends on that result.
+268:   run_in_background=true,
+277:   run_in_background=false,
+--- assertions on the RESOLVED runtime prompt ---
+permissive task-execution guidance present: true
+backgrounded category delegation example present: true
+leftover NEVER entries: NONE
+background collection mechanics intact (background_output/task_id): true
+background_cancel all=true guidance intact: true
+========================================================================
+CASE glm: modelID=glm-4.6 -> variant=glm
+resolved prompt length: 17131 chars
+--- steering section (lines mentioning run_in_background) ---
+82:   run_in_background=false,
+89:   run_in_background=false,
+179: task(category="quick", load_skills=[], run_in_background=false, prompt="...task A...")
+180: task(category="deep", load_skills=["programming"], run_in_background=false, prompt="...task B...")
+181: task(category="quick", load_skills=["git-master"], run_in_background=false, prompt="...task C...")
+184: Exploration agents use `run_in_background=true`. Implementation tasks may also use `run_in_background=true`, and that is the preferred default whenever your next step does not consume the result; verify the work when you collect it. Reserve `run_in_background=false` for the case where the very next step you take depends on that result. Collect background results with `background_output(task_id="bg_...")`. Store every continuation id `ses_...`. Never use `background_cancel(all=true)`.
+238: task(category="...", load_skills=["..."], run_in_background=true, prompt="[6-section prompt]")
+240: task(category="...", load_skills=["..."], run_in_background=false, prompt="[6-section prompt]")
+--- assertions on the RESOLVED runtime prompt ---
+permissive task-execution guidance present: true
+backgrounded category delegation example present: true
+leftover NEVER entries: NONE
+background collection mechanics intact (background_output/task_id): true
+background_cancel all=true guidance intact: true
+========================================================================
+RESULT: PASS - both resolved runtime prompts carry permissive guidance, no NEVER entry
+QA_EXIT=0
+
+### ADVERSARIAL: dirty_worktree proof
+4 unrelated files were already modified before this task started. NEVER git add -A / git add .
+CMD: git status --porcelain
+ M packages/omo-codex/plugin/components/codegraph/dist/cli.js
+ M packages/omo-codex/scripts/install-dist/install-local.mjs
+ M packages/omo-senpi/plugin/extensions/omo-member.js
+ M packages/omo-senpi/plugin/extensions/omo.js
+ M packages/prompts-core/prompts/atlas/default.md
+ M packages/prompts-core/prompts/atlas/gemini.md
+ M packages/prompts-core/prompts/atlas/glm.md
+ M packages/prompts-core/prompts/atlas/gpt.md
+ M packages/prompts-core/prompts/atlas/kimi-k2-7.md
+ M packages/prompts-core/prompts/atlas/kimi-k3.md
+ M packages/prompts-core/prompts/atlas/kimi.md
+ M packages/prompts-core/prompts/atlas/opus-4-7.md
+
+
+### COMMIT
+SHA: 3f7caef6a8baba532b9935559f6ef7ba4da9655f
+3f7caef6a docs(prompts): allow backgrounded task delegation in atlas variants
+
+Staged by explicit path only (no git add -A / git add .):
+3f7caef6a docs(prompts): allow backgrounded task delegation in atlas variants
+ packages/prompts-core/prompts/atlas/default.md   | 14 ++++++++++++--
+ packages/prompts-core/prompts/atlas/gemini.md    |  8 ++++++--
+ packages/prompts-core/prompts/atlas/glm.md       |  7 ++++---
+ packages/prompts-core/prompts/atlas/gpt.md       | 10 ++++++----
+ packages/prompts-core/prompts/atlas/kimi-k2-7.md | 12 +++++++-----
+ packages/prompts-core/prompts/atlas/kimi-k3.md   | 12 +++++++-----
+ packages/prompts-core/prompts/atlas/kimi.md      | 12 +++++++-----
+ packages/prompts-core/prompts/atlas/opus-4-7.md  | 10 ++++++----
+ 8 files changed, 55 insertions(+), 30 deletions(-)
+
+### POST-COMMIT dirty_worktree proof (the 4 pre-existing unrelated files remain UNSTAGED and UNCOMMITTED)
+CMD: git status --porcelain
+ M packages/omo-codex/plugin/components/codegraph/dist/cli.js
+ M packages/omo-codex/scripts/install-dist/install-local.mjs
+ M packages/omo-senpi/plugin/extensions/omo-member.js
+ M packages/omo-senpi/plugin/extensions/omo.js
+
+NOTE: .omo/evidence/ is gitignored in this repo, so this artifact is intentionally
+not part of the commit. Only the 8 declared prompt files were committed.
+
+### CLEANUP
+Throwaway QA script /tmp/t2-resolve-atlas.ts and temp captures under /tmp were deleted after this run.

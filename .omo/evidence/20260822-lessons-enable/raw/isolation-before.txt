@@ -1,0 +1,3 @@
+host_db=/Users/tim/.local/share/opencode/opencode.db
+host_sessions_before=2366
+opencode_version=1.18.15

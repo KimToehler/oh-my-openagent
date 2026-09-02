@@ -1,0 +1,10 @@
+14:[2026-08-08T15:36:34.748Z] [rt:50781:c450] [prompt-async-gate] promptAsync dispatching {"sessionID":"ses_01dfb55b4ffeh3Ioh4gpp4w9y9","source":"background-agent-parent-wake"}
+15:[2026-08-08T15:36:34.748Z] [rt:50781:c450] [live-server-route] dispatch via live listener {"sessionID":"ses_01dfb55b4ffeh3Ioh4gpp4w9y9","source":"background-agent-parent-wake"}
+17:[2026-08-08T15:36:34.754Z] [rt:50781:c450] [prompt-async-gate] remembered semantic prompt dispatch {"sessionID":"ses_01dfb55b4ffeh3Ioh4gpp4w9y9","source":"background-agent-parent-wake","holdMs":15000}
+18:[2026-08-08T15:36:34.754Z] [rt:50781:c450] [prompt-async-gate] promptAsync dispatched {"sessionID":"ses_01dfb55b4ffeh3Ioh4gpp4w9y9","source":"background-agent-parent-wake"}
+26:[2026-08-08T15:36:39.778Z] [rt:50781:c450] [background-agent] Requeued dispatched parent wake after no assistant output: {"sessionID":"ses_01dfb55b4ffeh3Ioh4gpp4w9y9","retryCount":1}
+27:[2026-08-08T15:36:40.738Z] [rt:50781:c450] [prompt-async-gate] expired reservation released {"sessionID":"ses_01dfb55b4ffeh3Ioh4gpp4w9y9","source":"background-agent-parent-wake"}
+28:[2026-08-08T15:36:40.739Z] [rt:50781:c450] [prompt-async-gate] promptAsync dispatching {"sessionID":"ses_01dfb55b4ffeh3Ioh4gpp4w9y9","source":"background-agent-parent-wake"}
+29:[2026-08-08T15:36:40.739Z] [rt:50781:c450] [live-server-route] dispatch via live listener {"sessionID":"ses_01dfb55b4ffeh3Ioh4gpp4w9y9","source":"background-agent-parent-wake"}
+31:[2026-08-08T15:36:40.744Z] [rt:50781:c450] [prompt-async-gate] remembered semantic prompt dispatch {"sessionID":"ses_01dfb55b4ffeh3Ioh4gpp4w9y9","source":"background-agent-parent-wake","holdMs":15000}
+32:[2026-08-08T15:36:40.744Z] [rt:50781:c450] [prompt-async-gate] promptAsync dispatched {"sessionID":"ses_01dfb55b4ffeh3Ioh4gpp4w9y9","source":"background-agent-parent-wake"}

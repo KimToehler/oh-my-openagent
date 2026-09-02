@@ -123,7 +123,6 @@ Every implementation `task()` prompt MUST include all six sections:
 ## 3. REQUIRED TOOLS
 - Read: [files to inspect]
 - Grep/Glob/LSP: [queries or symbols]
-- codegraph_explore: Use first when codegraph tools are available and useful
 - context7: Use when current library docs affect implementation
 - ast-grep skill: Use for structural search or rewrite
 ## 4. MUST DO
@@ -214,7 +213,7 @@ TASK ANALYSIS:
 
 ## Step 2: Notepad (auto-scaffolded)
 
-`/start-work` creates `.omo/notepads/{plan-name}/` with these files automatically:
+`/ulw-execute` creates `.omo/notepads/{plan-name}/` with these files automatically:
 - `learnings.md` - Conventions, patterns
 - `decisions.md` - Architectural choices
 - `issues.md` - Problems, gotchas

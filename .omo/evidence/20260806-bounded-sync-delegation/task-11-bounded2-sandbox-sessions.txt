@@ -1,0 +1,4 @@
+id                              parent_id                       agent                   title                                     time_created   time_updated 
+------------------------------  ------------------------------  ----------------------  ----------------------------------------  -------------  -------------
+ses_028d919efffe1F60UzIcE0BTZK                                  Sisyphus - ultraworker  wallclock yield probe                     1786021078544  1786021240651
+ses_028d9127bffeajZCUMH7XxpQdP  ses_028d919efffe1F60UzIcE0BTZK  explore                 wallclock busy child (@explore subagent)  1786021080452  1786021201242

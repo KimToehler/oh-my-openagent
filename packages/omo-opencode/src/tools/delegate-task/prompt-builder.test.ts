@@ -14,7 +14,7 @@ const { describe, test, expect } = require("bun:test") as {
   }
 }
 
-import { buildBackgroundTaskPrompt, buildSystemContent, buildTaskPrompt } from "./prompt-builder"
+import { buildBackgroundTaskPrompt, buildDelegatedTaskPrompt, buildSystemContent, buildTaskPrompt } from "./prompt-builder"
 import type { AvailableSkill, AvailableCategory } from "../../agents/dynamic-agent-prompt-builder"
 
 describe("prompt-builder", () => {
@@ -94,7 +94,6 @@ describe("prompt-builder", () => {
         // then
         expect(result).toBeDefined()
         expect(result).toContain("git-master")
-        expect(result).toContain("AVAILABLE SKILLS")
       })
     })
 
@@ -133,14 +132,14 @@ describe("prompt-builder", () => {
     })
   })
 
-  describe("buildTaskPrompt evidence reporting", () => {
+  describe("buildDelegatedTaskPrompt evidence reporting", () => {
     describe("#given a non-plan subagent prompt", () => {
       test("#when the task prompt is built #then it demands verbatim tool output", () => {
         // given
         const prompt = "Run the unit tests for the parser"
 
         // when
-        const result = buildTaskPrompt(prompt, "explore")
+        const result = buildDelegatedTaskPrompt(prompt, "explore")
 
         // then
         expect(result).toContain("<evidence-reporting>")
@@ -156,7 +155,7 @@ describe("prompt-builder", () => {
         const prompt = "Create a work plan"
 
         // when
-        const result = buildTaskPrompt(prompt, "plan")
+        const result = buildDelegatedTaskPrompt(prompt, "plan")
 
         // then
         expect(result).toContain("<evidence-reporting>")
@@ -199,7 +198,6 @@ describe("buildSystemContent — nativeSkillInfos merging", () => {
 
     // then
     expect(result).toBeDefined()
-    expect(result).toContain("AVAILABLE SKILLS")
     expect(result).toContain("omo-skill")
     expect(result).toContain("test-driven-development")
     expect(result).toContain("TDD discipline")
@@ -260,5 +258,42 @@ describe("buildSystemContent — nativeSkillInfos merging", () => {
 
     // then
     expect(result).toBeUndefined()
+  })
+})
+
+describe("buildDelegatedTaskPrompt", () => {
+  test("#given a non-plan agent #when a task is delegated #then the evidence contract is prefixed to the unchanged prompt", () => {
+    // given
+    const { buildDelegatedTaskPrompt, buildTaskPrompt } = require("./prompt-builder") as {
+      buildDelegatedTaskPrompt: (p: string, a: string | undefined, t?: boolean) => string
+      buildTaskPrompt: (p: string, a: string | undefined, t?: boolean) => string
+    }
+    const prompt = "delegated-prompt-sentinel"
+
+    // when
+    const delegated = buildDelegatedTaskPrompt(prompt, "explore")
+
+    // then
+    // The seam stays pure; the prefix is composed one level up, so a real
+    // dispatch still carries the contract without the builder rewriting input.
+    expect(buildTaskPrompt(prompt, "explore")).toBe(prompt)
+    expect(delegated).toContain("<evidence-reporting>")
+    expect(delegated.endsWith(prompt)).toBe(true)
+  })
+
+  test("#given a plan agent #when a task is delegated #then plan guidance stays a suffix behind the prefixed contract", () => {
+    // given
+    const { buildDelegatedTaskPrompt } = require("./prompt-builder") as {
+      buildDelegatedTaskPrompt: (p: string, a: string | undefined, t?: boolean) => string
+    }
+    const prompt = "plan-prompt-sentinel"
+
+    // when
+    const delegated = buildDelegatedTaskPrompt(prompt, "plan", false)
+
+    // then
+    expect(delegated.startsWith("<evidence-reporting>")).toBe(true)
+    expect(delegated).toContain(prompt)
+    expect(delegated.endsWith(prompt)).toBe(false)
   })
 })

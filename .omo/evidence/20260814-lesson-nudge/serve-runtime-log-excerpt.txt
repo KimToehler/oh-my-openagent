@@ -1,0 +1,31 @@
+[2026-08-14T11:00:28.720Z] [rt:59393:5e5a] [oh-my-openagent] ENTRY - plugin loading {"directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.ucUyyJfToW/proj"}
+[2026-08-14T11:00:28.732Z] [rt:59393:5e5a] [config-migration] startup completed {"journalResumed":false,"migratedFrom":[],"skippedConflictCount":0}
+[2026-08-14T11:00:28.735Z] [rt:59393:5e5a] lsp-daemon stale-version sweep skipped: current lsp-daemon version is unknown 
+[2026-08-14T11:00:28.739Z] [rt:59393:5e5a] [live-server-route] registered {"directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.ucUyyJfToW/proj","hasServerUrl":true,"registrationCount":1}
+[2026-08-14T11:00:28.741Z] [rt:59393:5e5a] [tmux-session-manager] initialized {"configEnabled":false,"tmuxConfig":{"enabled":false,"layout":"main-vertical","main_pane_size":60,"main_pane_min_width":120,"agent_pane_min_width":40,"isolation":"inline"},"projectDirectory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.ucUyyJfToW/proj","serverUrl":"http://127.0.0.1:55064/"}
+[2026-08-14T11:00:28.797Z] [rt:59393:5e5a] [tool-registry] Built tool registry {"totalTools":16,"teamModeEnabled":false,"teamToolCount":0}
+[2026-08-14T11:00:28.799Z] [rt:59393:5e5a] directory-agents-injector auto-disabled due to native OpenCode support {"currentVersion":"1.18.15","nativeVersion":"1.1.37"}
+[2026-08-14T11:00:28.802Z] [rt:59393:5e5a] [agent-source-loader] Agent sources loaded {"user":0,"project":0,"opencodeGlobal":0,"opencodeProject":0,"plugin":0,"agentDefinitions":0,"opencodeConfig":0,"config":0}
+[2026-08-14T11:00:28.802Z] [rt:59393:5e5a] [connected-providers-cache] Cache file not found {"cacheFile":"/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.ucUyyJfToW/cache/oh-my-opencode/connected-providers.json"}
+[2026-08-14T11:00:28.802Z] [rt:59393:5e5a] [fetchAvailableModels] CALLED {"connectedProvidersUnknown":true}
+[2026-08-14T11:00:28.802Z] [rt:59393:5e5a] [fetchAvailableModels] connected providers unknown, returning empty set for fallback resolution 
+[2026-08-14T11:00:28.804Z] [rt:59393:5e5a] [agent-registration] Agent skipped: unsupported Hephaestus model {"agent":"hephaestus","configuredModel":"mockprov/mock-model"}
+[2026-08-14T11:00:28.804Z] [rt:59393:5e5a] [fetchAvailableModels] CALLED {"connectedProvidersUnknown":true}
+[2026-08-14T11:00:28.804Z] [rt:59393:5e5a] [fetchAvailableModels] connected providers unknown, returning empty set for fallback resolution 
+[2026-08-14T11:00:28.805Z] [rt:59393:5e5a] [config-handler] agents loaded {"agentKeys":["Sisyphus - ultraworker","Prometheus - Plan Builder","Atlas - Plan Executor","build","explore","librarian","Metis - Plan Consultant","Momus - Plan Critic","multimodal-looker","oracle","plan","Sisyphus-Junior"]}
+[2026-08-14T11:00:28.838Z] [rt:59393:5e5a] [config-handler] config handler applied {"agentCount":12,"commandCount":16}
+[2026-08-14T11:00:28.845Z] [rt:59393:5e5a] [codegraph-bootstrap] CodeGraph project excluded; skipping bootstrap {"matchedRoot":"/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T","projectRoot":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.ucUyyJfToW/proj","reason":"tmp-root"}
+[2026-08-14T11:00:29.083Z] [rt:59393:5e5a] [connected-providers-cache] Provider-models cache file not found {"cacheFile":"/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.ucUyyJfToW/cache/oh-my-opencode/provider-models.json"}
+[2026-08-14T11:00:28.801Z] [rt:59393:5e5a] Loaded 0 plugins with 0 commands, 0 skills, 0 agents, 0 MCP servers 
+[2026-08-14T11:00:30.805Z] [rt:59393:5e5a] [todo-continuation-enforcer] session.idle {"sessionID":"ses_00011cbd6ffew74fI8k1Ina6Yu"}
+[2026-08-14T11:00:30.808Z] [rt:59393:5e5a] [todo-continuation-enforcer] No todos {"sessionID":"ses_00011cbd6ffew74fI8k1Ina6Yu"}
+[2026-08-14T11:00:30.808Z] [rt:59393:5e5a] [atlas] session.idle {"sessionID":"ses_00011cbd6ffew74fI8k1Ina6Yu"}
+[2026-08-14T11:00:30.808Z] [rt:59393:5e5a] [atlas] Skipped: session not registered in active boulder {"sessionID":"ses_00011cbd6ffew74fI8k1Ina6Yu"}
+[2026-08-14T11:00:34.020Z] [rt:59393:5e5a] [connected-providers-cache] Fetched connected providers {"count":3,"providers":["github-copilot","opencode","mockprov"]}
+[2026-08-14T11:00:34.020Z] [rt:59393:5e5a] [connected-providers-cache] Cache written {"count":3,"updatedAt":"2026-08-14T11:00:34.020Z"}
+[2026-08-14T11:00:34.021Z] [rt:59393:5e5a] [connected-providers-cache] Extracted models from provider list {"providerCount":3,"totalModels":42}
+[2026-08-14T11:00:34.021Z] [rt:59393:5e5a] [connected-providers-cache] Provider-models cache written {"providerCount":3,"updatedAt":"2026-08-14T11:00:34.021Z"}
+[2026-08-14T11:00:34.021Z] [rt:59393:5e5a] [auto-update-checker] Connected providers cache created on first run 
+[2026-08-14T11:00:34.261Z] [rt:59393:5e5a] [model-capabilities-cache] Cache written {"modelCount":2824,"generatedAt":"2026-08-14T11:00:34.258Z"}
+[2026-08-14T11:00:34.261Z] [rt:59393:5e5a] [auto-update-checker] Local development mode 
+[2026-08-14T11:00:39.530Z] [rt:59393:5e5a] [auto-update-checker] Local dev toast shown: v4.19.4 

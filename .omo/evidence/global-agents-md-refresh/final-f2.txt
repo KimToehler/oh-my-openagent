@@ -1,0 +1,148 @@
+F2 CONTENT QUALITY REVIEW — global-agents-md-refresh
+Reviewer: F2 (content/reading-comprehension pass, Final Verification Wave)
+Date: Thu Jul 23 2026
+Method: full end-to-end read of all 7 files + real byte-compare / existence commands.
+
+==================================================================
+FILES READ IN FULL (7/7)
+==================================================================
+1. /Users/tim/.claude/CLAUDE.md                          (97 lines) — read fully
+2. /Users/tim/.config/opencode/AGENTS.md                 (93 lines) — read fully
+3. /Users/tim/git/claude-config/core/instructions.md     (72 lines) — read fully
+4. /Users/tim/git/claude-config/harness/claude.md        (24 lines) — read fully
+5. /Users/tim/git/claude-config/harness/opencode.md      (20 lines) — read fully
+6. /Users/tim/git/claude-config/README.md                (61 lines) — read fully
+7. /Users/tim/git/onara/AGENTS.md                        (448 lines) — read fully
+
+==================================================================
+CATEGORY 1 — DUPLICATED CONTENT
+==================================================================
+Check A: does core content also appear in a harness appendix?
+  - core/instructions.md ends at "Tool Output Hygiene" (line 72). It has NO
+    lean-ctx runtime block, NO @RTK.md, NO "Claude Code Specifics", NO
+    "OpenCode Specifics" section. Grep for those terms in core matched ONLY
+    the Tool Output Hygiene prose (lines 66/72: "RTK filters..." and
+    "RTK_* in the 9router docker-compose.yml") — that is the legitimate
+    compression-proxy explanation, NOT the @RTK.md reference. exit:0 but
+    zero real leak.
+  - harness/claude.md contains ONLY: lean-ctx-claude-v5 block + @RTK.md +
+    "Claude Code Specifics". None of that appears in core. GOOD.
+
+Check B: content appearing in BOTH harness/claude.md AND harness/opencode.md
+  - claude.md: lean-ctx-claude-v5 (prose runtime, @RTK.md, Claude specifics).
+  - opencode.md: lean-ctx-rules-v8 (shadow-mode, compression block, OpenCode
+    specifics).
+  - These are DIFFERENT lean-ctx variants (v5 verbose runtime vs v8 rules).
+    No shared body. grep for OpenCode/oh-my-openagent/rules-injector/Prometheus
+    in claude.md → exit:1 (none). grep for @RTK/rules/ /lean-ctx-runtime in
+    opencode.md → none of the claude-only items. GOOD, no cross-appendix dup.
+
+Concatenation integrity (proves no duplication introduced by generation):
+  diff <(core + blank + harness/claude.md) ~/.claude/CLAUDE.md      → exit:0 (identical)
+  diff <(core + blank + harness/opencode.md) ~/.config/opencode/AGENTS.md → exit:0 (identical)
+  Deployed files are EXACTLY the source concatenation. No drift, no dup.
+
+VERDICT C1: PASS — no duplicated content.
+
+==================================================================
+CATEGORY 2 — ORPHANED REFERENCES
+==================================================================
+  ls -la ~/.claude/RTK.md
+    -rw-r--r-- 964 bytes  → EXISTS (exit:0). @RTK.md in deployed CLAUDE.md
+    line 93 resolves.
+  ls -la ~/.claude/rules/lean-ctx.md
+    -rw-r--r-- 1493 bytes → EXISTS (exit:0). @rules/lean-ctx.md referenced in
+    harness/claude.md line 24 (deployed CLAUDE.md line 97) resolves.
+  tasks/ mentions across all 7 files:
+    Only 3 hits, ALL in onara/AGENTS.md and ALL legitimate onara content:
+      - line 222: "├── tasks/   # Background job tasks" (Kotlin backend dir tree)
+      - line 272: "tasks/redesign-kit.css" (Open Design kit path)
+      - line 301: "tasks/redesign-kit.css" (same OD kit)
+    ZERO tasks/ references in any claude-config source or deployed global file.
+    No orphaned plan-dir/tasks artifact leaked into the global instructions. GOOD.
+
+VERDICT C2: PASS — no orphaned references.
+
+==================================================================
+CATEGORY 3 — LEAN-CTX BLOCK BYTE-INTEGRITY
+==================================================================
+lean-ctx-claude-v5 (CLAUDE.md):
+  before = git show 2c9164d:CLAUDE.md | sed -n '84,101p'  (18 lines)
+  now    = ~/.claude/CLAUDE.md lines 74-91                (18 lines)
+  diff before now → exit:0  → BYTE-IDENTICAL.
+
+lean-ctx-rules-v8 (AGENTS.md):
+  snapshot = git -C claude-config show 2c9164d:reference/opencode-AGENTS.md.snapshot (13 lines)
+  now      = ~/.config/opencode/AGENTS.md lines 74-86                                 (13 lines)
+  diff snapshot now       → exit:0
+  awk-anchored (<!-- lean-ctx-rules --> … <!-- /lean-ctx-rules -->) diff → exit:0
+  → BYTE-IDENTICAL (both fixed-line and anchored comparisons agree).
+
+VERDICT C3: PASS — both vendor blocks preserved byte-for-byte.
+
+==================================================================
+CATEGORY 4 — PROSE QUALITY / EDITING ARTIFACTS
+==================================================================
+  Double blank lines (awk prev=="" && $0==""):
+    ~/.claude/CLAUDE.md            → none
+    ~/.config/opencode/AGENTS.md   → none
+  Heading levels: consistent (## sections, ### numbered workflow subheads) in
+    both deployed files; appendix "## Claude Code Specifics" / "## OpenCode /
+    oh-my-openagent Specifics" sit at the same ## level as core sections. GOOD.
+  Markdown: lean-ctx HTML comment fences (<!-- lean-ctx --> … <!-- /lean-ctx -->)
+    are balanced and closed in both files. Table in README renders (aligned pipes).
+  Truncated sentences: none. Final lines end cleanly (CLAUDE.md line 97 full
+    sentence; AGENTS.md line 93 full sentence).
+  README.md: "Generation and Deployment" section accurately describes the
+    core + blank + harness concat (matches observed exit:0 concat diffs) and
+    the "What's in here" table lists harness/claude.md + harness/opencode.md +
+    core/instructions.md correctly. Known-Limitation note about re-copying
+    updated vendor blocks is accurate and reads well.
+
+VERDICT C4: PASS — no awkward phrasing, broken markdown, inconsistent headings,
+or leftover artifacts.
+
+==================================================================
+CATEGORY 5 — ONARA mcp__ REWORDING
+==================================================================
+  grep "mcp__" onara/AGENTS.md → exit:1 (ZERO matches). Claude-only
+    mcp__-prefixed tool naming fully removed.
+  Replacement wording reads naturally in every occurrence:
+    - line 61:  "read via the Open Design MCP tools"
+    - line 272: "read it with the Open Design MCP tools (project: \"onara\")"
+    - line 299: "read via the Open Design MCP tools with project: \"onara\""
+    - line 303: "the Open Design MCP search_files tool's pattern is a glob..."
+    Each is grammatical, harness-neutral, and preserves the original meaning
+    (which OD operation, with which project arg). No mechanical-substitution
+    stubs, no lost semantics.
+
+VERDICT C5: PASS — mcp__ rewording natural and meaning-preserving.
+
+==================================================================
+COMMAND LOG (key exit codes)
+==================================================================
+ls -la ~/.claude/RTK.md                                   → exit:0 (964B)
+ls -la ~/.claude/rules/lean-ctx.md                        → exit:0 (1493B)
+diff leanctx_claude_before leanctx_claude_now             → exit:0
+diff oc_snapshot oc_now (lean-ctx-rules-v8)               → exit:0
+awk-anchored diff oc_snapshot oc_now_awk                  → exit:0
+diff (core+blank+claude) ~/.claude/CLAUDE.md              → exit:0
+diff (core+blank+opencode) ~/.config/opencode/AGENTS.md   → exit:0
+double-blank scan (both deployed files)                   → none
+grep "mcp__" onara/AGENTS.md                              → exit:1 (none, good)
+grep "tasks/" (7 files)                                   → only 3 legit onara hits
+
+==================================================================
+SUMMARY
+==================================================================
+C1 Duplicated content ............. PASS
+C2 Orphaned references ............ PASS
+C3 lean-ctx block byte-integrity .. PASS (both blocks byte-identical)
+C4 Prose quality / artifacts ...... PASS
+C5 onara mcp__ rewording .......... PASS
+
+No content-quality defects found. Deployed files are exact source
+concatenations; vendor lean-ctx blocks preserved byte-for-byte; all
+@-references resolve; onara mcp__ cleanup is natural and complete.
+
+VERDICT: APPROVE

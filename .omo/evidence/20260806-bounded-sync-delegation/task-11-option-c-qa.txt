@@ -1,0 +1,536 @@
+TASK 11 - OPTION C REAL-OPENCODE QA
+bounded sync delegation: the wall-clock bound returns control to the user with a
+bg_ handle, and the child subagent is ADOPTED, not aborted.
+
+Date       : 2026-08-06
+Repo       : /Users/tim/git/oh-my-openagent
+Branch     : dev (main checkout, NO worktree - deliberate user override)
+HEAD       : c92d136e2 feat(delegate-task): yield sync tasks to background at wall-clock bound
+opencode   : (installed launcher, resolved through the sandboxed HOME symlink)
+Skill      : .agents/skills/opencode-qa/SKILL.md (Case A: `opencode run --format json`)
+
+VERDICT: PASS. All five required assertions proven on real opencode against
+SOURCE (not the stale dist). The negative control diverges cleanly.
+
+
+================================================================================
+0. THE QA DESIGN PROBLEM AND HOW IT WAS SOLVED
+================================================================================
+
+The bundled fake provider (.agents/skills/opencode-qa/scripts/lib/fake-openai-server.mjs)
+answers a child session in ONE turn, in well under a second. A child like that
+goes idle immediately, so a 60s wall-clock bound could never trip and the
+"bounded" run would be byte-identical to the "unbounded" run - which the task's
+gate F3 declares an automatic FAIL.
+
+So a new fake provider was written that makes the child STAY BUSY:
+
+  .omo/evidence/20260806-bounded-sync-delegation/task-11-fake-llm-busy.mjs
+  (source of truth during the run: /tmp/omo-qa-t11/fake-llm-busy.mjs)
+
+  - It reuses the bundled `sendSse` / `textEvents` / `toolCallEvents` SSE
+    encoders verbatim (imported from the skill's fake-openai-events.mjs), so the
+    wire format is the same one the skill's own scripts already validate.
+  - The CHILD branch answers every child request with another
+    `bash: sleep 6; echo CHILD_ALIVE_TURN_<n>` tool call, 20 times
+    (CHILD_TURNS=20, CHILD_SLEEP_S=6). The child therefore holds a continuous
+    busy/running status for roughly 127 seconds - more than twice the 60s bound.
+  - This is also the HONEST test. A child that is continuously active is exactly
+    the case the pre-existing INACTIVITY window (syncPollTimeoutMs /
+    MAX_POLL_TIME_MS) can never catch, because every busy tick resets it. That
+    is the entire reason the wall-clock ceiling exists.
+  - The PARENT branch, after its `task` tool call returns, issues one long
+    `bash sleep 100` to hold the parent turn open. Without it, `opencode run`
+    tears the server down the instant the parent turn ends and there is no
+    observable window in which to prove the child survived. (First bounded run,
+    label "bounded", was run WITHOUT this hold and demonstrated the problem:
+    the yield fired correctly but the process exited too fast to sample child
+    liveness afterwards. That run is retained at /tmp/omo-qa-t11/out/bounded.)
+
+Provider self-test before use (literal output):
+
+  $ curl -s -X POST "http://127.0.0.1:$PORT/v1/responses" -d '{"input":[{"role":"user","content":"Run the wallclock probe"}]}'
+  data: {"type":"response.output_item.added",...,"name":"task",...}
+  data: {"type":"response.function_call_arguments.delta",...,"delta":"{\"description\":\"wallclock busy child\",\"prompt\":\"WALLCLOCK_CHILD_TASK: ...\",\"subagent_type\":\"explore\",\"run_in_background\":false,\"load_skills\":[]}"}
+
+  $ curl -s -X POST "http://127.0.0.1:$PORT/v1/responses" -d '{"input":[{"role":"user","content":"WALLCLOCK_CHILD_TASK: keep working"}]}'
+  data: {"type":"response.output_item.added",...,"name":"bash",...}
+
+  -> parent asks for a SYNC delegation (run_in_background:false); child answers
+     with a shell call. Exactly the shape the test needs.
+
+
+================================================================================
+1. ISOLATION
+================================================================================
+
+Driver: .omo/evidence/20260806-bounded-sync-delegation/task-11-run-qa.sh
+        (source of truth during the run: /tmp/omo-qa-t11/run-qa.sh)
+
+Two layers, in this order:
+
+  1. `source script/agent/qa-sandbox.sh`
+       -> fresh mktemp XDG_DATA_HOME / XDG_CONFIG_HOME / XDG_CACHE_HOME /
+          XDG_STATE_HOME / CODEX_HOME, plus OPENCODE_DISABLE_AUTOUPDATE and
+          OPENCODE_DISABLE_MODELS_FETCH.
+
+  2. HOME is sandboxed on top of that.
+       qa-sandbox.sh does NOT sandbox HOME. `omo-config-core/src/loader/paths.ts`
+       resolves the USER config layer from HOME, not from XDG, so the real
+       ~/.omo/omo.jsonc would otherwise leak into the sandboxed run and route
+       every agent at the real `onara/*` models - defeating the hermetic fake
+       provider. $HOME/.opencode/bin is symlinked into the sandbox home so the
+       opencode launcher still resolves after HOME is rewritten. (Same technique
+       as todo 6 and as oqa_preserve_home_opencode_bin in the skill harness.)
+
+REAL DB SESSION COUNTS (host DB is only ever READ)
+
+  real DB path : /Users/tim/.local/share/opencode/opencode.db
+
+  bounded run  : BEFORE=1215  AFTER=1217
+  control run  : BEFORE=1217  AFTER=1217
+
+  The bounded run's +2 is NOT a leak from this QA. Both new rows are unrelated
+  concurrent host activity in a different repo. Proof - the three queries that
+  would catch a leak all return 0:
+
+    $ sqlite3 "$DB" "SELECT count(*) FROM session WHERE directory LIKE '%omo-qa-sandbox%'"
+    0
+    $ sqlite3 "$DB" "SELECT count(*) FROM session WHERE title LIKE '%wallclock%'"
+    0
+    $ sqlite3 "$DB" "SELECT count(*) FROM session WHERE id IN ('ses_028d9127bffeajZCUMH7XxpQdP','ses_028d919efffe1F60UzIcE0BTZK')"
+    0
+
+  And the two rows that did appear, inside the bounded run's window:
+
+    $ sqlite3 -header -column "$DB" "SELECT id, agent, substr(directory,1,60), substr(title,1,40), time_created FROM session WHERE time_created >= 1786021069040 ORDER BY time_created"
+    ses_028d725ecffegus065fpVu4R4V  librarian  /Users/tim/git/onara  Serena JetBrains mode requirements (@lib  1786021206547
+    ses_028d6e598ffeEVN5dTMzc87KqL  librarian  /Users/tim/git/onara  Serena memory + LS lifecycle costs (@lib  1786021223015
+
+  Different directory (/Users/tim/git/onara), different agent (librarian),
+  different titles. The control run, which ran later and alone, shows
+  BEFORE == AFTER == 1217 exactly.
+
+  Every session this QA created landed in the SANDBOX DB instead:
+    bounded run sandbox DB : 2 sessions
+    control run sandbox DB : 2 sessions
+  (1 parent + 1 delegated child each, exactly as expected.)
+
+
+================================================================================
+2. PROVENANCE - WHICH CODE PATH RAN (adversarial class: stale_state)
+================================================================================
+
+dist/index.js is STALE and predates every commit under test. Proven:
+
+  $ stat -f '%Sm' dist/index.js
+  Aug  5 14:08:57 2026            <- one day before the feature commits
+
+  $ grep -c 'Sync task moved to background' dist/index.js
+  0
+  $ grep -c 'wall_clock_yield' dist/index.js
+  0
+  $ grep -c 'adoptRunningSession' dist/index.js
+  0
+
+The sandbox config loads the plugin from SOURCE, not dist:
+
+  $ grep '"plugin"' /tmp/omo-qa-t11/out/bounded2/opencode.jsonc
+    "plugin": ["file:///Users/tim/git/oh-my-openagent/packages/omo-opencode/src/index.ts"],
+
+The string that identifies the new code path exists ONLY in source:
+
+  $ grep -c 'Sync task moved to background' packages/omo-opencode/src/tools/delegate-task/sync-task.ts
+  1
+
+...and it appears in the run's output tape:
+
+  $ grep -c 'Sync task moved to background' /tmp/omo-qa-t11/out/bounded2/run.jsonl
+  1
+
+DETERMINATION: the run exercised SOURCE. The observed output string is
+unreachable from the stale dist bundle, because that bundle does not contain it.
+
+Second, independent provenance signal - the plugin log emitted the new poller's
+log line, keyed to the exact child session id of this run:
+
+  $ grep "Poll wall-clock timeout reached" plugin.log | grep ses_028d9127bffeajZCUMH7XxpQdP
+  [2026-08-06T12:59:00.589Z] [task] Poll wall-clock timeout reached {"sessionID":"ses_028d9127bffeajZCUMH7XxpQdP","pollCount":60}
+
+  That log statement lives at sync-session-poller.ts:117, inside the new
+  wall-clock branch, and is likewise absent from dist.
+
+
+================================================================================
+3. THE BOUNDED RUN
+================================================================================
+
+Config (sandbox HOME ~/.omo/omo.jsonc):
+
+  {
+    "[opencode]": {
+      "background_task": { "defaultConcurrency": 4, "syncWallClockTimeoutMs": 60000 },
+      "agents": {
+        "explore": { "model": "openai/gpt-fake" },
+        "librarian": { "model": "openai/gpt-fake" },
+        "sisyphus-junior": { "model": "openai/gpt-fake" }
+      }
+    }
+  }
+
+  60000 ms is the schema minimum (config/schema/background-task.ts).
+
+Command:
+
+  $ PARENT_HOLD_S=100 RUN_TIMEOUT_S=420 bash /tmp/omo-qa-t11/run-qa.sh bounded2 60000
+  # which internally runs, from the sandbox project dir:
+  $ opencode run "Run the wallclock probe" --format json > run.jsonl
+
+Watchdog: 420 s, applied as a background `sleep + kill -9` on the opencode run
+PID (macOS has no `timeout` binary). Receipt:
+
+  $ cat watchdog.txt
+  watchdog_bound_s=420 fired=no
+
+  It did NOT fire. Total run wall time was 166.7 s (start 1786021074040,
+  end 1786021240715), comfortably inside the bound, so no result was truncated
+  by the harness.
+
+Fake-provider branch timeline (the child's continuous activity):
+
+  t+0.0s   START port=50464 CHILD_TURNS=20 CHILD_SLEEP_S=6 RUN_IN_BACKGROUND=false
+  t+6.x s  branch=title
+  t+7.x s  branch=parent-task-call {"run_in_background":false}   <- SYNC delegation
+  t+7.x s  branch=child {"childTurn":1}
+  ... child turns 2..10 every ~6s ...
+  t+66.8s  branch=parent-hold {"holdSeconds":100}   <- PARENT RESUMED, child still going
+  t+67.0s  branch=child {"childTurn":11}            <- child kept working AFTER
+  ... child turns 12..20 ...
+  t+127.4s branch=child-done {"childTurn":21}
+  t+166.8s branch=parent-final
+  FINAL_COUNTS title=1 parent-task-call=1 parent-hold=1 parent-final=1 child=20 child-done=1 wake=0 default=0 childTurns=21
+
+  The parent got its turn back at t+66.8s while the child had 10 more turns
+  (60+ seconds of work) still ahead of it.
+
+
+================================================================================
+4. THE FIVE ASSERTIONS (literal output)
+================================================================================
+
+--------------------------------------------------------------------------------
+ASSERTION 1 - the parent's `task` call RETURNS with a bg_ handle.   PASS
+--------------------------------------------------------------------------------
+
+  $ jq 'select(.type=="tool_use" and .part.tool=="task") | select(.part.state.output | contains("bg_"))' task-11-run.jsonl | head -1
+
+  Produces output (non-empty). The tool state, verbatim:
+
+    .part.tool                 = "task"
+    .part.state.status         = "completed"
+    .part.state.input.run_in_background = false      <- it WAS a sync delegation
+    .part.state.metadata.sync  = true
+    .part.state.output         =
+
+      Sync task moved to background.
+
+      Background Task ID: bg_75870ee5
+      Description: wallclock busy child
+      Agent: explore
+      Status: still running
+
+      Do NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it.
+
+      to continue: task(task_id="ses_028d9127bffeajZCUMH7XxpQdP", load_skills=[], run_in_background=false, prompt="...")
+
+  A SYNC (`run_in_background:false`) delegation returned a `bg_...` handle and
+  told the model, in words, that the child is "still running". The parent's turn
+  was released; the user has the keyboard back.
+
+--------------------------------------------------------------------------------
+ASSERTION 2 - elapsed tool time is BOUNDED.                         PASS
+--------------------------------------------------------------------------------
+
+  $ jq 'select(.type=="tool_use" and .part.tool=="task") | .part.state.time.end - .part.state.time.start' task-11-run.jsonl
+  60155
+
+  60155 ms against a 60000 ms bound: overshoot of 155 ms, i.e. one poll tick.
+
+  What an UNBOUNDED sync wait would have cost is not a guess - the negative
+  control measured it on the identical workload: 121259 ms (section 5). The
+  bounded call returned in 49.6% of that, at the bound, with 61.1 s of child
+  work still outstanding.
+
+  Cross-check against the poller's own log line:
+    tool start 1786021080438 -> 2026-08-06T12:58:00.438Z
+    tool end   1786021140593 -> 2026-08-06T12:59:00.593Z
+    poller log 12:59:00.589Z "Poll wall-clock timeout reached ... pollCount:60"
+  The tool returned 4 ms after the poller announced the wall-clock exit.
+
+--------------------------------------------------------------------------------
+ASSERTION 3 - THE CHILD IS STILL ALIVE ("adopted, not aborted").    PASS
+--------------------------------------------------------------------------------
+
+  This is the assertion that distinguishes adoption from the pre-existing abort
+  behavior, so it is proven three independent ways.
+
+  (3a) The child executed ELEVEN more tool calls AFTER the parent's tool call
+       returned. Query, against the sandbox DB, filtered to child tool parts
+       whose start time is strictly greater than the parent's tool END:
+
+    $ sqlite3 -header -column sandbox-opencode.db \
+      "SELECT session_id, json_extract(data,'\$.state.status') AS status,
+              json_extract(data,'\$.state.time.start') AS t_start,
+              substr(json_extract(data,'\$.state.input.command'),1,40) AS cmd
+       FROM part
+       WHERE json_extract(data,'\$.type')='tool'
+         AND session_id='ses_028d9127bffeajZCUMH7XxpQdP'
+         AND json_extract(data,'\$.state.time.start') > 1786021140593
+       ORDER BY t_start"
+
+    session_id                      status     t_start        cmd
+    ------------------------------  ---------  -------------  ----------------------------------
+    ses_028d9127bffeajZCUMH7XxpQdP  completed  1786021140855  sleep 6; echo CHILD_ALIVE_TURN_10
+    ses_028d9127bffeajZCUMH7XxpQdP  completed  1786021146888  sleep 6; echo CHILD_ALIVE_TURN_11
+    ses_028d9127bffeajZCUMH7XxpQdP  completed  1786021152919  sleep 6; echo CHILD_ALIVE_TURN_12
+    ses_028d9127bffeajZCUMH7XxpQdP  completed  1786021158952  sleep 6; echo CHILD_ALIVE_TURN_13
+    ses_028d9127bffeajZCUMH7XxpQdP  completed  1786021165002  sleep 6; echo CHILD_ALIVE_TURN_14
+    ses_028d9127bffeajZCUMH7XxpQdP  completed  1786021171034  sleep 6; echo CHILD_ALIVE_TURN_15
+    ses_028d9127bffeajZCUMH7XxpQdP  completed  1786021177067  sleep 6; echo CHILD_ALIVE_TURN_16
+    ses_028d9127bffeajZCUMH7XxpQdP  completed  1786021183098  sleep 6; echo CHILD_ALIVE_TURN_17
+    ses_028d9127bffeajZCUMH7XxpQdP  completed  1786021189140  sleep 6; echo CHILD_ALIVE_TURN_18
+    ses_028d9127bffeajZCUMH7XxpQdP  completed  1786021195177  sleep 6; echo CHILD_ALIVE_TURN_19
+    ses_028d9127bffeajZCUMH7XxpQdP  completed  1786021201207  sleep 6; echo CHILD_ALIVE_TURN_20
+
+    The parent's tool returned at 1786021140593. The first of these starts
+    262 ms later and they continue for a further 60.6 seconds. The child was
+    non-terminal at the moment of return and stayed productive.
+
+  (3b) The child RAN TO NATURAL COMPLETION rather than being cut off. Its last
+       assistant text part is the provider's terminal message, which is only
+       emitted after all 20 scripted turns are exhausted:
+
+    $ sqlite3 sandbox-opencode.db "SELECT substr(json_extract(data,'\$.text'),1,80) FROM part WHERE session_id='ses_028d9127bffeajZCUMH7XxpQdP' AND json_extract(data,'\$.type')='text' ORDER BY time_created DESC LIMIT 1"
+    CHILD_FINISHED_ALL_TURNS
+
+    The provider log agrees: `branch=child-done {"childTurn":21}` at t+127.4s.
+    An aborted child could not have reached turn 21.
+
+  (3c) NO ABORT WAS ISSUED ON THE YIELD PATH. sync-task.ts guards the entire
+       `finally` cleanup (cleanupSyncSessionSideEffects + handedBackSyncSessions
+       + client.session.abort) behind `!yieldedToBackground`. Log check:
+
+    $ grep -c "Failed to abort completed sync session" plugin.log
+    0
+
+    and the child's own session row keeps advancing after the parent returned:
+
+    id                              parent_id                       agent    time_created   time_updated
+    ses_028d9127bffeajZCUMH7XxpQdP  ses_028d919efffe1F60UzIcE0BTZK  explore  1786021080452  1786021201242
+
+    time_updated 1786021201242 is 60.6 s past the parent's tool end.
+
+--------------------------------------------------------------------------------
+ASSERTION 4 - NEGATIVE CONTROL.                                     PASS
+--------------------------------------------------------------------------------
+
+  See section 5 for the full run. The decisive check:
+
+  $ jq 'select(.type=="tool_use" and .part.tool=="task") | select(.part.state.output | contains("bg_"))' task-11-without-bound.jsonl
+  (empty - no output at all)
+
+  $ jq -r 'select(.type=="tool_use" and .part.tool=="task") | .part.state.output' task-11-without-bound.jsonl
+  Task completed in 2m 1s.
+
+  Agent: explore
+  Model: openai/gpt-fake
+
+  ---
+
+  CHILD_FINISHED_ALL_TURNS
+  ...
+
+  No `bg_` handle. The parent BLOCKED for the child's entire 2m 1s runtime and
+  received the child's actual RESULT. The bound is what changed the behavior,
+  not the harness.
+
+--------------------------------------------------------------------------------
+ASSERTION 5 - the adopted child's agent is NOT in DEFAULT_SKIP_AGENTS. PASS
+--------------------------------------------------------------------------------
+
+  DEFAULT_SKIP_AGENTS = ["prometheus", "compaction", "plan"]
+  (hooks/todo-continuation-enforcer/constants.ts:5)
+
+  $ jq -r 'select(.type=="tool_use" and .part.tool=="task") | .part.state.metadata.agent' task-11-run.jsonl
+  explore
+
+  Cross-checked against the sandbox DB session row (`agent` column): `explore`.
+
+  "explore" is not in the skip list, so the continuation enforcer will drive the
+  adopted child normally. The deadlock-by-skip-list route is not reachable here.
+
+
+================================================================================
+5. THE NEGATIVE CONTROL RUN
+================================================================================
+
+Identical driver, identical fake provider, identical child workload. The ONLY
+difference: `syncWallClockTimeoutMs` is omitted from the config entirely.
+
+  {
+    "[opencode]": {
+      "background_task": { "defaultConcurrency": 4 },
+      ...
+    }
+  }
+
+  $ PARENT_HOLD_S=100 RUN_TIMEOUT_S=420 bash /tmp/omo-qa-t11/run-qa.sh nobound none
+
+IMPORTANT PRECISION - what "unset" actually means at runtime. The task brief
+said an unset key defaults to Infinity. That is true of the TIMING SYMBOL
+(timing.ts: `let MAX_WALL_CLOCK_MS = Infinity`), which is the inert default so
+the feature cannot change behavior unless configured. But the PLUGIN WIRING
+supplies its own default when the config key is absent:
+
+  packages/omo-opencode/src/plugin/tool-registry-core-tools.ts:68
+    syncWallClockTimeoutMs: pluginConfig.background_task?.syncWallClockTimeoutMs ?? 600_000,
+
+So an unset key yields a 600000 ms (10 minute) ceiling in a real plugin session,
+not Infinity. This does not weaken the control: the child's total runtime is
+~127 s, an order of magnitude below 600 s, so the ceiling is never reached and
+the run behaves exactly as an unbounded sync wait. The control is honest about
+what it demonstrates - that WITHOUT the configured 60 s bound the parent blocks
+for the child's full duration and gets a result rather than a handle.
+
+Provider branch timeline (control):
+
+  t+7.x s  branch=parent-task-call {"run_in_background":false}
+  t+7.x s  branch=child {"childTurn":1}
+  ... child turns 2..20, uninterrupted, every ~6s ...
+  t+127.7s branch=child-done {"childTurn":21}
+  t+128.2s branch=parent-hold {"holdSeconds":100}   <- parent resumes ONLY NOW
+
+  Compare with the bounded run, where parent-hold fired at t+66.8s. The parent
+  in the control run did not get its turn back until AFTER the child finished.
+
+Measurements:
+
+  tool elapsed  : 121259 ms   (bounded run: 60155 ms)
+  bg_ in output : NO          (bounded run: YES, bg_75870ee5)
+  output kind   : the child's RESULT ("Task completed in 2m 1s ...
+                  CHILD_FINISHED_ALL_TURNS")
+                  (bounded run: a HANDLE, "Status: still running")
+  watchdog      : watchdog_bound_s=420 fired=no
+  real DB       : BEFORE=1217  AFTER=1217   (identical)
+  sandbox DB    : 2 sessions
+
+  The two runs are NOT byte-identical. Gate F3 is satisfied.
+
+
+================================================================================
+6. ADVERSARIAL CLASSES
+================================================================================
+
+stale_state
+  Handled and reported in section 2. dist/index.js is a day stale and contains
+  zero occurrences of the three feature markers; the sandbox config loads
+  `file://.../packages/omo-opencode/src/index.ts`; the observed output string
+  and the observed poller log line exist only in source. DETERMINATION: SOURCE
+  ran. A run against dist would have been impossible to confuse with this one -
+  it would have blocked for the full 121 s and produced no bg_ handle, which is
+  precisely what the negative control looks like.
+
+cancel_resume
+  This feature IS a cancel/resume boundary. Confirmed:
+    - the child survived the parent's return (assertion 3a, 11 post-return tool
+      calls),
+    - no abort was issued on the yield path (`Failed to abort completed sync
+      session` count = 0; the abort is guarded by `!yieldedToBackground`),
+    - the child reached natural completion (CHILD_FINISHED_ALL_TURNS), so
+      nothing about its work was discarded - which is the whole point of
+      adopting instead of aborting.
+
+misleading_success_output
+  `opencode run` exited 0 in BOTH runs, which by itself proves nothing - the
+  control run also exited 0 while doing the opposite thing. The proof is the jq
+  assertions on the tape plus the child-liveness queries against the sandbox DB,
+  all reproduced literally above. Note also the child tool parts show
+  `status: completed` per turn; that is per-tool-call status, not session
+  termination, which is why session-level liveness was proven separately via
+  post-return activity, natural completion, and time_updated.
+
+hung_commands
+  macOS has no `timeout` binary. Every `opencode run` was bounded by a
+  background `sleep <N>; kill -9 <run_pid>` watchdog that writes its own receipt
+  file. Configuration: RUN_TIMEOUT_S=420 for both runs, chosen to exceed the
+  deliberate ~127 s child runtime plus the 100 s parent hold plus startup.
+  Receipts: bounded `watchdog_bound_s=420 fired=no`; control
+  `watchdog_bound_s=420 fired=no`. Neither fired, so no result was truncated.
+  Actual wall times: bounded 166.7 s, control 228.1 s.
+
+dirty_worktree
+  4 unrelated build artifacts were already modified before this task began and
+  were NOT touched:
+    M packages/omo-codex/plugin/components/codegraph/dist/cli.js
+    M packages/omo-codex/scripts/install-dist/install-local.mjs
+    M packages/omo-senpi/plugin/extensions/omo-member.js
+    M packages/omo-senpi/plugin/extensions/omo.js
+  `git add -A` / `git add .` were never used. `.omo/evidence/` is gitignored and
+  was NOT force-added; the artifacts are left on disk only.
+
+
+================================================================================
+7. CLEANUP RECEIPTS
+================================================================================
+
+Registered resources per run: the fake provider process, the fake provider's
+bound port, the `opencode run` process, the DB sampler subshell, the watchdog
+subshell, the child's shell `sleep` processes, and the sandbox temp dir.
+No opencode SERVER and no tmux assets were used (Case A drives `opencode run`
+directly, which owns its own ephemeral server).
+
+  bounded run:
+    $ cat cleanup-receipts.txt
+    fake_llm_pid 14000 alive_after_kill=no
+    fake_llm_port 50464 listeners=0
+    opencode_run_pid 14015 alive=no
+    leftover_child_sleep_procs=0
+
+  control run:
+    $ cat cleanup-receipts.txt
+    fake_llm_pid 21341 alive_after_kill=no
+    fake_llm_port 50702 listeners=0
+    opencode_run_pid 21356 alive=no
+    leftover_child_sleep_procs=0
+
+Every process is gone and every port is free. Sandbox temp dirs were retained
+during evidence extraction and are removed at the end of the task; they contain
+no secrets beyond the literal string "fake-key" used as the fake provider's API
+key.
+
+
+================================================================================
+8. ARTIFACTS
+================================================================================
+
+Under .omo/evidence/20260806-bounded-sync-delegation/ (gitignored):
+
+  task-11-option-c-qa.txt              this file
+  task-11-run.jsonl                    bounded run, raw JSON tape
+  task-11-without-bound.out            control run, the task tool's output text
+  task-11-without-bound.jsonl          control run, raw JSON tape
+  task-11-run-qa.sh                    the driver
+  task-11-fake-llm-busy.mjs            the busy-child fake provider
+  task-11-bounded2-fake-llm.log        bounded run, provider branch timeline
+  task-11-nobound-fake-llm.log         control run, provider branch timeline
+  task-11-bounded2-sandbox-sessions.txt / task-11-nobound-sandbox-sessions.txt
+  task-11-bounded2-tool-parts.txt / task-11-nobound-tool-parts.txt
+
+Working directories retained on disk (not committed):
+  /tmp/omo-qa-t11/out/bounded    first bounded attempt, no parent hold
+  /tmp/omo-qa-t11/out/bounded2   the bounded run of record
+  /tmp/omo-qa-t11/out/nobound    the negative control
+
+The plugin log copies (plugin.log, ~19 MB each) are NOT copied into the evidence
+dir: they are host-wide logs spanning unrelated sessions and would bloat the
+directory. The specific lines relied upon are quoted verbatim above.

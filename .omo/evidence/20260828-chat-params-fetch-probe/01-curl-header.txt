@@ -1,0 +1,15 @@
+HTTP/1.1 200 OK
+Content-Type: text/event-stream
+Cache-Control: no-cache
+X-9Router-Upstream-Model: anthropic/claude-opus-5
+Date: Fri, 28 Aug 2026 14:25:15 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+Transfer-Encoding: chunked
+
+data: {"id":"chatcmpl-probe","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"probe complete"},"finish_reason":null}]}
+
+data: {"id":"chatcmpl-probe","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
+

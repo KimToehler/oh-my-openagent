@@ -99,15 +99,37 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
   )
 }
 
+/**
+ * The identity seam: a non-plan prompt is returned UNCHANGED, and a plan prompt
+ * gets guidance appended as a suffix, never a rewrite. Upstream pins both
+ * properties by test, and they are worth keeping - a prompt builder that
+ * silently rewrites its input is untestable at the boundary.
+ *
+ * Prefixes that every delegated task needs are composed in
+ * `buildDelegatedTaskPrompt` instead, so this function stays pure.
+ */
 export function buildTaskPrompt(prompt: string, agentName: string | undefined, tddEnabled?: boolean): string {
   if (!isPlanAgent(agentName)) {
-    return `${EVIDENCE_REPORTING}\n\n${prompt}`
+    return prompt
   }
 
   const effectiveTdd = tddEnabled ?? true
-  return `${EVIDENCE_REPORTING}\n\n${prompt}${buildPlanAgentPromptAppend(effectiveTdd)}`
+  return `${prompt}${buildPlanAgentPromptAppend(effectiveTdd)}`
+}
+
+/**
+ * What a delegated task actually receives: the evidence-reporting contract in
+ * front of the task prompt. Split from `buildTaskPrompt` so the seam above can
+ * stay an identity function while every real dispatch still carries the prefix.
+ */
+export function buildDelegatedTaskPrompt(
+  prompt: string,
+  agentName: string | undefined,
+  tddEnabled?: boolean,
+): string {
+  return `${EVIDENCE_REPORTING}\n\n${buildTaskPrompt(prompt, agentName, tddEnabled)}`
 }
 
 export function buildBackgroundTaskPrompt(prompt: string, agentName: string | undefined, tddEnabled?: boolean): string {
-  return `${BACKGROUND_BLOCKED_REPORTING}\n\n${buildTaskPrompt(prompt, agentName, tddEnabled)}`
+  return `${BACKGROUND_BLOCKED_REPORTING}\n\n${buildDelegatedTaskPrompt(prompt, agentName, tddEnabled)}`
 }

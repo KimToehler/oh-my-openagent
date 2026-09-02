@@ -1,0 +1,22 @@
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/features/background-agent/parent-wake-noout-retry-dedupe.test.ts:
+ 99 |         expect(retryElapsedMs).toBeLessThan(DEFAULT_PROMPT_SEMANTIC_DEDUPE_HOLD_MS)
+100 |         await notifier.flushPendingParentWake(sessionID)
+101 | 
+102 |         // then: the retry must be a REAL second dispatch, not coalesced away by
+103 |         // the semantic hold the first send itself created
+104 |         expect(promptAsyncCalls).toHaveLength(2)
+                                       ^
+error: expect(received).toHaveLength(expected)
+
+Expected length: 2
+Received length: 1
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/bg-wake-sse-render/packages/omo-opencode/src/features/background-agent/parent-wake-noout-retry-dedupe.test.ts:104:34)
+(fail) ParentWakeNotifier no-output retry vs semantic dedupe hold > #given a dispatched parent wake recorded in the semantic dedupe hold #when the no-output retry re-flushes the byte-identical wake while the hold is still active #then a real second dispatch reaches the client [2824.02ms]
+
+ 0 pass
+ 1 fail
+ 6 expect() calls
+Ran 1 test across 1 file. [2.90s]

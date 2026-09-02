@@ -1,0 +1,155 @@
+RED STAGE 1 (module does not exist)
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/hooks/lesson-nudge/hook.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './hook' from '/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/hooks/lesson-nudge/hook.test.ts'
+-------------------------------
+
+
+ 1 pass
+ 1 fail
+ 1 error
+ 6 expect() calls
+Ran 2 tests across 2 files. [202.00ms]
+
+
+RED STAGE 2 (function exists, behavior missing)
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/hooks/lesson-nudge/hook.test.ts:
+30 |     // when
+31 |     await hook(idleEvent("same-session"))
+32 |     await hook(idleEvent("same-session"))
+33 | 
+34 |     // then
+35 |     expect(registerSpy).toHaveBeenCalledTimes(1)
+                             ^
+error: expect(received).toHaveBeenCalledTimes(expected)
+
+Expected number of calls: 1
+Received number of calls: 0
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/hooks/lesson-nudge/hook.test.ts:35:25)
+(fail) createLessonNudgeHook > registers once when the same session becomes idle twice [1.68ms]
+76 |     await hook(idleEvent("deleted-session"))
+77 |     await hook(deletedEvent("deleted-session"))
+78 |     await hook(idleEvent("deleted-session"))
+79 | 
+80 |     // then
+81 |     expect(registerSpy).toHaveBeenCalledTimes(2)
+                             ^
+error: expect(received).toHaveBeenCalledTimes(expected)
+
+Expected number of calls: 2
+Received number of calls: 0
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/hooks/lesson-nudge/hook.test.ts:81:25)
+(fail) createLessonNudgeHook > registers again after the session is deleted [0.17ms]
+90 | 
+91 |     // when
+92 |     await hook(idleEvent("options-session"))
+93 | 
+94 |     // then
+95 |     expect(registerSpy).toHaveBeenCalledWith("options-session", expect.objectContaining({
+                             ^
+error: expect(received).toHaveBeenCalledWith(...expected)
+
+Expected: [ "options-session", ObjectContaining {
+    id: "lesson-nudge",
+    source: "custom",
+  } ]
+But it was not called.
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/hooks/lesson-nudge/hook.test.ts:95:25)
+(fail) createLessonNudgeHook > registers custom lesson-nudge context [0.86ms]
+108 | 
+109 |     // when
+110 |     await hook(idleEvent("resumed-session"))
+111 | 
+112 |     // then
+113 |     expect(registerSpy).toHaveBeenCalledTimes(1)
+                              ^
+error: expect(received).toHaveBeenCalledTimes(expected)
+
+Expected number of calls: 1
+Received number of calls: 0
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/hooks/lesson-nudge/hook.test.ts:113:25)
+(fail) createLessonNudgeHook > registers when the main session id is undefined [0.12ms]
+126 |     await hook(idleEvent("skipped-non-main"))
+127 |     await hook(idleEvent("registering-session"))
+128 |     await hook(idleEvent("registering-session"))
+129 | 
+130 |     // then
+131 |     expect(logger).toHaveBeenCalledTimes(1)
+                         ^
+error: expect(received).toHaveBeenCalledTimes(expected)
+
+Expected number of calls: 1
+Received number of calls: 0
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/hooks/lesson-nudge/hook.test.ts:131:20)
+(fail) createLessonNudgeHook > logs once only when registration succeeds [0.11ms]
+
+ 3 pass
+ 5 fail
+ 13 expect() calls
+Ran 8 tests across 2 files. [83.00ms]
+
+
+GREEN
+bun test v1.3.14 (d1632b29)
+
+ 8 pass
+ 0 fail
+ 14 expect() calls
+Ran 8 tests across 2 files. [165.00ms]
+
+
+MUTATION CHECK (once-guard insertion removed)
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/hooks/lesson-nudge/hook.test.ts:
+30 |     // when
+31 |     await hook(idleEvent("same-session"))
+32 |     await hook(idleEvent("same-session"))
+33 | 
+34 |     // then
+35 |     expect(registerSpy).toHaveBeenCalledTimes(1)
+                             ^
+error: expect(received).toHaveBeenCalledTimes(expected)
+
+Expected number of calls: 1
+Received number of calls: 2
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/hooks/lesson-nudge/hook.test.ts:35:25)
+(fail) createLessonNudgeHook > registers once when the same session becomes idle twice [3.48ms]
+126 |     await hook(idleEvent("skipped-non-main"))
+127 |     await hook(idleEvent("registering-session"))
+128 |     await hook(idleEvent("registering-session"))
+129 | 
+130 |     // then
+131 |     expect(logger).toHaveBeenCalledTimes(1)
+                         ^
+error: expect(received).toHaveBeenCalledTimes(expected)
+
+Expected number of calls: 1
+Received number of calls: 2
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/hooks/lesson-nudge/hook.test.ts:131:20)
+(fail) createLessonNudgeHook > logs once only when registration succeeds [0.16ms]
+
+ 5 pass
+ 2 fail
+ 7 expect() calls
+Ran 7 tests across 1 file. [94.00ms]
+
+
+TYPECHECK
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+
+EXIT_CODE=0

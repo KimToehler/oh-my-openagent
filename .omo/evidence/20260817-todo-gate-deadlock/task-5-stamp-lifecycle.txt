@@ -1,0 +1,63 @@
+WHAT WAS TESTED
+- TDD RED: bun test packages/omo-opencode/src/features/background-agent/manager.test.ts --test-name-pattern 'todo-gate stamp lifecycle'
+- Focused lifecycle tests ran twice with manual Date.now override.
+- Background-agent suite: bun test packages/omo-opencode/src/features/background-agent/
+- Typecheck: bun run typecheck
+- Manual QA drove real BackgroundManager with mock client, resuming an old stamped task then polling. Control drove identical old stamped running task without resume.
+
+WHAT WAS OBSERVED
+RED output:
+Received: 1970-01-01T00:00:00.000Z
+(fail) background-agent todo-gate stamp lifecycle > #given a stamped task #when a retry starts #then clears the todo-gate state
+Received: 1970-01-01T00:00:00.000Z
+(fail) background-agent todo-gate stamp lifecycle > #given a stamped task #when spawner resumes it #then clears the todo-gate state
+Received: 2023-11-14T22:11:20.000Z
+(fail) background-agent todo-gate stamp lifecycle > #given a stale stamped task #when BackgroundManager resumes then polls #then it remains running
+0 pass
+3 fail
+
+Focused GREEN, run 1:
+3 pass
+0 fail
+7 expect() calls
+Ran 3 tests across 1 file. [90.00ms]
+
+Focused GREEN, run 2:
+3 pass
+0 fail
+7 expect() calls
+Ran 3 tests across 1 file. [94.00ms]
+
+Background-agent suite:
+873 pass
+0 fail
+2294 expect() calls
+Ran 873 tests across 77 files. [31.58s]
+
+Typecheck exited 0.
+
+Manual QA output:
+AFTER_RESUME_BEFORE_POLL status=running stamp=undefined unfinishedTodoCount=undefined
+AFTER_RESUME_POLL status=running stamp=Mon Aug 17 2026 00:59:28 GMT+0200 (Central European Summer Time) unfinishedTodoCount=undefined
+WITHOUT_RESUME_POLL status=completed stamp=Tue Nov 14 2023 23:11:20 GMT+0100 (Central European Standard Time) unfinishedTodoCount=1
+CLEANUP_RECEIPT script_deleted=true
+
+session-idle-event-handler check:
+git diff dev..HEAD --name-only | grep session-idle-event-handler returned no output.
+
+Adversarial classes:
+- cancel_resume: retry startAttempt, spawner.resumeTask, and BackgroundManager.resume tests prove stale todo-gate state clears at every return-to-running choke point.
+- stale_state: all three routes clear stale stamp. Search found no fourth return-to-running choke point. manager.ts blocked-answer branch was inspected and left unchanged.
+- dirty_worktree: main checkout pre-existing dirty packages/omo-senpi/plugin/extensions/omo-task.js observed and left untouched. Worktree changes limited to assigned four files.
+- flaky_tests: manual Date.now override used. New tests passed identically twice, 3 pass / 0 fail.
+- authorization, concurrency, data loss, security, compatibility, observability, performance: not applicable. Change only resets transient in-memory gate metadata while explicitly resuming/retrying a task.
+
+WHY IT IS ENOUGH
+- RED proves lifecycle behavior was absent before production edits.
+- Unit cases exercise three specified choke points. Manager case asserts observable poll result: resumed task remains running despite prior stamp and stale progress.
+- Manual QA distinguishes resumed path from unchanged control under same old-stamp condition.
+- Focused suite and repository typecheck validate integration.
+
+WHAT WAS OMITTED
+- Full root bun test omitted per task instruction because baseline already exists and it takes about 340 seconds.
+- Raw logs contain no secrets. No credentials, environment dumps, or auth headers were recorded.

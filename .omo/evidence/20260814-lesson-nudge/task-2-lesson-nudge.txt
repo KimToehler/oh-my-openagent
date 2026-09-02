@@ -1,0 +1,96 @@
+# Task 2: Lesson nudge message builder
+
+## RED STAGE 1 (module does not exist)
+
+```text
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/hooks/lesson-nudge/message.test.ts:
+
+# Unhandled error between tests
+-------------------------------
+error: Cannot find module './message' from '/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/hooks/lesson-nudge/message.test.ts'
+-------------------------------
+
+
+ 0 pass
+ 1 fail
+ 1 error
+Ran 1 test across 1 file. [76.00ms]
+
+--- stderr ---
+zsh:test:1: unknown condition: -ne
+```
+
+## RED STAGE 2 (function exists, behavior missing)
+
+```text
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/hooks/lesson-nudge/message.test.ts:
+ 6 |   test("#given a correction #when nudge is built #then it directs lesson recording for future sessions", () => {
+ 7 |     // given / when
+ 8 |     const message = buildLessonNudgeMessage()
+ 9 |
+10 |     // then
+11 |     expect(message).toContain("record_lesson")
+                         ^
+error: expect(received).toContain(expected)
+
+Expected to contain: "record_lesson"
+Received: ""
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/hooks/lesson-nudge/message.test.ts:11:21)
+(fail) buildLessonNudgeMessage > #given a correction #when nudge is built #then it directs lesson recording for future sessions [0.48ms]
+
+ 0 pass
+ 1 fail
+ 1 expect() calls
+Ran 1 test across 1 file. [72.00ms]
+```
+
+## GREEN
+
+```text
+bun test v1.3.14 (d1632b29)
+
+ 1 pass
+ 0 fail
+ 6 expect() calls
+Ran 1 test across 1 file. [74.00ms]
+```
+
+## MUTATION CHECK
+
+```text
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/hooks/lesson-nudge/message.test.ts:
+10 |     // then
+11 |     expect(message).toContain("record_lesson")
+12 |     expect(message).toContain("future sessions")
+13 |     expect(message).toContain("globs")
+14 |     expect(message).toContain("evidence citation")
+15 |     expect(message).not.toMatch(/[\u2014\u2013]/)
+                             ^
+error: expect(received).not.toMatch(expected)
+
+Expected substring or pattern: not /[\u2014\u2013]/
+Received: "Record every correction received this session with `record_lesson`, including precise file globs and an evidence citation that proves the fix — Lessons recorded now become visible only in future sessions, not the current session, so capture correction details before work ends."
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/hooks/lesson-nudge/message.test.ts:15:25)
+(fail) buildLessonNudgeMessage > #given a correction #when nudge is built #then it directs lesson recording for future sessions [1.26ms]
+
+ 0 pass
+ 1 fail
+ 5 expect() calls
+Ran 1 test across 1 file. [77.00ms]
+```
+
+## Final message
+
+```text
+Record every correction received this session with `record_lesson`, including precise file globs and an evidence citation that proves the fix. Lessons recorded now become visible only in future sessions, not the current session, so capture correction details before work ends.
+```
+
+Character count: 276

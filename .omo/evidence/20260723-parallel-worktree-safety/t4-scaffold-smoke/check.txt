@@ -1,0 +1,132 @@
+T4 - user-global ulw-plan skill override (~/.config/opencode/skills/ulw-plan/)
+=================================================================================
+
+WHAT WAS TESTED
+---------------
+1. `mkdir -p ~/.config/opencode/skills/ulw-plan` then `cp -R` of the entire shipped
+   packages/shared-skills/skills/ulw-plan/ tree (SKILL.md, references/, scripts/, agents/).
+2. FORK-ADAPTATION header (spec SECTION 3, name=ulw-plan) inserted into SKILL.md and
+   references/full-workflow.md, immediately after each file's closing frontmatter `---`.
+3. spec SECTION 2a: Files: clause inserted into full-workflow.md's todo-carry-contract line.
+4. spec SECTION 2b: "+ a Files: line" inserted after "references" at every grep hit of
+   "every todo has references" in BOTH SKILL.md (1 hit, Stop rules) and
+   references/full-workflow.md (2 hits: Self-review line + Stop rules line).
+5. spec SECTION 2c: one exemplar `Files:` template line added to scripts/scaffold-plan.mjs's
+   buildPlanSkeleton() todo row, between References and Acceptance criteria.
+6. references/intent-clear.md, references/intent-unclear.md, agents/openai.yaml left untouched.
+7. `node --check` on the edited script.
+8. Scaffold smoke: --draft-only run, then a non-draft run, in a scratch cwd (/tmp/ulw-plan-smoke),
+   grepping the emitted plan skeleton for "Files:".
+
+WHAT WAS OBSERVED
+-----------------
+
+### node --check
+$ node --check ~/.config/opencode/skills/ulw-plan/scripts/scaffold-plan.mjs
+exit:0
+
+### Scaffold smoke invocation (matched the task's guessed invocation exactly, no deviation)
+$ cd /tmp/ulw-plan-smoke
+$ node ~/.config/opencode/skills/ulw-plan/scripts/scaffold-plan.mjs smoke-test --clear --draft-only
+created: .omo/drafts/smoke-test.md
+next: record intent, findings, decisions, review state, and the approval gate in the draft; create the plan only after approval.
+
+$ node ~/.config/opencode/skills/ulw-plan/scripts/scaffold-plan.mjs smoke-test --clear
+exists: .omo/drafts/smoke-test.md
+created: .omo/plans/smoke-test.md
+next: record findings/decisions in the draft, then APPEND task batches into the "## Todos" region of the plan; fill "## TL;DR (For humans)" LAST.
+
+Skeleton grep result (see skeleton.md, line 47):
+  Files: <repo-relative paths/globs this todo will touch - list shared i18n/config/barrel files explicitly>
+-> appears exactly once, correctly positioned between the References line and the
+   Acceptance criteria line of the exemplar todo row. No other Files: occurrence elsewhere
+   in the skeleton (headers untouched, per spec 2c).
+
+### Byte-identical untouched files
+$ diff ~/.config/opencode/skills/ulw-plan/references/intent-clear.md   <shipped>/intent-clear.md    -> empty, exit 0
+$ diff ~/.config/opencode/skills/ulw-plan/references/intent-unclear.md <shipped>/intent-unclear.md  -> empty, exit 0
+$ diff ~/.config/opencode/skills/ulw-plan/agents/openai.yaml           <shipped>/openai.yaml         -> empty, exit 0
+
+### Verbatim-base check as LITERALLY specified in the task
+$ diff <(sed '/ABD:begin/,/ABD:end/d; /FORK-ADAPTATION/,/-->/d' <override>) <shipped>
+
+Result for BOTH SKILL.md and references/full-workflow.md: NON-EMPTY (exit 1). The diff shows
+the entire body after the frontmatter as "missing" from the stripped override side.
+
+ROOT CAUSE (diagnosed, not a defect in the produced skill files):
+The literal sed command is line-oriented. Per documented GNU/BSD sed semantics, when a
+two-address range's END pattern is a regex, the search for the end match starts on the LINE
+AFTER the one that matched the START pattern - even if that same starting line also contains
+the end pattern. Empirically confirmed:
+  $ printf 'line1\nline2 <!-- ABD:begin x -->INSERTED<!-- ABD:end x --> tail\nline3\n' \
+      | sed '/ABD:begin/,/ABD:end/d'
+  line1
+(lines 2 AND 3 both vanish, even though the ABD span was fully closed on line 2 alone.)
+
+Two things compound this for our real files:
+1. Every one of this task's spec-mandated edits (2a, 2b) is an INLINE substring insertion -
+   `<!-- ABD:begin ... -->...<!-- ABD:end ... -->` sit on the SAME line as the surrounding
+   prose (this is the exact literal text spec SECTION 2a/2b prescribe - reproduced verbatim,
+   not paraphrased). Because start+end never "self-close" per the sed rule above, the range
+   opens at the FIRST such line and does not close until the NEXT line (searched from the
+   line after) that happens to contain the literal substring "ABD:end" - which, for a file
+   with multiple such inline edits, is some other, unrelated edit's line, deleting every line
+   in between.
+2. The mandatory FORK-ADAPTATION header (spec SECTION 3, reproduced verbatim) itself contains
+   the literal example text "<!-- ABD:begin ... --> / <!-- ABD:end ... -->" inside its
+   "resync:" explanation line. That literal example text matches /ABD:begin/ and opens the
+   ABD-delete range from INSIDE the header itself, before the header's own closing "-->" is
+   even reached by the FORK-ADAPTATION command - and that range then only closes at the
+   file's next real ABD-marked edit (the Stop-rules line), deleting the entire body in
+   between. This is why the diff shows the whole file body as "missing."
+
+This is a mechanical limitation of the specified sed one-liner on same-line marker pairs, not
+a verbatim-fidelity problem with the produced files. A corrected, non-greedy DOTALL strip
+(python re.sub, matching each ABD span and the FORK-ADAPTATION block as a real bounded region
+rather than a line range) proves the base bodies ARE byte-identical to upstream outside the
+ABD-wrapped/header spans:
+
+$ python3 -c "
+import re
+for f in ['SKILL.md', 'references/full-workflow.md']:
+    s = open(f'/Users/tim/.config/opencode/skills/ulw-plan/{f}').read()
+    s2 = re.sub(r'<!-- FORK-ADAPTATION.*?-->\n', '', s, count=1, flags=re.DOTALL)
+    s2 = re.sub(r'\s?<!-- ABD:begin.*?-->.*?<!-- ABD:end[^>]*-->', '', s2, flags=re.DOTALL)
+    shipped = open(f'/Users/tim/git/oh-my-openagent/packages/shared-skills/skills/ulw-plan/{f}').read()
+    print(f, 'MATCH' if s2 == shipped else 'DIFFER')
+"
+SKILL.md MATCH
+references/full-workflow.md MATCH
+
+Both files: base body VERBATIM upstream, confirmed by a correctly-bounded strip.
+
+### Repo isolation
+$ git status --porcelain -- packages/shared-skills/skills/ulw-plan packages/omo-codex/plugin/components/ultrawork/skills/ulw-plan
+(no output - both repo copies untouched)
+
+### Frontmatter placement note (deviation from literal task wording)
+The task and spec SECTION 3 both say "For non-frontmatter files (full-workflow.md) place at
+the very top", implying full-workflow.md has no YAML frontmatter. The shipped
+references/full-workflow.md (as copied verbatim into this override) DOES have a YAML
+frontmatter block (`---\nname: ulw-plan\ndescription: ...\n---`), contradicting that
+assumption - likely stale relative to an earlier version of the file. Per the SAME section's
+general placement rule ("Placement: immediately AFTER the closing `---` of YAML frontmatter -
+a comment above frontmatter breaks parsing"), the header was placed after the closing `---`
+in full-workflow.md too, exactly as it was for SKILL.md, to avoid breaking YAML parsing.
+
+WHY IT IS ENOUGH
+----------------
+- node --check passing + a real scaffold-plan.mjs run through both invocations (draft-only
+  and full) prove the script edit is syntactically valid and functionally correct: the
+  emitted skeleton contains exactly one Files: line, exactly where spec 2c requires it.
+- The 3 untouched files are diff-empty against upstream, byte-for-byte.
+- The base-verbatim claim for SKILL.md and full-workflow.md is proven by a correctly-bounded
+  DOTALL match/strip (not the line-oriented sed one-liner, which has a documented same-line
+  range limitation that this task's mandated verbatim inline edits trigger). Both files match
+  upstream exactly once ABD spans and the FORK-ADAPTATION header are properly excised.
+- Repository copies (shared-skills and the Codex dual-maintained copy) are provably untouched.
+
+WHAT WAS OMITTED
+----------------
+Nothing secret-bearing was produced; all outputs above are plan-skeleton/script text with no
+credentials, tokens, or personal data.

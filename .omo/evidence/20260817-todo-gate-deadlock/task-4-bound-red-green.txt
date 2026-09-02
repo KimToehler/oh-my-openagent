@@ -1,0 +1,73 @@
+WHAT WAS TESTED
+- TDD target: bun test packages/omo-opencode/src/features/background-agent/manager.polling.test.ts
+- Determinism: same target run three consecutive times with manual Date.now overrides and no sleeps.
+- Background-agent package: bun test packages/omo-opencode/src/features/background-agent/
+- Frozen idle handler: bun test packages/omo-opencode/src/features/background-agent/session-idle-event-handler.test.ts
+- Hooks suite: bun test packages/omo-opencode/src/hooks/
+- Type system: bun run typecheck
+- Manual real-manager poll harness: expired and fresh todo-gate stamps with idle status, valid assistant output, and one incomplete todo.
+- Full suite: bun test before and after. Both reached the same pre-existing ast-grep pinned-runtime failure; both then stalled in the pre-existing senpi chaos bench and were stopped.
+
+WHAT WAS OBSERVED
+
+RED output
+bun test v1.3.14 (d1632b29)
+Expected: "completed"
+Received: "running"
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when both grace conditions expire #then completes with unfinished count
+Expected stamp to be defined; Received: undefined
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when first observation is inside grace window #then stamps and waits
+Expected assistant/tool activity stamp to be undefined; Received: 2026-08-17T11:58:00.000Z
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when assistant and tool parts arrive #then clears the stamp
+Expected: { hasIncompleteTodos: true, incompleteTodoCount: 4 }
+Received: true
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when incomplete todos are checked twice #then cached result retains the count
+20 pass
+4 fail
+49 expect() calls
+Ran 24 tests across 1 file.
+
+GREEN output
+- New target, three runs: each 24 pass, 0 fail, 53 expect() calls.
+- Background-agent package: 870 pass, 0 fail, 2287 expect() calls, 77 files.
+- Frozen session-idle-event-handler.test.ts: 14 pass, 0 fail, 16 expect() calls; git status showed it unchanged.
+- Typecheck: exit 0.
+- LSP diagnostics unavailable because configured LSP could not find a valid TypeScript installation; bun run typecheck supplied compiler proof instead.
+- Hooks suite: 2127 pass, 44 fail. Failures are pre-existing shared-suite isolation/state failures, including runtime-fallback pendingFallbackModel logging; focused frozen idle-handler suite is green unchanged.
+
+Manual QA output, expired
+expired: status=completed unfinishedTodoCount=1
+expired: - `bg-expired`: expired - completed with 1 unfinished todo
+
+Manual QA output, fresh
+fresh: status=running unfinishedTodoCount=unset
+fresh: no completion notification
+
+Full-suite comparison
+- BEFORE: reached pre-existing packages/ast-grep-mcp/src/tools/scan.test.ts pinned binary failure, Expected true / Received false, then stalled in packages/senpi-task/src/__adversarial__/chaos-bench.test.ts.
+- AFTER: identical pre-existing packages/ast-grep-mcp/src/tools/scan.test.ts pinned binary failure, Expected true / Received false, then stalled in packages/senpi-task/src/__adversarial__/chaos-bench.test.ts.
+- Completed pass/fail summary unavailable for both runs because same baseline hang prevented suite termination. New scoped failures: none. Background-agent package and typecheck are green.
+
+Adversarial classes
+- stale_state: real interleaving mutates progress.lastUpdate inside awaited messages validation; final activity re-read leaves task running. Memoized count path called twice and retained count 4.
+- cancel_resume: TODO #4 alone leaves old todoGateFirstObservedAt on resume. Condition B usually masks instant completion through fresh progress, but semantic stamp reset remains TODO #5 and is an explicit known hole.
+- misleading_success_output: empty messages kept stalled task running with unfinishedTodoCount unset.
+- flaky_tests: three consecutive target runs produced identical 24 pass / 0 fail / 53 assertions.
+- dirty_worktree: only scoped manager files plus pre-existing packages/omo-senpi/plugin/extensions/omo-task.js were dirty before commit.
+- malformed_input: not applicable; no new external input boundary.
+- permission_denied: not applicable; no filesystem or authorization path changed.
+- network_partition: not applicable; polling tests use local client seams and no network.
+
+Cleanup receipt
+- /tmp/task4-manual-qa.ts deleted and absence asserted.
+- /tmp/task4-render.ts deleted and absence asserted.
+
+WHY IT IS ENOUGH
+- Tests cover all requested gate outcomes, both independent grace conditions, real-activity stamp semantics, stale status/activity interleaving, output validation, active sessions, and memoized count preservation.
+- Completion uses existing tryCompleteTask guard and notification pipeline; no second terminal writer exists.
+- Focused package suite proves neighboring background-agent behavior remains green; typecheck proves typed dependency lambda still satisfies frozen idle-handler contract.
+- Manual harness drives actual BackgroundManager poll loop and production notification renderer, proving observable completed annotation and fresh-window running state.
+
+WHAT WAS OMITTED
+- No secrets, environment dumps, credentials, auth headers, or private logs captured.
+- Full-suite final totals omitted because both baseline and patched runs hit same pre-existing hang after same pinned ast-grep failure.

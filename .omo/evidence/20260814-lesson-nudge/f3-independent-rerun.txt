@@ -1,0 +1,231 @@
+F3 INDEPENDENT QA RE-RUN - lesson nudge
+Worktree: /Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge
+Branch: feat/lesson-nudge   HEAD: bbc4db98320aad723146fdbcb83f0d9bfc16752f
+Run start (UTC): 2026-08-14T11:39:23Z
+Raw artifacts: .omo/evidence/20260814-lesson-nudge/f3-rerun/
+
+VERDICT: CONFIRMED
+
+All four functional gates (S0, S1, S2, S3) reproduced the prior run's numbers exactly,
+from a clean build and a fresh sandbox, with every positive control passing.
+
+The QA script itself exited 1, but NOT on a product gate. It failed on its final
+host-environment guard, which compares the real opencode DB session count before and
+after. That counter moved for a reason external to this feature, proven below. The
+product behavior under test is confirmed; the script's isolation guard is not
+concurrency-safe on a machine running other agent sessions.
+
+================================================================================
+WHAT WAS TESTED
+================================================================================
+
+Reproduced the live QA from scratch, assuming nothing from the prior run.
+
+1. Worktree integrity
+   git rev-parse HEAD, git status --porcelain, git rev-parse --abbrev-ref HEAD
+   Confirmed clean tree at bbc4db983 on feat/lesson-nudge BEFORE any action.
+
+2. Script byte-identity, verified independently
+   sed -n '262,557p' .omo/plans/2026-08-14-lesson-nudge.md \
+     | diff - .omo/evidence/20260814-lesson-nudge/qa-script.sh
+
+3. Bundle gate: proved the built artifact actually contains the fix
+   bun run build, then grep -c 'runEventHookSafely("lessonNudge"' dist/index.js
+
+4. Live run of the QA script, UNMODIFIED, in my own fresh isolated sandbox
+   bash .omo/evidence/20260814-lesson-nudge/qa-script.sh
+   Two isolated XDG sandboxes (one per case), a local mock model per case, one
+   opencode serve per case. No real API call. The real ~/.config/opencode and the
+   real ~/.codex were never read or written.
+   Gates: S0 gate engaged, S1 delivery plus contentLength match, S2 non-redelivery
+   and non-reregistration, S3 default install stays silent.
+
+5. Nudge length derived from SOURCE, not trusted from the prior report
+   bun -e 'import {buildLessonNudgeMessage} from
+   "./packages/omo-opencode/src/hooks/lesson-nudge/message.ts";
+   console.log(buildLessonNudgeMessage().length)'
+
+6. Isolation, measured by me
+   Real DB session count before and after; direct lookup of my sandbox session ids
+   against the real DB; count of real-DB sessions whose directory is a sandbox path;
+   attribution of the observed delta; confirmation that the two pre-existing
+   sandboxes (10:47, 10:53) were left alone.
+
+7. Evidence hygiene
+   The script hardcodes EVID to the SHARED prior-run directory and overwrites files
+   such as s0-gate.txt. That is the exact hygiene problem flagged in the brief. Since
+   the script had to run UNMODIFIED, I snapshotted all 57 prior files with sha256
+   first, let the script run, copied my results out under unique f3- names, then
+   restored every prior file and re-verified all 57 checksums.
+
+================================================================================
+WHAT WAS OBSERVED
+================================================================================
+
+SCRIPT BYTE-IDENTITY
+  diff exit 0, no output.
+  sha256 both sides: 31d0e09fc2f7ca2570ed46a3ec0acdb2c8d9363aedb01f3bade38e35a69b4864
+  The script was NOT modified by anyone. Confirmed.
+
+BUNDLE GREP
+  grep -c 'runEventHookSafely("lessonNudge"' dist/index.js  ->  1   (>= 1, PASS)
+  Matched text: runEventHookSafely("lessonNudge", hooks2.lessonNudge, input)
+  dist/index.js rebuilt at 13:38, 5839714 bytes. Gate passed BEFORE anything live ran.
+
+BUILD-DIRTIED ARTIFACTS - all 4 predicted, all restored
+  Exactly the 4 named in the brief, no more, no fewer:
+    M packages/omo-codex/plugin/components/codegraph/dist/cli.js
+    M packages/omo-codex/scripts/install-dist/install-local.mjs
+    M packages/omo-senpi/plugin/extensions/omo-member.js
+    M packages/omo-senpi/plugin/extensions/omo.js
+  Restored immediately with git checkout --. git status --porcelain empty afterwards,
+  HEAD still bbc4db983, and dist/index.js (gitignored) still carried the fix (grep 1).
+
+GATE RESULTS - mine vs the prior run's claim
+  Gate                          Prior claim                     Mine                            Match
+  S0 registration count         1                               1  ("S0 PASS")                  YES
+  S1 insertions / matching_len  insertions=1 matching_len=1     insertions=1 matching_len=1     YES
+  S2 insertions / registrations insertions=1 registrations=1    insertions=1 registrations=1    YES
+  S3 reg / ins                  reg=0 ins=0                     reg=0 ins=0                     YES
+  Source-derived nudge length   276                             276                             YES
+
+  No gate differs. Nothing to smooth over; there is no discrepancy in the product gates.
+
+NUDGE LENGTH, DERIVED INDEPENDENTLY
+  From source: 276. The live run's own source-derived value: 276. Prior claim: 276.
+  S1 matched contentLength 276 in the live log, so the delivered payload is the nudge
+  itself and not an unrelated synthetic injection.
+
+POSITIVE CONTROLS - all passed, so "we saw nothing" is distinguishable from
+"we looked at nothing"
+  Plugin loaded, case gate-on:
+    ENTRY - plugin loading  directory=.../oqa-xdg.XXXXXX.ODMngnDzlQ/proj
+  Plugin loaded, case default:
+    ENTRY - plugin loading  directory=.../oqa-xdg.XXXXXX.B0ngY60keD/proj
+  Model turns actually happened: mock request count 2 for gate-on, 2 for default.
+  This matters most for S3, whose claim is "zero lines": the mock log proves a real
+  turn completed, so the zeros are a working gate-off and not a dead model.
+  Log inode 53193481 before and after: no rotation mid-run, so counts are reliable.
+
+THE ONE FAILURE, AND ITS ROOT CAUSE
+  Script output: "FAIL: the real opencode DB session count changed", exit 1.
+  My measurement: before 2025, after 2026. Delta +1.
+
+  This is NOT an isolation breach by this feature. Evidence:
+    - My two sandbox session ids were looked up directly in the real DB:
+        ses_fffee0882ffeMUx5oXoQgFe7VU -> 0 hits
+        ses_fffedd868ffetPIvTYySwAv3pU -> 0 hits
+      Neither of my sessions is in the real DB.
+    - Real-DB sessions whose directory is under any oqa-xdg sandbox path: 0.
+    - The actual +1 row is an unrelated concurrent agent session on this host:
+        ses_fffede918ffeyfBUKWjYCTmjG1 | /Users/tim/git/onara
+        | "Rename field, ship vocabulary (@Sisyphus-Junior subagent)" | 13:39:40 local
+      Created inside my run window by a different task in a different repo.
+    - The script's own independent isolation check passed: ISOLATION OK
+      (real ~/.omo/rules identical before and after).
+
+  So the guard is correct in intent but not concurrency-safe: it attributes ANY
+  host-wide session-count movement to the run under test. On an otherwise idle
+  machine it passes, which is why the prior run saw 2020 -> 2020. This is a property
+  of the harness and the busy host, not of the lesson nudge.
+
+ISOLATION, MEASURED BY ME
+  Real ~/.omo/rules: unchanged (ISOLATION OK).
+  Real DB rows attributable to my run: 0.
+  My sandboxes: oqa-xdg.XXXXXX.ODMngnDzlQ and oqa-xdg.XXXXXX.B0ngY60keD, both distinct
+  from the two pre-existing ones, which I did not touch and which still exist with
+  their original 10:47 and 10:53 timestamps.
+  Note on method: an early probe of mine printed PREEXISTING_COUNT=0, which was a zsh
+  glob artifact (a non-matching /tmp pattern aborted the whole expansion). Corrected
+  by globbing TMPDIR directly; both pre-existing sandboxes were present the whole time
+  and remain present now.
+
+EVIDENCE HYGIENE
+  57 prior files snapshotted with sha256 before the run. After the run, all 57 restored
+  and re-verified: 57 OK, 0 FAILED. No prior evidence file was lost or left overwritten.
+  My own artifacts live only in f3-rerun/ under unique f3- names, written once.
+
+TEARDOWN RECEIPTS
+  opencode serve and mock-model.mjs processes: none remaining.
+  My two sandboxes: removed by the script's cleanup trap.
+  Pre-existing 10:47 and 10:53 sandboxes: still present, untouched.
+  Log inode: 53193481 unchanged.
+  git status --porcelain: EMPTY.   HEAD: bbc4db983, not amended.
+
+================================================================================
+WHY IT IS ENOUGH
+================================================================================
+
+The four product gates were reproduced independently, and each is guarded against
+passing vacuously:
+
+  - S0 could not pass on a config that was silently ignored: the plugin-loaded control
+    fires first, and a completed model turn is required before the gate line is sought.
+  - S1 asserts both the insertion count and that the payload's contentLength equals the
+    source-derived 276, anchored on the closing brace, so an unrelated injection or a
+    prefix-length collision cannot satisfy it.
+  - S2 waits for a NEW completed assistant turn past a baseline rather than sleeping,
+    so "no re-delivery" is measured after a turn that genuinely occurred.
+  - S3 is the one asserting zeros, so it carries its own positive controls in its own
+    sandbox: the plugin loaded there, and the mock recorded 2 real requests. The zeros
+    therefore mean the gate is off, not that the model was dead.
+
+The bundle grep ran before any live step, so the live run exercised a binary that
+provably contains the fix rather than a stale one. The nudge length was derived from
+source twice, independently of the prior report.
+
+The single failure is attributed to a specific unrelated session in a different repo,
+by direct id lookup and by directory query, with the feature's own isolation check
+passing. That is a harness limitation on a busy host, not a defect in the nudge, and
+it does not touch any of the four gates.
+
+I did not weaken, edit, or re-run any gate to obtain this result. The script ran
+unmodified, once.
+
+================================================================================
+WHAT WAS OMITTED
+================================================================================
+
+- Server passwords, auth headers, and the Authorization values used against the local
+  serve instance are omitted. They were per-run random values (oqa-$RANDOM$RANDOM) for
+  a 127.0.0.1 listener and died with the run. No token, credential, or API key appears
+  in this file or in f3-rerun/. The mock model needs no real key ("not-needed").
+- Full serve logs and the 7.4 MB shared plugin log are not copied. Only the matched
+  lines and the counts derived from them are recorded.
+- f3-resolved-config.json is opencode's own resolved config as returned by the local
+  serve endpoint. It is captured for the record; the script deliberately does not
+  assert on it, since that endpoint does not expose the omo plugin config.
+- The script's exit-1 path skipped its own final teardown echo. I verified teardown
+  directly instead (processes, sandboxes, log inode, git status), recorded above.
+- I did not re-run the script a second time after diagnosing the DB guard, since
+  re-running would not change the four gate outcomes and would have written over the
+  restored prior evidence again.
+- I did not fix the DB guard's concurrency weakness or the script's shared-EVID
+  hygiene problem. Both are script changes, and the brief forbids modifying the script.
+  Recommended follow-ups for whoever owns the script: scope the DB assertion to
+  sessions attributable to the run (id or directory) instead of a global count, and
+  parameterize EVID per run.
+
+RAW ARTIFACT INDEX (.omo/evidence/20260814-lesson-nudge/f3-rerun/)
+  f3-qa-run-stdout.log                        full script stdout
+  f3-qa-script-exit-code.txt                  1
+  f3-s0-gate.txt                              S0 PASS
+  f3-insert-count-after-prompt2.txt           insertions=1 matching_len=1
+  f3-insert-count-after-prompt3.txt           insertions=1 registrations=1
+  f3-default-install-counts.txt               reg=0 ins=0 / S3 PASS
+  f3-nudge-length-from-source.txt             276
+  f3-nudge-length.txt                         nudge length: 276
+  f3-bundle-grep-count.txt                    1
+  f3-plugin-loaded-gate-on.txt                positive control, case A
+  f3-plugin-loaded-default.txt                positive control, case B
+  f3-mock-requests-gate-on.txt                2
+  f3-mock-requests-default.txt                2
+  f3-isolation.txt                            ISOLATION OK
+  f3-real-db-session-count-before.txt         2025
+  f3-real-db-session-count-after.txt          2026
+  f3-real-db-sandbox-dir-sessions.txt         0
+  f3-db-delta-attribution.txt                 proof the +1 is an unrelated session
+  f3-prior-evidence-restore-verification.txt  57 OK, 0 FAILED
+  f3-log-inode-before.txt                     53193481
+  f3-head-commit.txt                          bbc4db983...
+  f3-run-start-utc.txt                        2026-08-14T11:39:23Z

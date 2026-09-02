@@ -1,0 +1,81 @@
+TASK 4 EVIDENCE: Register "lesson-nudge" in HookNameSchema
+
+=== ENUM COUNT VERIFICATION ===
+Command used to count entries:
+  bun -e "const fs = require('fs'); const content = fs.readFileSync('packages/omo-opencode/src/config/schema/hooks.ts', 'utf8'); const match = content.match(/z\.enum\(\[([\s\S]*?)\]\)/); const entries = match[1].split('\n').filter(l => l.trim().startsWith('\"')).map(l => l.trim()); console.log('COUNT:', entries.length);"
+
+Before count: 56 entries
+After count: 57 entries
+
+=== DUPLICATE CHECK ===
+Command used:
+  bun -e "const fs = require('fs'); const content = fs.readFileSync('packages/omo-opencode/src/config/schema/hooks.ts', 'utf8'); const match = content.match(/z\.enum\(\[([\s\S]*?)\]\)/); const entries = match[1].split('\n').filter(l => l.trim().startsWith('\"')).map(l => l.trim()); const dups = new Set(); entries.forEach(e => { if (dups.has(e)) console.log('DUPLICATE:', e); dups.add(e); }); if (dups.size === entries.length) console.log('NO DUPLICATES: OK');"
+
+Result: NO DUPLICATES: OK
+
+=== ADDED CODE LOCATION ===
+File: packages/omo-opencode/src/config/schema/hooks.ts
+Lines around the addition (3 above, 3 below):
+  "tool-pair-validator",
+  "monitor-status-injector",
+  "goal",
+  "category-skill-reminder",
+  "lesson-nudge",
+  
+  "compaction-context-injector",
+
+Group: Placed in the same visual group as "goal" and "category-skill-reminder" as required.
+
+=== TEST CASE ADDED ===
+File: packages/omo-opencode/src/config/schema.test.ts
+Test added after line 523:
+
+  test("accepts lesson-nudge hook name", () => {
+    //#given
+    const input = "lesson-nudge"
+
+    //#when
+    const result = HookNameSchema.safeParse(input)
+
+    //#then
+    expect(result.success).toBe(true)
+  })
+
+=== TEST EXECUTION RESULT ===
+Command:
+  bun test packages/omo-opencode/src/config/schema.test.ts
+
+Output:
+  bun test v1.3.14 (d1632b29)
+
+   82 pass
+   0 fail
+   176 expect() calls
+  Ran 82 tests across 1 file. [107.00ms]
+
+Result: PASSED - All 82 tests green, including the new lesson-nudge acceptance test.
+
+=== MANUAL QA: HAPPY PATH ===
+Command:
+  bun -e "import { HookNameSchema } from './packages/omo-opencode/src/config/schema/hooks.ts'; console.log('HAPPY PATH (lesson-nudge):', HookNameSchema.safeParse('lesson-nudge').success);"
+
+Output:
+  HAPPY PATH (lesson-nudge): true
+
+Proves: The string "lesson-nudge" is accepted by the closed enum.
+
+=== MANUAL QA: FAILURE PATH ===
+Command:
+  bun -e "import { HookNameSchema } from './packages/omo-opencode/src/config/schema/hooks.ts'; console.log('FAILURE PATH (lesson-nudged):', HookNameSchema.safeParse('lesson-nudged').success);"
+
+Output:
+  FAILURE PATH (lesson-nudged): false
+
+Proves: The enum is still closed; only exact matches are accepted. Typos are rejected.
+
+=== SUMMARY ===
+- HookNameSchema enum expanded from 56 to 57 entries
+- "lesson-nudge" registered and ready for use in isHookEnabled() calls
+- All existing entries preserved, no reordering
+- Test suite fully green (82/82 tests pass)
+- Manual QA confirms exact-match acceptance and typo rejection

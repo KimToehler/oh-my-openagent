@@ -1,0 +1,55 @@
+WHAT WAS TESTED
+================
+
+1. Edited packages/omo-opencode/src/hooks/lesson-nudge/message.ts to reword buildLessonNudgeMessage() function.
+2. Updated docs/reference/features.md line 897 to match the new message timing semantics.
+3. Verified line 875 of features.md (TUI/serve vs opencode run context) does NOT imply end-of-session timing — already accurate.
+4. Ran bun test packages/omo-opencode/src/hooks/lesson-nudge/ to confirm the message passes all assertions.
+5. Ran bun run typecheck to ensure no type errors.
+
+WHAT WAS OBSERVED
+==================
+
+OLD MESSAGE (368 characters):
+"Record every correction received this session with `record_lesson`, including precise file globs and an evidence citation that proves the fix. Lessons recorded now become visible only in future sessions, not the current session, so capture correction details before work ends."
+
+NEW MESSAGE (218 characters):
+"When you receive a correction, record it with `record_lesson`: include precise file globs and an evidence citation. Recorded lessons become visible only in future sessions, not the current one, so capture them as they happen."
+
+Message assertion test results (bun test lesson-nudge):
+  ✓ Contains "record_lesson"
+  ✓ Contains "future sessions"
+  ✓ Contains "globs"
+  ✓ Contains "evidence citation"
+  ✓ No em dashes (U+2014) or en dashes (U+2013)
+  ✓ Length 218 <= 400 character limit
+  ✓ All 8 tests passed (message.test.ts + hook.test.ts)
+
+typecheck exit code: 0
+
+docs/reference/features.md line 897 updated from:
+  "controls the idle reminder that suggests recorded lessons when a session is idle; has no effect under `oh-my-opencode run`."
+to:
+  "enables a single early-session reminder to record corrections as they arise; has no effect under `oh-my-opencode run`."
+
+Line 875 context (TUI/serve limitation): CHECKED — already states "delivered on the next user message" which is factually early and does not imply deadline. NO CHANGE NEEDED.
+
+WHY IT IS ENOUGH
+=================
+
+The new message is empirically true to the hook's real behavior (fires once on first idle, early in session). It:
+  1. Removes the false "before work ends" deadline framing
+  2. Reframes as a standing instruction ("When you receive") rather than a last-call reminder
+  3. Preserves the core motivation (lessons visible in future sessions only)
+  4. Still requires precise globs and evidence citations
+  5. Uses second-person imperative, matching the register of the original
+  6. Passes all existing test assertions (no test modifications needed)
+  7. Fits under 400 character limit (218 chars, 150 chars shorter than original)
+
+The features.md bullet now correctly describes "single early-session reminder" instead of vague "idle reminder that suggests lessons", clarifying the once-per-session and when-it-fires semantics.
+
+WHAT WAS OMITTED
+=================
+
+No sensitive data, credentials, API keys, or authentication tokens appear in this report.
+The evidence covers only message text, test results, and documentation updates.

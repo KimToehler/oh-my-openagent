@@ -1,0 +1,29 @@
+PRE-EXISTING DIRTY WORKTREE BASELINE
+Captured at orchestration start, before any todo dispatched.
+Branch: dev
+Commit: aa44f8048
+
+WHY THIS FILE EXISTS
+The `dirty_worktree` adversarial class is LIVE for this run. The working tree was
+already dirty before any work began, and this run executes directly in the main
+checkout (user override: no worktree, no push, no PR). Without this baseline there
+is no way for a reviewer to tell which modifications belong to this plan and which
+were already present.
+
+FILES ALREADY MODIFIED AND NOT OWNED BY THIS PLAN (do not stage, do not revert,
+do not include in any commit):
+
+ M packages/omo-codex/plugin/components/codegraph/dist/cli.js
+ M packages/omo-senpi/plugin/extensions/omo-member.js
+ M packages/omo-senpi/plugin/extensions/omo.js
+ M packages/omo-codex/scripts/install-dist/install-local.mjs
+
+All four are generated/vendored build artifacts under packages/omo-codex/ and
+packages/omo-senpi/. No todo in .omo/plans/bounded-sync-delegation.md declares any
+of these paths in its `Files:` line, so no lane may touch them.
+
+CONTROL APPLIED
+Every dispatched worker is instructed to stage ONLY its declared `Files:` paths by
+explicit path, and `git add -A` / `git add .` is forbidden (.omo/rules/worktree-parallel-safety.md
+rule D). Final gate F4 re-checks that these four files remain unstaged and that no
+commit produced by this plan contains them.

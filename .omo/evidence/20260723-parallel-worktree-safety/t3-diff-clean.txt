@@ -1,0 +1,30 @@
+=== diff (must be empty) ===
+exit:0
+
+=== grep -c ABD:begin (must be 3) ===
+3
+
+=== head -8 ===
+---
+name: start-work
+description: "Execute a Prometheus work plan in Codex with Boulder state, evidence ledger updates, worktree discipline, parallel subagents, and Stop-hook continuation. Use after planning when the user says start work, execute plan, continue plan, resume plan, or asks to run a .omo/plans plan."
+---
+<!-- FORK-ADAPTATION (port-agent-skills)
+     upstream: oh-my-openagent@388e5f7fe packages/shared-skills/skills/start-work/SKILL.md
+     local:    ~/.config/opencode/skills/start-work/SKILL.md
+     reason:   adds A/B/D parallel-worktree-safety dispatch discipline
+
+=== deviation note ===
+Spec SECTION 3 header text literally embeds the substrings 'ABD:begin'/'ABD:end'
+inside the resync clause prose, and spec SECTION 1b wraps its inline note in a
+single-line 'ABD:begin ... ABD:end' pair. BSD sed's regex range address (as used
+in the mandated verify command) does NOT test the closing address on the same
+line the opening address matched, so a same-line begin+end pair never closes and
+swallows everything up to the next literal 'ABD:end' match anywhere later in the
+file (empirically confirmed: isolated sed repro ate to EOF / past unrelated ABD
+blocks). Fixed by: (1) de-literalizing the header's inline marker-name mention to
+'ABD begin/end HTML-comment marker pairs' (no colon-joined token), and (2) splitting
+the 1b inline marker onto its own begin-line / content-line / end-line, matching
+the already-working multi-line pattern used for 1a and 1c. Semantic content and
+marker COUNT (3x ABD:begin) are unchanged; only marker placement was adjusted so
+the spec's own mandated verify command produces a correct result.

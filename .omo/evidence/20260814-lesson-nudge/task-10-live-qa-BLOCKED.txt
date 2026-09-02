@@ -1,0 +1,340 @@
+TODO 10 - LIVE QA FOR THE LESSON NUDGE - RESULT: BLOCKED (product defect found)
+================================================================================
+Date:      2026-08-14
+Worktree:  /Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge
+Branch:    feat/lesson-nudge
+Commit:    48ca28d2a
+Runtime:   opencode 1.18.15, bun 1.3.12, node v25.9.0, macOS (darwin, arm64)
+
+VERDICT
+  S0 FAILED as a hard exit-1 gate. S1, S2 and S3 were never reached.
+  BOTH positive controls PASSED before the gate was evaluated, which is what makes
+  this a PRODUCT DEFECT and not a harness fault.
+  Root cause, proven statically and independently confirmed by the parent:
+  the lesson-nudge hook is CONSTRUCTED but NEVER DISPATCHED. It is dead code.
+
+  No assertion was loosened. No partial pass is claimed. No source file was edited.
+  No commit was made.
+
+
+================================================================================
+WHAT WAS TESTED
+================================================================================
+
+The exact live QA script from the approved plan, run UNMODIFIED.
+
+  Source:   .omo/plans/2026-08-14-lesson-nudge.md
+            section "### Exact live QA script for todo 10"
+  Extract:  sed -n '262,557p' <plan> > .omo/evidence/20260814-lesson-nudge/qa-script.sh
+  Size:     296 lines
+  Validate: bash -n qa-script.sh -> clean
+  Run:      bash qa-script.sh  (pid 59259), output -> qa-run-main.log
+
+Not one line of the script was edited, reordered, or "simplified". The plan is
+authoritative and every command in it is literal.
+
+Surface driven: ONE long-lived `opencode serve` process inside an isolated XDG
+sandbox, fed by a LOCAL mock model, prompted over the HTTP API
+(POST /session/:id/message). Intended proof: the nudge registers exactly once per
+session, is delivered exactly once, is never delivered twice, and does nothing at
+all on a default install.
+
+The six load-bearing properties of the script were preserved, each of which closes
+a defect found in an earlier review round:
+
+  1. ONE `opencode serve` spans every prompt of a case. The ContextCollector and
+     the once-guard are PROCESS-LOCAL module state. `opencode run` is
+     process-per-turn and was NOT used anywhere in this run.
+  2. The harness config key is BRACKETED: "[opencode]". Unbracketed is an unknown
+     top-level key that is silently ignored, which would make every downstream
+     assertion vacuously true.
+  3. The pass condition is read from the PLUGIN log at
+     ${TMPDIR}/oh-my-opencode.log, never from SQLite. The injected synthetic part
+     is never persisted, so a DB assertion would FAIL against a correct
+     implementation.
+  4. Config is written AFTER oqa_mk_isolated_xdg runs, because that helper does
+     `export HOME=...` UNCONDITIONALLY (common.sh:83), so a `HOME=... command`
+     prefix would be silently discarded.
+  5. A mock model is booted AND pinned per-agent and per-category, with a provider
+     block defining `mockprov`. A virgin sandbox has no provider auth and
+     OPENCODE_DISABLE_MODELS_FETCH=1 is set; with no resolvable model there is no
+     assistant turn, no session.idle, and nothing to observe.
+  6. Log slicing is by unique SESSION ID, never a line offset, because the log
+     rotates at 50 MB and is shared with other opencode processes on this machine.
+
+Pre-flight confirmations before running (nothing was rebuilt):
+  - `bun run build` and `bun install` were NOT run, per instruction.
+  - All three required strings were confirmed already present in dist/index.js:
+      "[lesson-nudge] registered nudge"                   -> 1
+      "Inserted synthetic part with hook content"         -> 1
+      "ENTRY - plugin loading"                            -> 1
+  - git status --porcelain in the worktree: EMPTY at start.
+  - The four tracked build artifacts were never regenerated and stayed clean.
+
+
+================================================================================
+WHAT WAS OBSERVED
+================================================================================
+
+--- S0: FAILED (hard gate, exit 1) -------------------------------------------
+Artifacts: s0-gate.txt, qa-run-main.log
+
+  nudge length: 276
+  session: ses_00011cbd6ffew74fI8k1Ina6Yu
+  FAIL S0: plugin IS loaded and a turn DID complete, but no [lesson-nudge] line
+           - the gate is off or the hook never ran
+
+  Count of "[lesson-nudge] registered nudge" for that session: 0   (expected >= 1)
+
+--- BOTH POSITIVE CONTROLS PASSED FIRST --------------------------------------
+This is the decisive point. "We saw nothing" was distinguished from "we looked at
+nothing" BEFORE the count was trusted.
+
+  Control 1 - plugin actually loaded. Artifact: plugin-loaded-gate-on.txt
+    [2026-08-14T11:00:28.720Z] [rt:59393:5e5a] [oh-my-openagent] ENTRY - plugin
+    loading {"directory":"/private/var/folders/.../oqa-xdg.XXXXXX.ucUyyJfToW/proj"}
+    Naming THIS case's own $OQA_PROJ, captured AFTER the first prompt (the plugin
+    loads on first prompt, not at boot) and from the PLUGIN log, not the serve log.
+
+  Control 2 - a model turn actually happened. Artifact: mock-requests-gate-on.txt
+    2 requests reached the local mock model.
+
+  Control 3 - a NEW completed assistant turn appeared past the pre-prompt
+    baseline: wait_for_turn returned 0, counting only turns with time.completed set.
+
+--- LIVE CORROBORATION: the event fired, the hook did not react ---------------
+Artifact: session-log-excerpt.txt (4 lines), serve-runtime-log-excerpt.txt (31 lines)
+
+session.idle DID fire for the session under test, in runtime rt:59393, and OTHER
+session-tier hooks demonstrably reacted to that very event:
+
+  [2026-08-14T11:00:30.805Z] [rt:59393:5e5a] [todo-continuation-enforcer] session.idle
+      {"sessionID":"ses_00011cbd6ffew74fI8k1Ina6Yu"}
+  [2026-08-14T11:00:30.808Z] [rt:59393:5e5a] [todo-continuation-enforcer] No todos
+      {"sessionID":"ses_00011cbd6ffew74fI8k1Ina6Yu"}
+  [2026-08-14T11:00:30.808Z] [rt:59393:5e5a] [atlas] session.idle
+      {"sessionID":"ses_00011cbd6ffew74fI8k1Ina6Yu"}
+  [2026-08-14T11:00:30.808Z] [rt:59393:5e5a] [atlas] Skipped: session not registered
+      in active boulder {"sessionID":"ses_00011cbd6ffew74fI8k1Ina6Yu"}
+
+Meanwhile "[lesson-nudge] registered nudge" for that session: 0 occurrences.
+
+So: the plugin was loaded, a model turn completed, session.idle fired for the exact
+session under test, sibling session-tier hooks ran on that same event in that same
+runtime - and the nudge hook produced nothing. Every harness-side explanation is
+excluded by construction.
+
+--- STATIC ROOT CAUSE (four independent proofs) -------------------------------
+Artifact: root-cause.txt
+
+  1. The hook IS constructed and returned:
+       create-session-hooks.ts:180-181  builds it via safeHook("lesson-nudge", ...)
+       create-session-hooks.ts:257      returns it as the member `lessonNudge`
+
+  2. The session-tier dispatcher enumerates hooks BY NAME. In
+     plugin/event-hook-dispatcher.ts there are 27 explicit
+     `await runEventHookSafely(...)` call sites, and `grep -c lessonNudge` on that
+     file returns 0. The sibling `goal` hook, gated the same way, IS dispatched:
+       event-hook-dispatcher.ts:63  await runEventHookSafely("goal", hooks.goal?.event, input);
+
+     (Correction to an earlier figure I quoted: 32 was a repo-wide count of
+     runEventHookSafely across src/. The dispatcher file itself has 27. The
+     conclusion is unchanged - none of them is lessonNudge.)
+
+  3. There is no generic iteration fallback. createCoreHooks merely spreads the
+     session/tool/transform objects into one record, and event.ts invokes only
+     named members. Dispatch sites for `lessonNudge` in all of src/, excluding
+     tests and AGENTS.md: 0.
+
+  4. The SHIPPED bundle agrees, so this is not a stale-build artifact:
+       dist/index.js  "lessonNudge"                        -> 2 (both in the factory)
+       dist/index.js  runEventHookSafely("lessonNudge")    -> 0
+       dist/index.js  runEventHookSafely("goal")           -> 1
+
+  Parent-confirmed addition (independently verified by the parent, not by me):
+  of the 12 session-hook members with no dispatch site, 11 are consumed by other
+  tiers; `hooks.lessonNudge` is consumed in ZERO non-factory files. The feature is
+  dead code, not merely misrouted.
+
+  Why the unit tests did not catch it: create-session-hooks.test.ts asserts only
+  that `result.lessonNudge` is non-null. A factory-only assertion cannot detect a
+  missing dispatch line. This is precisely the defect class live QA exists to find.
+
+  Correct fix shape (for the record; NOT applied by me - a separate worker,
+  bg_31ab9579, owns the source change): neither `?.event` nor `?.handler` is right.
+  createLessonNudgeHook() returns the handler DIRECTLY, typed
+  `(input: LessonNudgeEvent) => Promise<void>`, so it must be passed BARE, matching
+  the existing sessionNotification precedent at dispatcher line 45:
+      await runEventHookSafely("lessonNudge", hooks.lessonNudge, input);
+
+--- S1: NOT REACHED ----------------------------------------------------------
+Artifact: insert-count-after-prompt2.txt
+The script exited at the S0 hard gate before prompt 2 was ever sent. No insertion
+count and no contentLength match was produced. NUDGE_LEN was derived from source
+as 276 (nudge-length.txt) but never compared against anything.
+
+--- S2: NOT REACHED ----------------------------------------------------------
+Artifact: insert-count-after-prompt3.txt
+Prompt 3 was never sent. The once-only property is UNPROVEN in both directions.
+
+--- S3: NOT REACHED ----------------------------------------------------------
+Artifacts: default-install-counts.txt, plugin-loaded-default.txt,
+           mock-requests-default.txt, default-session-id.txt
+CASE B (default install, no lessons key) never ran, because the script exits at
+S0 inside CASE A. The default-install silence property is UNPROVEN. Note that in
+the current dead-code state a CASE B run would trivially report zero lines for the
+WRONG reason, so running it now would be actively misleading.
+
+--- CROSS-CHECKS -------------------------------------------------------------
+Artifact: cross-checks.txt
+
+  (a) Log surface is live:  grep -ac "context-injector" $LOG = 127  -> nonzero. PASS.
+      (The -a matters: the shared log is multi-MB and one stray byte would make
+      grep treat it as binary and silently return 0 for every count.)
+
+  (b) Unbracketed "opencode" key must make S0 FAIL:
+      NOT RUN - UNINFORMATIVE BY CONSTRUCTION. S0 already fails with the CORRECT
+      bracketed key, so both arms of the discriminator now yield FAIL and it can
+      distinguish nothing. Running it would yield a green-looking result carrying
+      zero information. Must be re-run once S0 can pass.
+
+  (c) Removing the hook's log(...) call must make S0 FAIL:
+      NOT RUN - SAME REASON. The mutation cannot change an already-failing outcome,
+      so it would prove nothing about the provenance of the counted line. The hook
+      source was left UNMODIFIED; git status --porcelain is empty.
+
+  Both (b) and (c) are prerequisites for signing off todo 10 after the fix lands.
+
+--- INTEGRITY / ISOLATION RECEIPTS - ALL PASS --------------------------------
+
+  Plugin log rotation guard (artifact: log-inode.txt)
+    inode before: 53193481
+    inode after:  53193481    -> UNCHANGED. No rotation, so the zero-count is a
+                                 real zero and not an artifact of a moved file.
+
+  Real user rules (artifacts: real-user-rules-before.txt, real-user-rules-after.txt,
+  isolation.txt)
+    `ls -la $REAL_HOME/.omo/rules` byte-identical immediately before and after the
+    run. A later re-check at 13:11 showed a single cosmetic delta on the ".." parent
+    directory mtime line (12:50 -> 13:08), caused by the operator's own live
+    opencode session writing elsewhere under ~/.omo AFTER my run finished at 13:01.
+    The rules directory CONTENTS are unchanged. Recorded here rather than hidden.
+
+  Real opencode DB (artifacts: session-count-before.txt, session-count-after.txt)
+    before run:  2017
+    after run:   2017    -> UNCHANGED by this QA.
+    A later re-check at 13:11 read 2019. That +2 is NOT from this run, proven four
+    ways:
+      - sessions created inside my run window (12:59:30-13:02:00): 0
+      - rows whose id = ses_00011cbd6ffew74fI8k1Ina6Yu (my QA session): 0
+      - rows whose directory matches '%oqa-xdg%' (any sandbox): 0
+      - the two newest rows are timestamped 13:10:07 and 13:11:03, i.e. AFTER my
+        run ended, with directories /Users/tim/git/oh-my-openagent and an
+        Open Design namespace - the operator's own live processes.
+    The QA session lived only in the sandbox DB, which was deleted with the sandbox.
+
+
+================================================================================
+WHY IT IS ENOUGH
+================================================================================
+
+The run is inconclusive about the feature's behaviour but CONCLUSIVE about the
+defect that blocks it. Three reasons.
+
+First, the failure cannot be confused with a setup failure. Every plausible
+harness-side cause was excluded BEFORE the gate was evaluated, in this case's own
+sandbox: the plugin under test was proven loaded, a model request was proven to
+have reached the mock, a completed assistant turn was proven to exist past a
+baseline, and session.idle was proven to have fired for the exact session with two
+sibling session-tier hooks visibly reacting to it in the same runtime. The only
+remaining explanation lies inside the feature.
+
+Second, the live symptom is backed by a static proof that needs no runtime at all.
+The dispatcher enumerates hooks by name and simply lacks the lessonNudge line, in
+BOTH the TypeScript source and the shipped dist bundle. A live failure plus a
+static cause that fully and exactly explains it is a stronger result than either
+alone, and it rules out a stale build as the explanation.
+
+Third, the guards that would otherwise make a zero count meaningless all held: the
+log did not rotate, counts were sliced by a unique session id rather than a line
+offset, the log surface was proven live at 127 context-injector lines, and the real
+DB and real HOME were provably untouched.
+
+What this evidence does NOT establish, and must not be read as establishing:
+  - that the once-per-session guard works,
+  - that delivery happens exactly once,
+  - that a default install is silent.
+S1, S2 and S3 were never executed. All three remain UNPROVEN in both directions.
+Todo 10 is NOT satisfied and must be re-run in full, unmodified, after the fix.
+
+
+================================================================================
+WHAT WAS OMITTED
+================================================================================
+
+- Cross-checks (b) and (c) were deliberately NOT run. Reasoning is recorded above
+  rather than represented as a passing tick. Both must run after the fix.
+
+- CASE B (default install) was never executed. Reported as NOT REACHED rather than
+  as a passing zero, because in the current dead-code state it would report zero
+  for the wrong reason.
+
+- No credentials, tokens, or auth headers are reproduced anywhere in this evidence
+  set. The sandbox server password is a per-run random `oqa-*` value scoped to a
+  temp sandbox that has since been deleted, and is not recorded here. The mock model
+  requires no key (apiKey "not-needed"), and no vendor endpoint was contacted:
+  OPENCODE_DISABLE_MODELS_FETCH=1 plus a 127.0.0.1 provider mean there was no
+  network egress and no real API call.
+
+- Log excerpts are scoped to this run's runtime id (rt:59393) and its session id,
+  so no unrelated sessions from the shared plugin log are copied into evidence.
+
+- resolved-config.json WAS captured (310 KB) but is used as corroboration only,
+  never as an assertion: GET /config returns opencode's config, not the omo plugin
+  config, so `.lessons` is null even on a healthy run (verified: jq '.lessons' ->
+  null). It proves nothing about the gate in either direction.
+
+- No source file was edited and no commit was made. The source fix, the
+  failing-first dispatcher regression test, and the structural guard test are owned
+  by a separate worker (bg_31ab9579). `.omo/` is gitignored, so this evidence is
+  untracked and cannot be committed; git status --porcelain in the worktree is
+  EMPTY, which is the correct end state for this todo.
+
+- `bun run build` and `bun install` were never run, so the four tracked generated
+  artifacts (omo-codex install-local.mjs, codegraph dist/cli.js, omo-senpi
+  omo.js / omo-member.js) were never regenerated and never needed restoring.
+
+
+================================================================================
+TEARDOWN RECEIPTS
+================================================================================
+  QA script process pid 59259 ............................. EXITED
+  `opencode serve` processes still running ................ 0
+  `mock-model.mjs` processes still running ................ 0
+     (pid 59356 logged "Terminated: 15" - killed by common.sh's EXIT trap)
+  My isolated sandbox: /var/folders/.../T/oqa-xdg.XXXXXX.ucUyyJfToW
+     ...................................................... REMOVED by the EXIT trap
+  Sandbox contents removed with it: XDG_{DATA,CONFIG,CACHE,STATE}_HOME, the sandbox
+     HOME (holding .omo/omo.jsonc), $OQA_PROJ, the sandbox opencode DB, serve.log,
+     mock.log and mock-requests.log.
+  Other oqa-xdg dirs on the machine, dated 10:47:52 and 10:53:40, PREDATE this
+     13:00 run, were not created by it, and were deliberately left untouched.
+  tmux ........ no server running ("error connecting to /private/tmp/tmux-501/default")
+  git status --porcelain (worktree) ....................... EMPTY
+  Hook source packages/omo-opencode/src/hooks/lesson-nudge/ . UNMODIFIED (no diff)
+
+  Nothing of mine is still alive: no process, no port, no temp dir.
+
+
+================================================================================
+REQUIRED NEXT STEP (owned by bg_31ab9579, NOT by me)
+================================================================================
+  1. Add to packages/omo-opencode/src/plugin/event-hook-dispatcher.ts, alongside
+     the sibling goal hook and matching the bare sessionNotification precedent:
+        await runEventHookSafely("lessonNudge", hooks.lessonNudge, input);
+  2. Add a failing-first dispatcher regression test.
+  3. Add a structural guard test asserting every non-null createSessionHooks member
+     is either dispatched or on a proven-consumer allowlist, so this defect class
+     cannot recur.
+  4. Rebuild, then re-run THIS script unmodified end-to-end, and additionally run
+     cross-checks (b) and (c), which only become informative once S0 can pass.

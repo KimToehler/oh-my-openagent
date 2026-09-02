@@ -1,0 +1,3 @@
+PROBE_CONFIG_HOOK_RAN
+PROBE_HEADER=anthropic/claude-opus-5
+PROBE_HEADER=anthropic/claude-opus-5

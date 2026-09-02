@@ -1,0 +1,38 @@
+ISOLATION PROOF - parallel-worktree-safety t2 harness
+======================================================
+Date: 2026-07-23
+Real opencode DB: /Users/tim/.local/share/opencode/opencode.db
+
+Method: capture `SELECT count(*) FROM session` against the REAL DB, then run
+run-scenario.sh once (which sources script/agent/qa-sandbox.sh -> fresh XDG_*
++ CODEX_HOME under mktemp, copies auth + plugin + config into the isolated
+config, and spawns `opencode run` from the sandbox repo). Re-count the REAL DB.
+If the sandbox is isolated, the count must be UNCHANGED.
+
+BEFORE = 681
+AFTER  = 681
+RESULT = IDENTICAL -> real DB was NOT polluted. Sandbox isolation confirmed.
+
+Observed during the dry run:
+- qa-sandbox.sh reported isolated env root under
+  /var/folders/.../T/omo-qa-sandbox.XXXXXX.* (host ~/.config/opencode and
+  ~/.codex untouched).
+- run-scenario.sh copied provider auth, registered plugin
+  ["oh-my-openagent@4.19.1"] in the isolated opencode.json, copied
+  oh-my-openagent.json (agent/model routing), MODE=baseline (no override
+  skills copied, because the override files do not exist yet).
+- opencode BOOTED inside the isolated sandbox and created a session in the
+  ISOLATED DB (ses_0709bf89...), then errored resolving the custom `onara/*`
+  provider in isolation (UnknownError err_c8ee6b8a). Boot + isolated-session
+  creation is sufficient to prove DB isolation; a completing model run is not
+  required for the isolation proof.
+
+Interpretation:
+- The `onara/*` provider models in oh-my-openagent.json are a custom provider
+  wired through the user's real environment; they do not resolve inside the
+  throwaway sandbox. This is EXPECTED and does NOT affect the isolation proof.
+- A full behavioral proof (checks i/ii/iii producing a real verdict) requires
+  BOTH (a) the start-work/ulw-plan override skills to exist under
+  ~/.config/opencode/skills/, AND (b) a provider that resolves in the isolated
+  sandbox (e.g. a plain model string in oh-my-openagent.json, or an
+  auth.json/provider that works headless). See READY.md.

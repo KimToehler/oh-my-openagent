@@ -1,0 +1,13 @@
+LOADER-PRECEDENCE PROOF (2026-07-23T14:51:37Z)
+Method: discoverAllSkills() from packages/skills-loader-core against real ~/.config/opencode/skills/
+
+RESULT: both skills resolve to the OVERRIDE path at scope=opencode (shadows shipped 'shared' scope)
+  start-work -> /Users/tim/.config/opencode/skills/start-work  scope=opencode  matches=1 (dedup: override won)
+  ulw-plan   -> /Users/tim/.config/opencode/skills/ulw-plan    scope=opencode  matches=1 (dedup: override won)
+
+Content at winning paths:
+  start-work ABD:begin blocks = 3 (expect 3)
+  ulw-plan   Files: in full-workflow = 5
+  ulw-plan   SKILL.md ABD:begin = 2
+
+CONCLUSION: OpenCode loads the A/B/D-enhanced overrides, not the shipped skills. Verbatim-base CLEAN (perl-strip diff empty on both).

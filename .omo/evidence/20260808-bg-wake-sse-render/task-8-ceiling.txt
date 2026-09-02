@@ -1,0 +1,144 @@
+TASK 8 - RETAINED-ADMIT CEILING RE-VERIFICATION AFTER THE PHANTOM-DELIVERY FIX
+==============================================================================
+
+Scope: read-only verification. No source file, no test file, and no config file
+was edited. No git add, no stage, no commit, no branch created.
+
+Worktree under test : /Users/tim/git/oh-my-openagent/.worktrees/bg-wake-sse-render
+Branch              : fix/bg-wake-sse-render
+HEAD                : 5113f9124 "fix(background-agent): treat an already-delivered
+                      coalesce as an undelivered parent wake"
+Runner              : bun test v1.3.14 (d1632b29)
+Date of run         : 2026-08-08
+
+
+1. THE CONSTANT AND WHAT MEASURES AGAINST IT
+--------------------------------------------
+packages/omo-opencode/src/features/background-agent/parent-wake-flush-runner.ts
+
+  line 23: const PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS = 60_000
+  line 28: const PENDING_PARENT_WAKE_MAX_RETAINED_ADMIT_DEFER_MS = 300_000
+
+  lines 300-309 (shouldAdmitRetainedWakeAfterCeiling):
+    const referenceAt = wake.lastAdmitOnlyDepositAt
+                     ?? wake.noReplyAdmittedAt
+                     ?? wake.queuedAt
+    if (referenceAt === undefined) return false
+    return Date.now() - referenceAt >= PENDING_PARENT_WAKE_MAX_RETAINED_ADMIT_DEFER_MS
+
+  lines 60-76 (the active-defer branch that consumes it): when the parent session
+  is active and the 60_000 ms force-dispatch ceiling has NOT been reached, a wake
+  that satisfies shouldAdmitRetainedWakeAfterCeiling is re-deposited as a
+  forceNoReply, retainPendingWake admit-only dispatch. It NEVER becomes a forced
+  reply. shouldForceDispatchAfterActiveDefer (line 296-298, frozen, pins #4120)
+  is the separate 60_000 ms reply ceiling and reads queuedAt, not
+  lastAdmitOnlyDepositAt.
+
+  The only writer of lastAdmitOnlyDepositAt in production code is
+  parent-wake-prompt-dispatch.ts line 175, inside markRetainedNoReplyAdmission,
+  which returns early (line 164-166) unless retainPendingWake === true AND
+  forceNoReply === true. parent-wake-pending-queue.ts line 93 only carries an
+  existing value forward with ??=, and line 64 deletes it on a fresh queue.
+
+
+2. WHAT THE CEILING TEST ASSERTS
+--------------------------------
+File: packages/omo-opencode/src/features/background-agent/parent-wake-active-defer-ceiling.test.ts
+
+The pinned case at line 145:
+  "#given retained noReply wake ages while parent is busy #then it does not force a reply"
+
+Concrete numbers inside that test (Date.now is stubbed):
+  - t = 100_000 ms : parent status idle, wake queued with shouldReply true,
+                     first flush -> exactly 1 promptAsync call, body.noReply === true,
+                     noReplyAdmittedAt is defined.
+  - t = 220_000 ms : parent status flipped to busy, hold released, timer cleared,
+                     second flush.
+  - Elapsed since the admission : 220_000 - 100_000 = 120_000 ms.
+  - 120_000 ms < 300_000 ms, so the retained-admit ceiling has NOT elapsed.
+  - Asserted outcome: promptAsyncCalls still has length 1 (no second dispatch),
+    the wake's shouldReply is still true, and a pending flush timer still exists.
+
+The other five cases in the file cover: aged wake + safe history dispatches a
+reply (1 call, noReply not true); ceiling + fresh activity window 180_000 ms
+dispatches once safe (2 calls, second one is a real reply); fresh user message
+admits noReply; blocked tool history admits noReply; prompt gate seeing blocked
+tool state after the active ceiling keeps the reply queued (0 calls).
+
+
+3. COMMANDS AND OBSERVED RESULTS
+--------------------------------
+Command A (run from the worktree root):
+  bun test packages/omo-opencode/src/features/background-agent/parent-wake-active-defer-ceiling.test.ts
+  Exit code: 0
+  Output:
+     6 pass
+     0 fail
+     23 expect() calls
+    Ran 6 tests across 1 file. [390.00ms]
+
+Command B (full module suite, for context):
+  bun test packages/omo-opencode/src/features/background-agent
+  Exit code: 0
+  Output:
+     781 pass
+     0 fail
+     2045 expect() calls
+    Ran 781 tests across 66 files. [28.27s]
+
+  781 pass / 0 fail matches the stated baseline of 781 / 0 exactly. Sibling
+  agents are adding tests on other branches; none of those appear here.
+
+Environment check: no `bun install` was needed. The worktree's
+node_modules/@oh-my-opencode/* entries are relative symlinks into this worktree's
+own packages/ (verified via ls -la), and the new coalesceKind discriminator is
+present in @oh-my-opencode/utils, so the resolved dependency was NOT stale.
+
+
+4. VERDICT: GREEN - THE CEILING INVARIANT SURVIVED THE FIX UNCHANGED
+--------------------------------------------------------------------
+Why the 300_000 ms retained-admit ceiling was unaffected on the paths this test
+exercises:
+
+lastAdmitOnlyDepositAt is written in exactly one place, markRetainedNoReplyAdmission
+in parent-wake-prompt-dispatch.ts line 175, and only after the guard at lines
+164-166 confirms the dispatch was an admit-only deposit (retainPendingWake true
+and forceNoReply true). In this test that write happens once, at the t = 100_000 ms
+admit-only deposit, so the ceiling clock in shouldAdmitRetainedWakeAfterCeiling
+starts there and reads 120_000 ms elapsed at the second flush, far below the
+300_000 ms threshold. The new coalesce branch added by 5113f9124 sits at
+parent-wake-prompt-dispatch.ts line 118 and is guarded by
+`isDiscardedCoalesceDispatchResult(promptResult) && !isAdmitOnlyDispatch(input)`,
+so it is structurally excluded from admit-only deposits and cannot requeue or
+re-time them. It also requires a discarded-coalesce dispatch result, which the
+test's stubbed promptAsync (a plain resolved `{ data: {} }`) never produces, so
+the branch is not reached at all in these six cases. The behavior change the task
+description anticipated, the ceiling now measuring from the last REAL deposit
+instead of being pushed forward by phantom deposits, is real in production but
+does not manifest here because this test never generates a phantom deposit in the
+first place.
+
+Note on honesty: the above is derived from reading the guards and the stubbed
+client in the test, plus the observed pass result. I did not instrument the run
+to print lastAdmitOnlyDepositAt at each step, so the mechanism is established by
+code path analysis rather than by a runtime trace of that field.
+
+
+5. FROZEN ITEMS CONFIRMED UNTOUCHED
+-----------------------------------
+  - shouldForceDispatchAfterActiveDefer (parent-wake-flush-runner.ts:296-298):
+    unmodified.
+  - parent-wake-active-defer-ceiling.test.ts line 145: unmodified. No expectation
+    anywhere in that file was adjusted.
+
+git status --porcelain in the worktree, before and after this task, reports the
+same four pre-existing modified build artifacts and nothing else:
+  M packages/omo-codex/plugin/components/codegraph/dist/cli.js
+  M packages/omo-codex/scripts/install-dist/install-local.mjs
+  M packages/omo-senpi/plugin/extensions/omo-member.js
+  M packages/omo-senpi/plugin/extensions/omo.js
+None of these were produced by this task. No file under
+packages/omo-opencode/src was modified.
+
+The only file this task wrote is this evidence file, which lives under .omo/ in
+the main checkout and is gitignored.

@@ -1,0 +1,28 @@
+ROOT CAUSE: the lesson-nudge hook is CONSTRUCTED but NEVER DISPATCHED.
+
+1) Constructed and returned by createSessionHooks:
+33:import { createLessonNudgeHook } from "../../hooks/lesson-nudge"
+180:  const lessonNudge = isHookEnabled("lesson-nudge") && pluginConfig.lessons?.enabled && pluginConfig.lessons?.nudge !== false
+181:    ? safeHook("lesson-nudge", () => createLessonNudgeHook())
+257:    lessonNudge,
+
+2) The session-tier event dispatcher enumerates each hook BY NAME.
+   It has 32 runEventHookSafely() calls; none is lessonNudge:
+   grep -c lessonNudge event-hook-dispatcher.ts = 0
+   For contrast, the sibling 'goal' hook IS dispatched:
+63:    await runEventHookSafely("goal", hooks.goal?.event, input);
+
+3) There is no generic iteration fallback: createCoreHooks spreads the
+   objects into one record, and event.ts dispatches only named members.
+   Dispatch sites for lessonNudge in all of src (excluding tests/docs): 0
+
+4) Same in the SHIPPED bundle dist/index.js:
+   occurrences of lessonNudge: 2 (both in the factory)
+   runEventHookSafely("lessonNudge"): 0
+   runEventHookSafely("goal"):        1
+
+CONSEQUENCE: session.idle fires (proven in the log above), other session-tier
+hooks run for the same session in the same runtime, but createLessonNudgeHook's
+returned function is never invoked, so it can never register and never log.
+The unit test at create-session-hooks.test.ts asserts only that the member is
+non-null; it cannot catch a missing dispatch line.

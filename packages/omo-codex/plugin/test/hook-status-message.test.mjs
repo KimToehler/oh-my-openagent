@@ -25,13 +25,12 @@ const AGGREGATE_EXPECTED_LABELS = new Map([
 	["hooks/hooks.json:PreToolUse:1:0", "Enforcing Unlimited Goal Budget"],
 	["hooks/hooks.json:PostToolUse:0:0", "Checking Comments"],
 	["hooks/hooks.json:PostToolUse:0:1", "Checking LSP Diagnostics"],
-	["hooks/hooks.json:PostToolUse:0:2", "Checking CodeGraph Init Guidance"],
 	["hooks/hooks.json:PostToolUse:1:0", "Matching Project Rules"],
 	["hooks/hooks.json:PostCompact:0:0", "Resetting Git Bash MCP Reminder"],
 	["hooks/hooks.json:PostCompact:1:0", "Resetting Project Rule Cache"],
 	["hooks/hooks.json:PostCompact:2:0", "Resetting LSP Diagnostics Cache"],
-	["hooks/hooks.json:Stop:0:0", "Checking Start-Work Continuation"],
-	["hooks/hooks.json:SubagentStop:0:0", "Checking Start-Work Continuation"],
+	["hooks/hooks.json:Stop:0:0", "Checking Ulw-Execute Continuation"],
+	["hooks/hooks.json:SubagentStop:0:0", "Checking Ulw-Execute Continuation"],
 	["hooks/hooks.json:SubagentStop:1:0", "Verifying LazyCodex Executor Evidence"],
 ]);
 
@@ -47,8 +46,8 @@ const COMPONENT_EXPECTED_LABELS = new Map([
 	["components/ultrawork/hooks/hooks.json:UserPromptSubmit:0:0", "Checking Ultrawork Trigger"],
 	["components/ulw-loop/hooks/hooks.json:UserPromptSubmit:0:0", "Checking Ulw-Loop Steering"],
 	["components/ulw-loop/hooks/hooks.json:PreToolUse:0:0", "Enforcing Unlimited Ulw-Loop Budget"],
-	["components/start-work-continuation/hooks/hooks.json:Stop:0:0", "Checking Start-Work Continuation"],
-	["components/start-work-continuation/hooks/hooks.json:SubagentStop:0:0", "Checking Start-Work Continuation"],
+	["components/ulw-execute-continuation/hooks/hooks.json:Stop:0:0", "Checking Ulw-Execute Continuation"],
+	["components/ulw-execute-continuation/hooks/hooks.json:SubagentStop:0:0", "Checking Ulw-Execute Continuation"],
 	[
 		"components/lazycodex-executor-verify/hooks/hooks.json:SubagentStop:0:0",
 		"Verifying LazyCodex Executor Evidence",

@@ -1,0 +1,16 @@
+Task completed in 2m 1s.
+
+Agent: explore
+Model: openai/gpt-fake
+
+---
+
+CHILD_FINISHED_ALL_TURNS
+
+<task_metadata>
+session_id: ses_028d4c297ffeFiAloK33HF79Yy
+task_id: ses_028d4c297ffeFiAloK33HF79Yy
+subagent: explore
+</task_metadata>
+
+to continue: task(task_id="ses_028d4c297ffeFiAloK33HF79Yy", load_skills=[], run_in_background=false, prompt="...")

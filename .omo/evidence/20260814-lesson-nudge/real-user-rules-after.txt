@@ -1,0 +1,5 @@
+total 16
+drwxr-xr-x   4 tim  staff   128 23 Juli 16:47 .
+drwx------@ 18 tim  staff   576 14 Aug. 13:12 ..
+-rw-r--r--   1 tim  staff  1796 23 Juli 16:47 worktree-parallel-safety.md
+-rw-r--r--   1 tim  staff  1798 23 Juli 11:50 worktrees.md

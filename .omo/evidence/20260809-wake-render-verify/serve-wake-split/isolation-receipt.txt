@@ -1,0 +1,4 @@
+real_db=/Users/tim/.local/share/opencode/opencode.db before=1563
+fake_llm_port=57410
+session_id=ses_019d59697ffeU0PED5fXve4jw2
+after=1563 unchanged=yes

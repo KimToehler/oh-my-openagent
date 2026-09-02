@@ -1,0 +1,1 @@
+{"type":"error","timestamp":1786347649723,"sessionID":"ses_0156210d0ffe4gTF7DxMhY8Jar","error":{"name":"ProviderAuthError","data":{"providerID":"onara","message":"Anthropic API key is missing. Pass it using the 'apiKey' parameter or the ANTHROPIC_API_KEY environment variable."}}}

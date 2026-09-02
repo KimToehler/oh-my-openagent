@@ -6,7 +6,7 @@ import {
 import { log } from "../../shared/logger"
 import { SessionCategoryRegistry } from "../../shared/session-category-registry"
 import type { ExecutorContext, ParentContext } from "./executor-types"
-import { buildTaskPrompt } from "./prompt-builder"
+import { buildDelegatedTaskPrompt } from "./prompt-builder"
 import { buildSyncPromptTools } from "./sync-prompt-sender"
 import type { DelegatedModelConfig, DelegateTaskArgs } from "./types"
 import { migrateToolsToPermission } from "../../shared/permission-compat"
@@ -30,7 +30,7 @@ export async function registerSyncSessionSideEffects(input: {
     : undefined
   registerDelegatedChildSessionBootstrap({
     sessionID: input.sessionID,
-    promptText: buildTaskPrompt(input.args.prompt, input.agentToUse, input.executorCtx.sisyphusAgentConfig?.tdd),
+    promptText: buildDelegatedTaskPrompt(input.args.prompt, input.agentToUse, input.executorCtx.sisyphusAgentConfig?.tdd),
     fallbackChain: input.fallbackChain,
     category: input.args.category,
     system: input.systemContent,

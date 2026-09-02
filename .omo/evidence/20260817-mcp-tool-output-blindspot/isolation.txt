@@ -1,0 +1,6 @@
+host_db=/Users/tim/.local/share/opencode/opencode.db
+host_sessions_before=2221
+host_sessions_after=2221
+sandbox_cleanup=all qa-sandbox directories removed by EXIT traps
+server_cleanup=all isolated opencode serve PIDs killed and waited by EXIT traps
+side_effect_cleanup=git checkout -- packages/omo-senpi/plugin/extensions

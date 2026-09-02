@@ -1,0 +1,407 @@
+TODO 4 - config schema: add background_task.syncWallClockTimeoutMs
+Date: 2026-08-06T11:35:54Z  Branch: dev  Base: aa44f8048
+
+==============================================================
+WHAT WAS TESTED
+==============================================================
+Surface: the real Zod v4 config schema, both at the sub-schema level
+(BackgroundTaskConfigSchema) and through the composed root
+(OhMyOpenCodeConfigSchema.safeParse), which is the shape a user's
+omo.json[c] is actually validated against at plugin startup.
+
+Behavior to prove:
+  - syncWallClockTimeoutMs is accepted and its value preserved
+  - values below the 60000 minimum are REJECTED (mirrors syncPollTimeoutMs)
+  - the field is genuinely optional and injects NO default when absent
+    (the 10-minute production default belongs to todo 7's read site)
+  - malformed inputs (string, negative) are rejected
+
+Commands:
+  bun test packages/omo-opencode/src/config/schema/background-task.test.ts   (RED)
+  bun test packages/omo-opencode/src/config/                                 (GREEN)
+  bun /tmp/qa-syncwallclock.ts                                               (manual QA)
+  bun run typecheck
+  git status --porcelain assets/
+
+==============================================================
+1. RED - failing-first proof (test written BEFORE the field existed)
+==============================================================
+$ bun test packages/omo-opencode/src/config/schema/background-task.test.ts
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/config/schema/background-task.test.ts:
+77 |   describe("syncWallClockTimeoutMs", () => {
+78 |     describe("#given valid syncWallClockTimeoutMs (600000)", () => {
+79 |       test("#when parsed #then returns correct value", () => {
+80 |         const result = BackgroundTaskConfigSchema.parse({ syncWallClockTimeoutMs: 600000 })
+81 | 
+82 |         expect(result.syncWallClockTimeoutMs).toBe(600000)
+                                                   ^
+error: expect(received).toBe(expected)
+
+Expected: 600000
+Received: undefined
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/config/schema/background-task.test.ts:82:47)
+(fail) BackgroundTaskConfigSchema > syncWallClockTimeoutMs > #given valid syncWallClockTimeoutMs (600000) > #when parsed #then returns correct value [0.41ms]
+91 |           BackgroundTaskConfigSchema.parse({ syncWallClockTimeoutMs: 59999 })
+92 |         } catch (error) {
+93 |           thrownError = error
+94 |         }
+95 | 
+96 |         expect(thrownError).toBeInstanceOf(ZodError)
+                                 ^
+error: expect(received).toBeInstanceOf(expected)
+
+Expected constructor: [Function: _]
+Received value: undefined
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/config/schema/background-task.test.ts:96:29)
+(fail) BackgroundTaskConfigSchema > syncWallClockTimeoutMs > #given syncWallClockTimeoutMs below minimum (59999) > #when parsed #then throws ZodError [0.18ms]
+113 |           BackgroundTaskConfigSchema.parse({ syncWallClockTimeoutMs: "600000" })
+114 |         } catch (error) {
+115 |           thrownError = error
+116 |         }
+117 | 
+118 |         expect(thrownError).toBeInstanceOf(ZodError)
+                                  ^
+error: expect(received).toBeInstanceOf(expected)
+
+Expected constructor: [Function: _]
+Received value: undefined
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/config/schema/background-task.test.ts:118:29)
+(fail) BackgroundTaskConfigSchema > syncWallClockTimeoutMs > #given syncWallClockTimeoutMs is non-number ("600000") > #when parsed #then throws ZodError [0.10ms]
+127 |           BackgroundTaskConfigSchema.parse({ syncWallClockTimeoutMs: -1 })
+128 |         } catch (error) {
+129 |           thrownError = error
+130 |         }
+131 | 
+132 |         expect(thrownError).toBeInstanceOf(ZodError)
+                                  ^
+error: expect(received).toBeInstanceOf(expected)
+
+Expected constructor: [Function: _]
+Received value: undefined
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/config/schema/background-task.test.ts:132:29)
+(fail) BackgroundTaskConfigSchema > syncWallClockTimeoutMs > #given syncWallClockTimeoutMs is negative (-1) > #when parsed #then throws ZodError [0.09ms]
+139 |           background_task: { syncWallClockTimeoutMs: 600000 },
+140 |         })
+141 | 
+142 |         expect(result.success).toBe(true)
+143 |         if (result.success) {
+144 |           expect(result.data.background_task?.syncWallClockTimeoutMs).toBe(600000)
+                                                                            ^
+error: expect(received).toBe(expected)
+
+Expected: 600000
+Received: undefined
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/config/schema/background-task.test.ts:144:71)
+(fail) BackgroundTaskConfigSchema > syncWallClockTimeoutMs > #given root config carrying background_task.syncWallClockTimeoutMs (600000) > #when safeParsed #then succeeds and preserves the value [1.37ms]
+
+ 7 pass
+ 5 fail
+ 13 expect() calls
+Ran 12 tests across 1 file. [106.00ms]
+exit=1
+
+==============================================================
+2. GREEN - after adding the field
+==============================================================
+$ bun test packages/omo-opencode/src/config/
+bun test v1.3.14 (d1632b29)
+
+ 150 pass
+ 0 fail
+ 296 expect() calls
+Ran 150 tests across 15 files. [115.00ms]
+exit=0
+
+==============================================================
+3. MANUAL QA - real safeParse against the composed root schema
+==============================================================
+Script: /tmp/qa-syncwallclock.ts (throwaway, deleted after this run)
+$ bun /tmp/qa-syncwallclock.ts
+----------------------------------------------------------------
+(1) syncWallClockTimeoutMs: 600000  -> expect SUCCESS, value preserved
+  input          : {"background_task":{"syncWallClockTimeoutMs":600000}}
+  success        : true
+  parsed value   : 600000 (typeof: number )
+  key present    : true
+----------------------------------------------------------------
+(2) syncWallClockTimeoutMs: 5000    -> expect FAILURE (below 60000 min)
+  input          : {"background_task":{"syncWallClockTimeoutMs":5000}}
+  success        : false
+  issue          : too_small | background_task.syncWallClockTimeoutMs | Too small: expected number to be >=60000
+----------------------------------------------------------------
+(3) background_task: {}             -> expect SUCCESS, field undefined (no default)
+  input          : {"background_task":{}}
+  success        : true
+  parsed value   : undefined (typeof: undefined )
+  key present    : false
+----------------------------------------------------------------
+(4) ADVERSARIAL string "600000"     -> malformed_input probe
+  input          : {"background_task":{"syncWallClockTimeoutMs":"600000"}}
+  success        : false
+  issue          : invalid_type | background_task.syncWallClockTimeoutMs | Invalid input: expected number, received string
+----------------------------------------------------------------
+(5) ADVERSARIAL negative -1         -> malformed_input probe
+  input          : {"background_task":{"syncWallClockTimeoutMs":-1}}
+  success        : false
+  issue          : too_small | background_task.syncWallClockTimeoutMs | Too small: expected number to be >=60000
+----------------------------------------------------------------
+exit=0
+
+Binary observable: PASS / FAIL / PASS-with-undefined on cases (1)(2)(3) -> MET.
+Case (1) success=true, value 600000 preserved as a number.
+Case (2) success=false, too_small at background_task.syncWallClockTimeoutMs.
+Case (3) success=true, value undefined AND the key is absent from parsed
+         output - proving .optional() with no zod .default() injection.
+
+==============================================================
+4. ADVERSARIAL PROBES
+==============================================================
+malformed_input:
+  5000            -> REJECTED  too_small       (expected number to be >=60000)
+  "600000" string -> REJECTED  invalid_type    (expected number, received string)
+                     No zod coercion is applied, so a quoted number in JSONC
+                     is a hard validation error rather than a silent cast.
+  -1              -> REJECTED  too_small       (min 60000 subsumes negatives;
+                     no separate .nonnegative() needed, same as syncPollTimeoutMs)
+  omitted         -> ACCEPTED, undefined, key absent (intended)
+
+stale_state:
+  assets/oh-my-opencode.schema.json deliberately NOT regenerated.
+  bun run build:schema was NOT run. Regeneration is serialized into todo 12
+  because todo 1 feeds the same generated asset; running it here would be a
+  lost-update race. Proof below.
+$ git status --porcelain assets/
+  (no output above = assets/ untouched)
+
+dirty_worktree:
+  Pre-existing unrelated modifications were present before this task started
+  (packages/omo-codex/, packages/omo-senpi/), and sibling wave-1 lanes have
+  since dirtied more files (delegate-task/, prompts-core/atlas/).
+  NO 'git add -A' / 'git add .' was used at any point. Only these two paths
+  were staged, explicitly:
+    packages/omo-opencode/src/config/schema/background-task.ts
+    packages/omo-opencode/src/config/schema/background-task.test.ts
+  Post-commit worktree state is recorded in section 6.
+
+==============================================================
+5. TYPECHECK
+==============================================================
+$ bun run typecheck
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+exit=0
+
+==============================================================
+6. COMMIT
+==============================================================
+sha: 18967d9aea8928bb9fd86ae2cf8c98b439b8263b
+18967d9ae feat(config): add background_task.syncWallClockTimeoutMs
+ .../src/config/schema/background-task.test.ts      | 74 ++++++++++++++++++++++
+ .../src/config/schema/background-task.ts           |  2 +
+ 2 files changed, 76 insertions(+)
+
+Staged by explicit path only (no 'git add -A' / 'git add .'):
+  packages/omo-opencode/src/config/schema/background-task.ts
+  packages/omo-opencode/src/config/schema/background-task.test.ts
+
+Worktree AFTER the commit - every remaining dirty file belongs to another
+lane or predates this task, and all remain unstaged:
+ M packages/omo-codex/plugin/components/codegraph/dist/cli.js
+ M packages/omo-codex/scripts/install-dist/install-local.mjs
+M  packages/omo-opencode/src/tools/delegate-task/task-schema.test.ts
+ M packages/omo-opencode/src/tools/delegate-task/timing.test.ts
+ M packages/omo-opencode/src/tools/delegate-task/timing.ts
+M  packages/omo-opencode/src/tools/delegate-task/tool-description.test.ts
+M  packages/omo-opencode/src/tools/delegate-task/tool-description.ts
+M  packages/omo-opencode/src/tools/delegate-task/tools.ts
+ M packages/omo-senpi/plugin/extensions/omo-member.js
+ M packages/omo-senpi/plugin/extensions/omo.js
+ M packages/prompts-core/prompts/atlas/default.md
+ M packages/prompts-core/prompts/atlas/gemini.md
+ M packages/prompts-core/prompts/atlas/gpt.md
+ M packages/prompts-core/prompts/atlas/kimi.md
+ M packages/prompts-core/prompts/atlas/opus-4-7.md
+
+assets/ after commit (empty = clean):
+
+==============================================================
+WHY IT IS ENOUGH
+==============================================================
+The failing-first run proves the 5 new assertions genuinely depended on the
+new field: before the edit the value was silently stripped (undefined) and
+the out-of-range/malformed inputs did not throw, because an unknown key is
+not validated. After the edit all 150 tests across the 15 config test files
+pass. The manual QA goes beyond the unit test by driving the composed ROOT
+schema, which is the object real user config is parsed with, and by printing
+key presence rather than only value equality - that is what distinguishes
+'.optional() with no default' from '.default(600000)', the single constraint
+most likely to be violated silently here. typecheck covers all 27 workspace
+tsconfigs, so the widened BackgroundTaskConfig inferred type breaks no
+consumer.
+
+==============================================================
+WHAT WAS OMITTED
+==============================================================
+- bun run build:schema and the resulting assets/oh-my-opencode.schema.json
+  diff: deliberately deferred to todo 12 to avoid a lost-update race with
+  todo 1. Until todo 12 runs, the generated asset does not yet advertise
+  syncWallClockTimeoutMs to editor autocomplete. Runtime validation is
+  unaffected because it reads the Zod schema, not the JSON asset.
+- No runtime/behavioral QA: this todo adds a schema field only. Nothing
+  reads syncWallClockTimeoutMs yet; the read site lands in todo 7 and the
+  enforcement in todos 9-10. No opencode process was spawned, so no XDG
+  sandbox or session-count isolation proof applies to this todo.
+- No secrets, tokens, env dumps, or auth headers appear in any artifact above.
+
+==============================================================
+CLEANUP
+==============================================================
+Throwaway QA script /tmp/qa-syncwallclock.ts and the /tmp capture files
+(red.txt, green.txt, qa-out.txt, typecheck.txt) were deleted after their
+contents were transcribed into this artifact.
+
+==============================================================
+7. FOLLOW-UP - JSDoc vs .describe(), and re-verification
+==============================================================
+The first pass documented the field with a JSDoc comment, matching the
+visible style of the sibling fields. That was wrong for this task, which
+explicitly requires a .describe(). Checking the already-committed generated
+asset showed why the distinction matters:
+
+  $ grep -n 'acquireTimeoutMs' -A 4 assets/oh-my-opencode.schema.json
+    7876:        "acquireTimeoutMs": {
+    7877-          "type": "number",
+    7878-          "minimum": 0
+    7879-        },
+
+acquireTimeoutMs carries a JSDoc comment in the source yet emits NO
+"description" into the asset - JSDoc is invisible to the schema generator,
+so that documentation never reaches editor autocomplete. The field was
+converted to .describe() and the difference verified directly:
+
+  $ bun -e 'z.toJSONSchema(BackgroundTaskConfigSchema, { io: "input" })'
+  syncWallClockTimeoutMs -> {
+    "description": "Absolute wall-clock ceiling on synchronous task delegation...",
+    "type": "number", "minimum": 60000 }
+  syncPollTimeoutMs (sibling, JSDoc-only) -> {"type":"number","minimum":60000}
+
+Runtime validation is byte-identical either way; .describe() only attaches
+metadata. syncPollTimeoutMs itself was NOT touched, per the task constraint.
+
+Re-verification after the conversion:
+  bun test packages/omo-opencode/src/config/   -> 150 pass, 0 fail (exit 0)
+  bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json -> exit 0
+  bun run typecheck                            -> exit 0
+
+Transient full-typecheck failure, investigated and cleared:
+  One 'bun run typecheck' run failed with TS2307 'Cannot find module
+  @oh-my-opencode/team-core/team-state-store' in packages/omo-senpi/. Proven
+  NOT caused by this change: stashing this file and typechecking omo-senpi
+  alone still passed (exit 0), restoring it passed (exit 0), and a full
+  re-run passed (exit 0). Cause was a concurrent sibling lane mid-write on
+  team-core during the first run. No omo-senpi source file is dirty here.
+
+$ bun /tmp/qa-syncwallclock.ts   (re-run against the .describe() version)
+----------------------------------------------------------------
+(1) syncWallClockTimeoutMs: 600000  -> expect SUCCESS, value preserved
+  input          : {"background_task":{"syncWallClockTimeoutMs":600000}}
+  success        : true
+  parsed value   : 600000 (typeof: number )
+  key present    : true
+----------------------------------------------------------------
+(2) syncWallClockTimeoutMs: 5000    -> expect FAILURE (below 60000 min)
+  input          : {"background_task":{"syncWallClockTimeoutMs":5000}}
+  success        : false
+  issue          : too_small | background_task.syncWallClockTimeoutMs | Too small: expected number to be >=60000
+----------------------------------------------------------------
+(3) background_task: {}             -> expect SUCCESS, field undefined (no default)
+  input          : {"background_task":{}}
+  success        : true
+  parsed value   : undefined (typeof: undefined )
+  key present    : false
+----------------------------------------------------------------
+(4) ADVERSARIAL string "600000"     -> malformed_input probe
+  input          : {"background_task":{"syncWallClockTimeoutMs":"600000"}}
+  success        : false
+  issue          : invalid_type | background_task.syncWallClockTimeoutMs | Invalid input: expected number, received string
+----------------------------------------------------------------
+(5) ADVERSARIAL negative -1         -> malformed_input probe
+  input          : {"background_task":{"syncWallClockTimeoutMs":-1}}
+  success        : false
+  issue          : too_small | background_task.syncWallClockTimeoutMs | Too small: expected number to be >=60000
+----------------------------------------------------------------
+exit=0
+
+Same PASS / FAIL / PASS-with-undefined pattern, plus both malformed probes
+still rejected. assets/ remains clean; commit amended in place.
+
+==============================================================
+8. INCIDENT - errant amend onto a sibling lane's commit, recovered
+==============================================================
+WHAT HAPPENED. To land the .describe() conversion I ran
+'git commit --amend --no-edit', intending to amend MY commit 18967d9ae.
+Between my commit and the amend, two parallel lanes committed on top:
+  6f1b3982e docs(delegate-task): stop restricting run_in_background ...
+  6291fbe9a feat(delegate-task): add inert wall-clock timing symbol
+HEAD was therefore 6291fbe9a, not mine, and the amend rewrote THEIR commit,
+folding my schema file into it as e8919692a.
+
+DETECTION. The post-amend 'git show --stat' listed three files where one
+was expected - timing.ts and timing.test.ts, which are not mine.
+
+RECOVERY. No branch was pushed, so the fix was purely local:
+  $ git reset --mixed 6291fbe9a
+which restored the sibling commit byte-for-byte from reflog and returned my
+edit to the working tree. The .describe() change was then committed as its
+own follow-up, staging exactly one file by explicit path.
+
+VERIFICATION that nothing was lost:
+2a00dc2cf docs(config): describe syncWallClockTimeoutMs via zod metadata
+6291fbe9a feat(delegate-task): add inert wall-clock timing symbol
+6f1b3982e docs(delegate-task): stop restricting run_in_background to 5+ query exploration
+18967d9ae feat(config): add background_task.syncWallClockTimeoutMs
+
+  6291fbe9a (sibling, restored) -- 2 files, both theirs:
+ .../src/tools/delegate-task/timing.test.ts         | 54 +++++++++++++++++++++-
+ .../omo-opencode/src/tools/delegate-task/timing.ts |  8 ++++
+ 2 files changed, 61 insertions(+), 1 deletion(-)
+  18967d9ae (mine, untouched throughout):
+ .../src/config/schema/background-task.test.ts      | 74 ++++++++++++++++++++++
+ .../src/config/schema/background-task.ts           |  2 +
+ 2 files changed, 76 insertions(+)
+  2a00dc2cf (mine, the follow-up):
+ packages/omo-opencode/src/config/schema/background-task.ts | 9 +++++++--
+ 1 file changed, 7 insertions(+), 2 deletions(-)
+
+ROOT CAUSE. 'git commit --amend' targets HEAD, not the commit you authored.
+In a shared checkout with concurrent lanes, HEAD moves under you. Amending
+is unsafe here; a follow-up commit is the correct instrument. Recorded so
+later todos in this plan do not repeat it.
+
+FINAL STATE. Two commits from this todo:
+  18967d9ae  feat(config): add background_task.syncWallClockTimeoutMs
+  2a00dc2cf  docs(config): describe syncWallClockTimeoutMs via zod metadata
+assets/ clean (verified again below), and every other lane's files unstaged.
+  [no output above = assets/ untouched]
+
+Remaining dirty files, all belonging to other lanes or predating this task:
+ M packages/omo-codex/plugin/components/codegraph/dist/cli.js
+ M packages/omo-codex/scripts/install-dist/install-local.mjs
+ M packages/omo-senpi/plugin/extensions/omo-member.js
+ M packages/omo-senpi/plugin/extensions/omo.js
+ M packages/prompts-core/prompts/atlas/default.md
+ M packages/prompts-core/prompts/atlas/gemini.md
+ M packages/prompts-core/prompts/atlas/glm.md
+ M packages/prompts-core/prompts/atlas/gpt.md
+ M packages/prompts-core/prompts/atlas/kimi-k2-7.md
+ M packages/prompts-core/prompts/atlas/kimi-k3.md
+ M packages/prompts-core/prompts/atlas/kimi.md
+ M packages/prompts-core/prompts/atlas/opus-4-7.md

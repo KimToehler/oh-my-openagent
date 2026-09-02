@@ -1,0 +1,153 @@
+# Task 6: lesson-nudge session hook wiring
+
+## Source edits
+
+```ts
+import { createLessonNudgeHook } from "../../hooks/lesson-nudge"
+```
+
+```ts
+lessonNudge: ReturnType<typeof createLessonNudgeHook> | null
+```
+
+```ts
+const lessonNudge = isHookEnabled("lesson-nudge") && pluginConfig.lessons?.enabled && pluginConfig.lessons?.nudge !== false
+  ? safeHook("lesson-nudge", () => createLessonNudgeHook())
+  : null
+```
+
+```ts
+goal,
+lessonNudge,
+editErrorRecovery,
+```
+
+## ctx argument finding
+
+Real factory signature:
+
+```ts
+export function createLessonNudgeHook(
+  collector: ContextCollector = contextCollector,
+  logger: LessonNudgeLogger = log,
+): (input: LessonNudgeEvent) => Promise<void>
+```
+
+Used `createLessonNudgeHook()` with no arguments. `ctx` is `PluginContext`, not `ContextCollector`; passing it would not typecheck. Defaults select shared `contextCollector` and `log`.
+
+## Four gate cases
+
+- `creates lesson nudge hook when lessons are enabled and nudge is unset`: pass.
+- `skips lesson nudge hook when lessons config is absent`: pass.
+- `skips lesson nudge hook when lessons are disabled`: pass.
+- `skips lesson nudge hook when nudge is disabled`: pass.
+
+Targeted green output:
+
+```text
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/plugin/hooks/create-session-hooks.test.ts:
+(pass) createSessionHooks > keeps model fallback disabled when config is unset [1.75ms]
+(pass) createSessionHooks > creates model fallback hook when config explicitly enables it [0.15ms]
+(pass) createSessionHooks > creates lesson nudge hook when lessons are enabled and nudge is unset [0.08ms]
+(pass) createSessionHooks > skips lesson nudge hook when lessons config is absent [0.05ms]
+(pass) createSessionHooks > skips lesson nudge hook when lessons are disabled [0.04ms]
+(pass) createSessionHooks > skips lesson nudge hook when nudge is disabled [0.05ms]
+(pass) createSessionHooks > does not create removed context window monitor hook [0.04ms]
+(pass) createSessionHooks > skips interactive bash session hook when tmux integration is disabled [0.06ms]
+(pass) createSessionHooks > skips codegraph bootstrap when disabled hooks exclude it [2.12ms]
+(pass) createSessionHooks > keeps codegraph bootstrap registered when the hook is enabled [0.07ms]
+
+ 10 pass
+ 0 fail
+ 10 expect() calls
+Ran 10 tests across 1 file. [121.00ms]
+
+```
+
+## Mutation check
+
+Temporarily changed `pluginConfig.lessons?.nudge !== false` to `pluginConfig.lessons?.nudge === true`.
+
+```text
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/plugin/hooks/create-session-hooks.test.ts:
+(pass) createSessionHooks > keeps model fallback disabled when config is unset [1.62ms]
+(pass) createSessionHooks > creates model fallback hook when config explicitly enables it [0.14ms]
+74 |       isHookEnabled: (hookName) => hookName === "lesson-nudge",
+75 |       safeHookEnabled: true,
+76 |     })
+77 | 
+78 |     // then
+79 |     expect(result.lessonNudge).not.toBeNull()
+                                        ^
+error: expect(received).not.toBeNull()
+
+Received: null
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge/packages/omo-opencode/src/plugin/hooks/create-session-hooks.test.ts:79:36)
+(fail) createSessionHooks > creates lesson nudge hook when lessons are enabled and nudge is unset [0.14ms]
+(pass) createSessionHooks > skips lesson nudge hook when lessons config is absent [0.04ms]
+(pass) createSessionHooks > skips lesson nudge hook when lessons are disabled [0.04ms]
+(pass) createSessionHooks > skips lesson nudge hook when nudge is disabled [0.04ms]
+(pass) createSessionHooks > does not create removed context window monitor hook [0.04ms]
+(pass) createSessionHooks > skips interactive bash session hook when tmux integration is disabled [0.05ms]
+(pass) createSessionHooks > skips codegraph bootstrap when disabled hooks exclude it [2.65ms]
+(pass) createSessionHooks > keeps codegraph bootstrap registered when the hook is enabled [0.10ms]
+
+ 9 pass
+ 1 fail
+ 10 expect() calls
+Ran 10 tests across 1 file. [119.00ms]
+
+```
+
+Result: exit 1. Required unset-nudge case failed with `Received: null`. Restored `!== false`, then targeted test returned green.
+
+## Typecheck
+
+Command: `bun run typecheck`
+
+```text
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+
+```
+
+Result: exit 0.
+
+## Omitted
+
+No secrets, auth headers, or environment dumps captured.
+
+## Final verification
+
+Command: `bun test packages/omo-opencode/src/plugin/`
+
+```text
+bun test v1.3.14 (d1632b29)
+
+ 337 pass
+ 0 fail
+ 944 expect() calls
+Ran 337 tests across 49 files. [6.79s]
+
+```
+
+Result: exit 0.
+
+Command: `bun run typecheck`
+
+```text
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+
+```
+
+Result: exit 0.
+
+LSP diagnostics could not initialize because this worktree has no valid TypeScript installation discoverable by configured LSP server. Repository typecheck passed.

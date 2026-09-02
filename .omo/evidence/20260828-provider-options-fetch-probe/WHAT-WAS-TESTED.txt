@@ -1,0 +1,4 @@
+Command: source script/agent/qa-sandbox.sh; cd "$OMO_QA_PROJ"; timeout 40 opencode run 'Reply with probe success.' --format json
+Surface: isolated OpenCode successful streaming chat completion against local OpenAI-compatible mock.
+Plugin: sandbox-only file:// provider-fetch-probe.ts. Its only hook is config; it assigns cfg.provider.mockprov.options.fetch to a global-fetch wrapper and writes invocation data to plugin-probe.txt.
+Precondition: curl -i to local /v1/chat/completions before OpenCode.

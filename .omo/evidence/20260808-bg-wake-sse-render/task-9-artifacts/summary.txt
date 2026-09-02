@@ -1,0 +1,2 @@
+dispatching=2 dispatched=2 coalesced=0 requeued=1 live_dispatch=2 sse_exit=0 wake_frames_on_wire=3 real_db_before=1542 real_db_after=1542
+VERDICT=PASS

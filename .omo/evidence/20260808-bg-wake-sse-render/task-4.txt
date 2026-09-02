@@ -1,0 +1,152 @@
+TASK 4 - coalesceKind discriminator on InternalPromptDispatchResult
+Worktree: .worktrees/bg-wake-sse-render, branch fix/bg-wake-sse-render
+Date: 2026-08-08T13:58:22Z
+
+== WHAT WAS TESTED ==
+Additive optional field coalesceKind: 'already-delivered' | 'in-flight' on the
+'queued' variant of InternalPromptDispatchResult. Populated at both coalesce sites:
+  - semantic-dedupe.ts coalesceRecentSemanticPromptDispatch -> 'already-delivered'
+  - queue.ts enqueueInternalPrompt reservation-match + queue-entry-match -> 'in-flight'
+Field absent on genuine dispatched results and on non-coalesce queued results.
+isInternalPromptDispatchAccepted untouched; no status value changed anywhere.
+
+== COMMANDS + RESULTS ==
+--- bun test packages/utils/src/prompt-async-gate ---
+
+ 83 pass
+ 0 fail
+ 191 expect() calls
+Ran 83 tests across 11 files. [207.00ms]
+exit=0
+
+--- bun test packages/omo-opencode/src/features/background-agent ---
+
+ 777 pass
+ 0 fail
+ 2018 expect() calls
+Ran 777 tests across 65 files. [28.23s]
+exit=0
+
+--- bun run typecheck ---
+typecheck exit=2 (exit 2 caused by 34 pre-existing senpi errors on base branch)
+total error lines: 34
+non-senpi error lines: 0
+errors mentioning prompt-async-gate: 0
+
+== PRODUCTION DIFF ==
+diff --git a/packages/utils/src/prompt-async-gate.ts b/packages/utils/src/prompt-async-gate.ts
+index 00ab325cd..2455072fa 100644
+--- a/packages/utils/src/prompt-async-gate.ts
++++ b/packages/utils/src/prompt-async-gate.ts
+@@ -59,6 +59,7 @@ export {
+ } from "./prompt-async-gate/timing"
+ 
+ export type {
++  InternalPromptCoalesceKind,
+   InternalPromptDispatchArgs,
+   InternalPromptDispatchMode,
+   InternalPromptDispatchResult,
+diff --git a/packages/utils/src/prompt-async-gate/queue.ts b/packages/utils/src/prompt-async-gate/queue.ts
+index af389fddf..f991f8242 100644
+--- a/packages/utils/src/prompt-async-gate/queue.ts
++++ b/packages/utils/src/prompt-async-gate/queue.ts
+@@ -4,7 +4,7 @@ import {
+   getActiveReservation,
+   setExpiredReservationHandler,
+ } from "./reservations"
+-import type { InternalPromptDispatchResult, QueuedInternalPrompt } from "./types"
++import type { InternalPromptCoalesceKind, InternalPromptDispatchResult, QueuedInternalPrompt } from "./types"
+ 
+ declare function setTimeout(callback: () => void, delay?: number): unknown
+ declare function clearTimeout(timeout: unknown): void
+@@ -38,7 +38,20 @@ function setPromptQueue(sessionID: string, queue: QueuedInternalPrompt[]): void
+   promptQueues.set(sessionID, queue)
+ }
+ 
+-function queuedResult(entry: QueuedInternalPrompt, position: number, queuedBy = entry.source): InternalPromptDispatchResult {
++function queuedResult(
++  entry: QueuedInternalPrompt,
++  position: number,
++  queuedBy = entry.source,
++  coalesceKind?: InternalPromptCoalesceKind,
++): InternalPromptDispatchResult {
++  if (coalesceKind !== undefined) {
++    return {
++      status: "queued",
++      queuedBy,
++      position,
++      coalesceKind,
++    }
++  }
+   return {
+     status: "queued",
+     queuedBy,
+@@ -199,7 +212,7 @@ export async function enqueueInternalPrompt(entry: QueuedInternalPrompt): Promis
+       source: entry.source,
+       queuedBy: activeReservation.source,
+     })
+-    return queuedResult(entry, 0, activeReservation.source)
++    return queuedResult(entry, 0, activeReservation.source, "in-flight")
+   }
+ 
+   const queue = getPromptQueue(entry.sessionID)
+@@ -213,7 +226,7 @@ export async function enqueueInternalPrompt(entry: QueuedInternalPrompt): Promis
+         queuedBy: existing.source,
+         position: existingIndex + 1,
+       })
+-      return queuedResult(existing, existingIndex + 1)
++      return queuedResult(existing, existingIndex + 1, existing.source, "in-flight")
+     }
+   }
+ 
+diff --git a/packages/utils/src/prompt-async-gate/semantic-dedupe.ts b/packages/utils/src/prompt-async-gate/semantic-dedupe.ts
+index 14675fcc5..429b1e956 100644
+--- a/packages/utils/src/prompt-async-gate/semantic-dedupe.ts
++++ b/packages/utils/src/prompt-async-gate/semantic-dedupe.ts
+@@ -128,5 +128,5 @@ export function coalesceRecentSemanticPromptDispatch(args: {
+     source: args.source,
+     queuedBy: recentDispatch.source,
+   })
+-  return { status: "queued", queuedBy: recentDispatch.source, position: 0 }
++  return { status: "queued", queuedBy: recentDispatch.source, position: 0, coalesceKind: "already-delivered" }
+ }
+diff --git a/packages/utils/src/prompt-async-gate/types.ts b/packages/utils/src/prompt-async-gate/types.ts
+index cbb8d9cea..e910c0b7b 100644
+--- a/packages/utils/src/prompt-async-gate/types.ts
++++ b/packages/utils/src/prompt-async-gate/types.ts
+@@ -62,9 +62,20 @@ export type PromptAsyncReservation = {
+   readonly expiresAt?: number
+ }
+ 
++// Distinguishes the two "queued" coalesce shapes: "already-delivered" means an
++// identical prompt already dispatched within the semantic dedupe hold and this
++// one was discarded; "in-flight" means an identical prompt is reserved or
++// pending right now and will still be delivered.
++export type InternalPromptCoalesceKind = "already-delivered" | "in-flight"
++
+ export type InternalPromptDispatchResult =
+   | { readonly status: "dispatched"; readonly response: unknown }
+-  | { readonly status: "queued"; readonly queuedBy: string; readonly position: number }
++  | {
++    readonly status: "queued"
++    readonly queuedBy: string
++    readonly position: number
++    readonly coalesceKind?: InternalPromptCoalesceKind
++  }
+   | { readonly status: "active" }
+   | { readonly status: "reserved"; readonly reservedBy: string }
+   | { readonly status: "unavailable" }
+
+== WHY IT IS ENOUGH ==
+New test file prompt-async-gate-coalesce-kind.test.ts asserts the NAMED field:
+ (a) already-delivered on semantic-dedupe coalesce
+ (b) in-flight on reservation-match coalesce AND queue-pending coalesce
+ (c) Object.hasOwn(result,'coalesceKind') === false on genuine dispatched result
+     and on a non-coalesce queued accept.
+Existing exhaustive toEqual assertions updated in 3 test files pin exact result shapes,
+proving no other result shape changed. Full utils gate suite (83 tests) and
+background-agent suite (777 tests) green so no caller control flow shifted.
+
+== WHAT WAS OMITTED ==
+Full typecheck log (34 pre-existing @code-yeongyu/senpi module errors, present on base
+branch, unrelated). No secrets involved.

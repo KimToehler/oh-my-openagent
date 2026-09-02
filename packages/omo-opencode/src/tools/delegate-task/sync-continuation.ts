@@ -13,11 +13,12 @@ import { resolveMessageContext } from "../../features/hook-message-injector"
 import { formatDuration } from "./time-formatter"
 import { syncContinuationDeps, type SyncContinuationDeps } from "./sync-continuation-deps"
 import { setSessionTools } from "../../shared/session-tools-store"
-import { buildTaskPrompt } from "./prompt-builder"
+import { buildDelegatedTaskPrompt } from "./prompt-builder"
 import { buildTaskMetadataBlock } from "../../features/tool-metadata-store/task-metadata-contract"
 import { getTaskID } from "./task-id"
 import { resolveMetadataModel } from "./resolve-metadata-model"
 import { log } from "../../shared/logger"
+import { cancelSyncSessionDeletion, scheduleSyncSessionDeletion } from "./sync-session-cleanup"
 
 type ResumeModel = { providerID: string; modelID: string }
 
@@ -26,6 +27,7 @@ type ResumeContext = {
   resumeModel?: ResumeModel
   resumeVariant?: string
   anchorMessageCount?: number
+  anchorMessageID?: string
 }
 
 function shouldAttemptPollErrorRecovery(pollError: string): boolean {
@@ -77,11 +79,12 @@ async function resolveResumeContext(
             : undefined),
           resumeVariant: info.variant,
           anchorMessageCount: messages.length,
+          anchorMessageID: messages.at(-1)?.info?.id,
         }
       }
     }
 
-    return { anchorMessageCount: messages.length }
+    return { anchorMessageCount: messages.length, anchorMessageID: messages.at(-1)?.info?.id }
   } catch (error) {
     if (!(error instanceof Error)) throw error
     const resumeMessageDir = getMessageDir(continuationID)
@@ -112,6 +115,7 @@ export async function executeSyncContinuation(
   if (!continuationID) {
     throw new Error("task_id is required to continue a sync task")
   }
+  cancelSyncSessionDeletion(continuationID)
   const taskId = `resume_sync_${continuationID.slice(0, 8)}`
   const startTime = new Date()
   const wallClockTimeoutMs = syncWallClockTimeoutMs ?? Infinity
@@ -130,7 +134,9 @@ export async function executeSyncContinuation(
   let resumeModel: ResumeModel | undefined
   let resumeVariant: string | undefined
   let anchorMessageCount: number | undefined
+  let anchorMessageID: string | undefined
   let yieldedToBackground = false
+  let handedBackToParent = false
 
   try {
     const resumeContext = await resolveResumeContext(client, continuationID)
@@ -138,6 +144,7 @@ export async function executeSyncContinuation(
     resumeModel = resumeContext.resumeModel
     resumeVariant = resumeContext.resumeVariant
     anchorMessageCount = resumeContext.anchorMessageCount
+    anchorMessageID = resumeContext.anchorMessageID
 
     const resumeModelForMetadata = resumeModel && resumeVariant !== undefined
       ? { ...resumeModel, variant: resumeVariant }
@@ -164,7 +171,7 @@ export async function executeSyncContinuation(
 
     const allowTask = isPlanFamily(resumeAgent)
     const tddEnabled = sisyphusAgentConfig?.tdd
-    const effectivePrompt = buildTaskPrompt(args.prompt, resumeAgent, tddEnabled)
+    const effectivePrompt = buildDelegatedTaskPrompt(args.prompt, resumeAgent, tddEnabled)
     const tools = {
       task: allowTask,
       call_omo_agent: true,
@@ -192,6 +199,7 @@ export async function executeSyncContinuation(
        toastManager.removeTask(taskId)
      }
      const errorMessage = promptError instanceof Error ? promptError.message : String(promptError)
+     scheduleSyncSessionDeletion(client, continuationID)
      return `Failed to send continuation prompt: ${errorMessage}\n\nTask ID: ${continuationID}`
    }
 
@@ -202,6 +210,7 @@ export async function executeSyncContinuation(
         toastManager,
         taskId,
         anchorMessageCount,
+        anchorMessageID,
         wallClockDeadline,
       }, syncPollTimeoutMs)
       switch (pollOutcome.kind) {
@@ -293,7 +302,7 @@ ${buildTaskMetadataBlock({
      if (toastManager) {
        toastManager.removeTask(taskId)
      }
-     if (!yieldedToBackground) {
+     if (!yieldedToBackground && handedBackToParent) {
        handedBackSyncSessions.add(continuationID)
        if (typeof client.session.abort === "function") {
          void client.session.abort({ path: { id: continuationID } }).catch((error: unknown) => {
@@ -301,5 +310,8 @@ ${buildTaskMetadataBlock({
          })
        }
      }
+     // Every terminal continuation path must restore the cleanup grace timer,
+     // including prompt/poll failures after revival cancelled the old timer.
+     scheduleSyncSessionDeletion(client, continuationID)
    }
 }

@@ -2,6 +2,13 @@ import { describe, expect, test } from "bun:test"
 import { OmoConfigSchema } from "../index"
 
 describe("omo config schema", () => {
+  test("#given an empty formatOnMutation config #when parsed #then formatter defaults are available", () => {
+    expect(OmoConfigSchema.parse({ formatOnMutation: {} }).formatOnMutation).toEqual({ mode: "best-effort", maxFileBytes: 1048576, timeoutMs: 3000 })
+  })
+
+  test("#given formatOnMutation overrides #when parsed #then mode limits and language map survive", () => {
+    expect(OmoConfigSchema.parse({ formatOnMutation: { mode: "required", languages: { python: false }, timeoutMs: 1000 } }).formatOnMutation).toEqual({ mode: "required", languages: { python: false }, maxFileBytes: 1048576, timeoutMs: 1000 })
+  })
   test("#given a full omo config #when parsed #then task defaults and deprecated category keys normalize", () => {
     // given
     const config = {
@@ -40,7 +47,7 @@ describe("omo config schema", () => {
           disable: false,
         },
       },
-      codegraph: { daemon: true },
+      git_master: { include_co_authored_by: false },
       task: {},
       teams: {
         builders: {
@@ -56,7 +63,7 @@ describe("omo config schema", () => {
     // then
     expect(result.success).toBe(true)
     if (!result.success) throw new Error(result.error.message)
-    expect(result.data.codegraph?.daemon).toBe(true)
+    expect(result.data.git_master?.include_co_authored_by).toBe(false)
     expect(result.data.task?.default_execution_mode).toBe("in-process")
     expect(result.data.task?.default_concurrency).toBe(5)
     expect(result.data.task?.residency_max_children).toBe(8)
@@ -68,9 +75,9 @@ describe("omo config schema", () => {
     })
   })
 
-  test("#given an empty codegraph config #when parsed #then daemon defaults on", () => {
+  test("#given an empty git_master config #when parsed #then the attribution defaults apply", () => {
     // given
-    const config = { codegraph: {} }
+    const config = { git_master: {} }
 
     // when
     const result = OmoConfigSchema.safeParse(config)
@@ -78,7 +85,7 @@ describe("omo config schema", () => {
     // then
     expect(result.success).toBe(true)
     if (!result.success) throw new Error(result.error.message)
-    expect(result.data.codegraph?.daemon).toBe(true)
+    expect(result.data.git_master).toEqual({ commit_footer: true, include_co_authored_by: true })
   })
 
   test("#given an unknown root key #when parsed #then the schema rejects the config", () => {
@@ -92,9 +99,9 @@ describe("omo config schema", () => {
     expect(result.success).toBe(false)
   })
 
-  test("#given a wrong typed codegraph daemon setting #when parsed #then the issue path identifies the bad field", () => {
+  test("#given a wrong typed git_master setting #when parsed #then the issue path identifies the bad field", () => {
     // given
-    const config = { codegraph: { daemon: "yes" } }
+    const config = { git_master: { include_co_authored_by: "yes" } }
 
     // when
     const result = OmoConfigSchema.safeParse(config)
@@ -103,7 +110,7 @@ describe("omo config schema", () => {
     expect(result.success).toBe(false)
     if (result.success) throw new Error("Expected config parsing to fail")
     const issuePaths = result.error.issues.map((issue) => issue.path.join("."))
-    expect(issuePaths).toContain("codegraph.daemon")
+    expect(issuePaths).toContain("git_master.include_co_authored_by")
   })
 
   test("#given a wrong typed task setting #when parsed #then the issue path identifies the bad field", () => {

@@ -1,0 +1,145 @@
+=== TASK 3: no-output parent wake retry distinct dispatch identity ===
+Date: Sat Aug  8 13:43:38 UTC 2026
+Worktree: /Users/tim/git/oh-my-openagent/.worktrees/bg-wake-sse-render, branch fix/bg-wake-sse-render, base HEAD e2cb98f72
+
+=== WHAT WAS TESTED ===
+RED test packages/omo-opencode/src/features/background-agent/parent-wake-noout-retry-dedupe.test.ts:
+proves that the no-assistant-output retry re-flush produces a REAL second promptAsync dispatch
+instead of being coalesced by the 15s semantic dedupe hold created by the first send.
+
+=== PRODUCTION CHANGE (full diff) ===
+diff --git a/packages/omo-opencode/src/features/background-agent/parent-wake-history-state.ts b/packages/omo-opencode/src/features/background-agent/parent-wake-history-state.ts
+index cb4604cf0..a1add08ec 100644
+--- a/packages/omo-opencode/src/features/background-agent/parent-wake-history-state.ts
++++ b/packages/omo-opencode/src/features/background-agent/parent-wake-history-state.ts
+@@ -99,6 +99,16 @@ export function createEmptyAssistantTurnRetryDedupeKey(wake: PendingParentWake):
+   ].join("\u0000")
+ }
+ 
++export function createNoAssistantOutputRetryDedupeKey(wake: PendingParentWake): string {
++  return [
++    "background-agent-parent-wake-noout-retry",
++    String(wake.noAssistantOutputRetryCount ?? 0),
++    ...wake.notifications,
++    JSON.stringify(wake.promptContext),
++    wake.shouldReply ? "reply" : "silent",
++  ].join("\u0000")
++}
++
+ function partHasFreshToolActivity(part: unknown, now: number, maxAgeMs: number): boolean {
+   if (!isRecord(part)) {
+     return false
+diff --git a/packages/omo-opencode/src/features/background-agent/parent-wake-prompt-dispatch.ts b/packages/omo-opencode/src/features/background-agent/parent-wake-prompt-dispatch.ts
+index bc7343b9c..d00ebdc06 100644
+--- a/packages/omo-opencode/src/features/background-agent/parent-wake-prompt-dispatch.ts
++++ b/packages/omo-opencode/src/features/background-agent/parent-wake-prompt-dispatch.ts
+@@ -7,7 +7,10 @@ import {
+ import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
+ import type { PromptDispatchClient } from "../../shared/prompt-async-gate/types"
+ import { getErrorText } from "./error-classifier"
+-import { createEmptyAssistantTurnRetryDedupeKey } from "./parent-wake-history-state"
++import {
++  createEmptyAssistantTurnRetryDedupeKey,
++  createNoAssistantOutputRetryDedupeKey,
++} from "./parent-wake-history-state"
+ import { cloneParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"
+ import type { ToolWaitDeferralDecision } from "./parent-wake-session-history"
+ 
+@@ -40,7 +43,9 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
+       source: "background-agent-parent-wake",
+       ...(input.emptyAssistantTurnRetry
+         ? { dedupeKey: createEmptyAssistantTurnRetryDedupeKey(input.latestWake) }
+-        : {}),
++        : (input.latestWake.noAssistantOutputRetryCount ?? 0) > 0
++          ? { dedupeKey: createNoAssistantOutputRetryDedupeKey(input.latestWake) }
++          : {}),
+       settleMs: 0,
+       queueBehavior: "defer",
+       checkStatus: input.forceNoReply !== true && input.skipPromptGateStatusCheck !== true,
+
+=== GREEN: targeted test ===
+(pass) ParentWakeNotifier no-output retry vs semantic dedupe hold > #given a dispatched parent wake recorded in the semantic dedupe hold #when the no-output retry re-flushes the byte-identical wake while the hold is still active #then a real second dispatch reaches the client [2819.20ms]
+
+ 1 pass
+ 0 fail
+ 6 expect() calls
+Ran 1 test across 1 file. [2.89s]
+exit=0
+
+=== GREEN: full module suite ===
+(pass) invokeTmuxSessionCreatedCallback > #given enabled callback outside literal tmux #when invoked #then delegates eligibility to the manager [0.07ms]
+
+ 777 pass
+ 0 fail
+ 2018 expect() calls
+Ran 777 tests across 65 files. [28.15s]
+exit=0
+
+=== DISCRIMINATION PROOF: production change reverted (git stash), RED test must FAIL ===
+Saved working directory and index state On fix/bg-wake-sse-render: discrimination-proof-evidence
+error: expect(received).toHaveLength(expected)
+
+Expected length: 2
+Received length: 1
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/.worktrees/bg-wake-sse-render/packages/omo-opencode/src/features/background-agent/parent-wake-noout-retry-dedupe.test.ts:104:34)
+(fail) ParentWakeNotifier no-output retry vs semantic dedupe hold > #given a dispatched parent wake recorded in the semantic dedupe hold #when the no-output retry re-flushes the byte-identical wake while the hold is still active #then a real second dispatch reaches the client [2819.29ms]
+
+ 0 pass
+ 1 fail
+ 6 expect() calls
+Ran 1 test across 1 file. [2.89s]
+On branch fix/bg-wake-sse-render
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	modified:   packages/omo-opencode/src/features/background-agent/parent-wake-history-state.ts
+	modified:   packages/omo-opencode/src/features/background-agent/parent-wake-prompt-dispatch.ts
+
+no changes added to commit (use "git add" and/or "git commit -a")
+Dropped refs/stash@{0} (6bde4ad19dba7cbcc316e034e98ab1fd4af1e815)
+
+=== RESTORED: RED test GREEN again ===
+
+ 1 pass
+ 0 fail
+ 6 expect() calls
+Ran 1 test across 1 file. [2.89s]
+
+=== TYPECHECK ===
+bun run typecheck exits 2 with 34 pre-existing errors, ALL in packages/omo-senpi + packages/senpi-task (missing @code-yeongyu/senpi module, present on base branch).
+Zero errors reference parent-wake-history-state.ts or parent-wake-prompt-dispatch.ts:
+NO_ERRORS_IN_TOUCHED_FILES
+packages/omo-senpi/src/components/config-startup/index.test.ts
+packages/omo-senpi/src/components/config-startup/index.ts
+packages/omo-senpi/src/components/fallback-architect/notice.ts
+packages/omo-senpi/src/components/fallback-architect/tip-message.ts
+packages/omo-senpi/src/components/lsp/adapter/renderers-common.ts
+packages/omo-senpi/src/components/lsp/adapter/renderers-diagnostics.ts
+packages/omo-senpi/src/components/lsp/adapter/renderers-navigation.ts
+packages/omo-senpi/src/components/lsp/adapter/renderers-rename.ts
+packages/omo-senpi/src/components/lsp/adapter/renderers-symbols.ts
+packages/omo-senpi/src/components/task/engine-runners.ts
+packages/omo-senpi/src/components/task/engine.ts
+packages/omo-senpi/src/components/task/message-renderers.test.ts
+packages/omo-senpi/src/components/task/renderers.ts
+packages/omo-senpi/src/components/task/team-service-test-model-registry.ts
+packages/omo-senpi/src/extension/tool-capture-registry.ts
+packages/omo-senpi/src/extension/types.ts
+packages/omo-senpi/src/senpi-test-runtime.ts
+packages/senpi-task/src/manager/types.ts
+packages/senpi-task/src/runners/rpc/handle.ts
+packages/senpi-task/src/runners/rpc/protocol-client.ts
+packages/senpi-task/src/runners/rpc/ui-auto-answer.ts
+packages/senpi-task/src/runners/types.ts
+packages/senpi-task/src/senpi/thinking-level.ts
+
+=== WHY IT IS ENOUGH ===
+Test drives the real ParentWakeNotifier + real prompt-async gate (only client stubbed),
+waits out the real 2s post-dispatch reservation, and asserts the retry lands inside the 15s
+semantic hold yet still reaches the client. Discrimination proof shows the same test fails
+without the production change, so it goes green for exactly this fix. Full module suite
+(777 tests, 65 files) green proves no regression, incl. parent-wake-window-requeue.test.ts.
+
+=== WHAT WAS OMITTED ===
+No secrets involved; full raw typecheck log kept at /tmp/typecheck-noout.log (senpi noise only).

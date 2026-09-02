@@ -1,0 +1,1 @@
+COMMAND: opencode run --model mockprov/mock-model --format json "Reply with exactly probe complete"

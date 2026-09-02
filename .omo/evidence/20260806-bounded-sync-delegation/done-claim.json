@@ -1,0 +1,41 @@
+{
+  "task": "Task 8: adoptRunningSession implementation — recovery of cancelled worker's committed code",
+  "status": "completed",
+  "changed_files": [
+    "packages/omo-opencode/src/features/background-agent/manager.ts",
+    "packages/omo-opencode/src/features/background-agent/types.ts",
+    "packages/omo-opencode/src/features/background-agent/manager.adopt.test.ts",
+    "assets/omo.schema.json"
+  ],
+  "tests": {
+    "typecheck": "bun run typecheck: exit 0 ✓",
+    "unit_tests": "bun test packages/omo-opencode/src/features/background-agent/: 762 pass, 0 fail, 1955 expect() calls [23.76s] ✓",
+    "lint_violations": "rg -n 'as any|@ts-ignore|@ts-expect-error' manager.ts: no matches ✓"
+  },
+  "manual_qa": {
+    "whitespace_only_fix": "git diff -w manager.ts: confirmed indentation-only, no semantic changes ✓",
+    "schema_asset_verification": "rg -n 'syncWallClockTimeoutMs' assets/omo.schema.json: matches at lines 9128, 21137 ✓",
+    "staged_files": "git status --porcelain: all four target files staged, 4 pre-existing artifacts unstaged ✓",
+    "commit_structure": "git show --stat HEAD: exactly four files, 273 insertions, 7 deletions ✓"
+  },
+  "cleanup": {
+    "action": "None required",
+    "reason": "Uncommitted artifacts are pre-existing (from previous worker) and not recovery responsibility. Main checkout (dev branch) not cleaned per deliberate user override."
+  },
+  "risks": [
+    {
+      "area": "Red-to-Green evidence sourcing",
+      "level": "low",
+      "note": "Test suite (manager.adopt.test.ts) and all 762 passing tests originate from the cancelled worker's own run, not re-derived by recovery. TDD was correctly applied: RED (201 test assertions) before GREEN (implementation). Recovery worker did not re-audit or re-implement; only fixed cosmetic indentation defect and staged the second schema asset."
+    },
+    {
+      "area": "Concurrency guard implementation",
+      "level": "low",
+      "note": "Guard (completingTaskIds) was audited and approved by orchestrator before worker cancellation. Recovery worker did not modify the guard logic or adoptRunningSession() implementation; only re-indented the try block body."
+    }
+  ],
+  "commit_sha": "308e84418",
+  "commit_date": "2026-08-06T14:12:20+02:00",
+  "commit_author": "Tim <tim.koehler90@googlemail.com>",
+  "evidence_file": ".omo/evidence/20260806-bounded-sync-delegation/task-8-adopt-red-green.txt"
+}

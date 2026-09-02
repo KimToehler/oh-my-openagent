@@ -1,0 +1,53 @@
+WHAT WAS TESTED
+- Rewrote `#when progress refreshes after both grace checks #then final activity re-read keeps task running` in `packages/omo-opencode/src/features/background-agent/manager.polling.test.ts`.
+- `session.todo()` queues a three-hop microtask refresh. This runs after the initial activity-grace check and after the memoized output revalidation, but before the authoritative `latestActivityAt` re-read.
+- Guard present: `bun test packages/omo-opencode/src/features/background-agent/manager.polling.test.ts`
+- Guard deleted in `/tmp/todo-gate-deadlock-mutation`: same targeted command.
+- Guard restored in real worktree: same targeted command.
+- Full feature tests: `bun test packages/omo-opencode/src/features/background-agent/`
+- Typecheck: `bun run typecheck`
+
+WHAT WAS OBSERVED
+1. Guard present:
+```
+bun test v1.3.14 (d1632b29)
+
+ 24 pass
+ 0 fail
+ 53 expect() calls
+Ran 24 tests across 1 file. [118.00ms]
+```
+
+2. Guard deleted in copied worktree:
+```
+Expected: "running"
+Received: "completed"
+
+(fail) BackgroundManager pollRunningTasks > #given idle output with incomplete todos > #when progress refreshes after both grace checks #then final activity re-read keeps task running [0.56ms]
+
+ 23 pass
+ 1 fail
+ 52 expect() calls
+Ran 24 tests across 1 file. [103.00ms]
+```
+
+3. Guard restored:
+```
+bun test v1.3.14 (d1632b29)
+
+ 24 pass
+ 0 fail
+ 53 expect() calls
+Ran 24 tests across 1 file. [93.00ms]
+```
+
+- Full feature suite: `878 pass`, `0 fail`, `2304 expect() calls`, `77 files`.
+- `bun run typecheck` exited 0.
+- Cleanup receipt: removed `/tmp/todo-gate-deadlock-mutation` after mutation run and `/tmp/todo-gate-deadlock-baseline` after baseline comparison.
+- LSP diagnostics could not initialize because workspace has no valid TypeScript installation. `bun run typecheck` supplied compiler verification.
+
+WHY IT IS ENOUGH
+The test begins with both todo-gate grace conditions expired. Its `session.todo()` interleave refreshes activity only after those stale checks, so task stays running only if authoritative re-read sees refreshed progress. Guard deletion completes task and triggers explicit `Expected: "running" Received: "completed"` assertion. Full suite and typecheck cover integration and static typing.
+
+WHAT WAS OMITTED
+No secrets, environment dumps, tokens, headers, or raw service logs captured.

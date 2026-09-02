@@ -1,0 +1,1 @@
+No secrets, host configuration, credentials, or full environment dump recorded. Sandbox paths include temporary OS directory only. No external provider request occurred.

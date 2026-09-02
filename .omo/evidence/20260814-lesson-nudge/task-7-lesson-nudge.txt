@@ -1,0 +1,41 @@
+TASK: Regenerate assets/oh-my-opencode.schema.json to include lessons.nudge config field
+TIME: 2026-08-14T00:00:00Z
+BRANCH: feat/lesson-nudge
+
+==== BUILD COMMAND ====
+bun run build:schema
+
+==== BUILD OUTPUT ====
+$ bun run script/build-schema.ts
+Generating JSON Schemas...
+✓ JSON Schemas generated: assets/omo.schema.json, assets/oh-my-opencode.schema.json
+
+==== GIT DIFF STAT ====
+ assets/oh-my-opencode.schema.json | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+==== JSON PATH TO LESSONS DEFINITION ====
+s.properties.lessons (top-level property in schema)
+
+==== EXTRACTED NUDGE PROPERTY ====
+{
+  "default": true,
+  "type": "boolean"
+}
+
+==== REQUIRED ARRAY ====
+["enabled","storage","max_files","max_body_chars","nudge"]
+
+VERIFICATION: nudge is present as 5th element with default=true
+
+==== IDEMPOTENCE TEST ====
+First build: SHA256 = ea8c013b4d969d71dc7b5fcfc446bb23a067bb7b113de9ffa41c4bdf838895f0
+Second build: SHA256 = ea8c013b4d969d71dc7b5fcfc446bb23a067bb7b113de9ffa41c4bdf838895f0
+RESULT: PASS (hashes identical, generator is deterministic)
+
+==== SUMMARY ====
+✓ Schema regenerated successfully
+✓ lessons.nudge property added with default: true
+✓ nudge added to required array
+✓ Idempotence verified (deterministic output)
+✓ Ready to commit

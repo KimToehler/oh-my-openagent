@@ -1,0 +1,149 @@
+================================================================
+TODO 9 - FULL REPOSITORY GATES vs RECORDED BASELINE
+================================================================
+Worktree : /Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge
+Branch   : feat/lesson-nudge
+Commit   : 48ca28d2a2e81092d82ae0f8982d9bff1e858541
+Baseline : .omo/evidence/20260814-lesson-nudge/baseline-dev.txt
+           (binding baseline = COMMITTED STATE: 13001 pass / 5 fail)
+NOTE     : `bun install` was NOT run. No product file was edited.
+
+----------------------------------------------------------------
+0. ARTIFACT-CONTAMINATION PRECHECK
+----------------------------------------------------------------
+$ git status --porcelain packages/omo-codex/scripts/install-dist/
+<EMPTY>
+VERDICT: install-local.mjs was NOT regenerated. Committed artifact still
+embeds 4.19.3 vs package.json 4.19.4, so the 5-failure committed-state
+baseline is the correct comparand. Count is NOT contaminated.
+
+----------------------------------------------------------------
+1. GATE: bun run build:schema
+----------------------------------------------------------------
+$ bun run build:schema
+Generating JSON Schemas...
+✓ JSON Schemas generated: assets/omo.schema.json, assets/oh-my-opencode.schema.json
+BUILD_SCHEMA_EXIT=0
+
+$ git status --porcelain
+<EMPTY>
+VERDICT: PASS. Regeneration produced byte-identical assets; generator is
+deterministic and the committed assets are current. No diff.
+
+----------------------------------------------------------------
+2. GATE: bun run typecheck
+----------------------------------------------------------------
+TYPECHECK_EXIT=0
+VERDICT: PASS. tsgo --noEmit + typecheck:script + typecheck:packages
+(27 package tsconfigs) all clean. Full output: typecheck.txt
+
+----------------------------------------------------------------
+3. GATE: bun test (FULL SUITE)
+----------------------------------------------------------------
+PASS  = 13015
+FAIL  = 5
+SKIP  = 3
+TOTAL = 13023 tests across 1706 files
+TIME  = 129.47s
+EXIT  = 1   <- EXPECTED (pre-existing failures), not an error
+
+----------------------------------------------------------------
+4. FAILURE-SET COMPARISON (name by name)
+----------------------------------------------------------------
+Extraction: grep -a "(fail)" /tmp/todo9-fulltest.txt | sort
+
+BASELINE SET (5, from baseline-dev.txt "BINDING BASELINE FOR THIS PR"):
+  B1 resolveSkillContentAsync > #given the shared ulw-plan skill source #when OpenCode skills are resolved #then ulw-plan is path-backed with workflow resources
+  B2 skill loader MCP parsing > deduplication > prioritizes project Agents ulw-plan over shared ulw-plan
+  B3 skill loader MCP parsing > deduplication > prioritizes project Claude ulw-plan over shared ulw-plan
+  B4 skill loader MCP parsing > deduplication > treats a project skill literally named shared/ulw-plan as a plain name, not a canonical alias
+  B5 script/codex-installer-version.test.ts #given the generated Codex installer #when release versions are synchronized #then its embedded package version matches the root release version
+
+OBSERVED SET (5, verbatim from this run):
+  O1 (fail) #given the generated Codex installer #when release versions are synchronized #then its embedded package version matches the root release version [4.19ms]
+  O2 (fail) resolveSkillContentAsync > #given the shared ulw-plan skill source #when OpenCode skills are resolved #then ulw-plan is path-backed with workflow resources [6.94ms]
+  O3 (fail) skill loader MCP parsing > deduplication > prioritizes project Agents ulw-plan over shared ulw-plan [6.87ms]
+  O4 (fail) skill loader MCP parsing > deduplication > prioritizes project Claude ulw-plan over shared ulw-plan [8.86ms]
+  O5 (fail) skill loader MCP parsing > deduplication > treats a project skill literally named shared/ulw-plan as a plain name, not a canonical alias [14.40ms]
+
+NAME-BY-NAME MATCH TABLE:
+  B1 <-> O2  MATCH  (packages/skills-loader-core, resolveSkillContentAsync)
+  B2 <-> O3  MATCH  (packages/skills-loader-core, dedup, project Agents)
+  B3 <-> O4  MATCH  (packages/skills-loader-core, dedup, project Claude)
+  B4 <-> O5  MATCH  (packages/skills-loader-core, dedup, literal shared/ulw-plan)
+  B5 <-> O1  MATCH  (script/codex-installer-version.test.ts, 4.19.3 vs 4.19.4)
+
+  Baseline-not-observed : NONE
+  Observed-not-baseline : NONE  <- no new failure, therefore NO REGRESSION
+
+>>> VERDICT: IDENTICAL. <<<
+The observed failure set is exactly the baseline's 5 names, one-to-one, with
+no additions and no removals. Distribution also matches: 4 in
+packages/skills-loader-core + 1 in script/codex-installer-version.test.ts.
+No test was deleted, skipped, or weakened to reach this result.
+
+----------------------------------------------------------------
+5. PASS-COUNT DELTA vs BASELINE 13001
+----------------------------------------------------------------
+  observed 13015 - baseline 13001 = +14 passing tests
+  total    13023 - baseline 13006 = +17 (13015 pass + 5 fail + 3 skip = 13023)
+  file count 1706 vs baseline 1704 = +2 files (the two new lesson-nudge test files)
+
+ACCOUNTING - net new `it(`/`test(` cases per changed test file
+(git diff a39320716...HEAD, counting added minus removed case declarations):
+
+  +7  packages/omo-opencode/src/hooks/lesson-nudge/hook.test.ts        (NEW file, +139 lines)
+  +4  packages/omo-opencode/src/plugin/hooks/create-session-hooks.test.ts (+78 lines)
+  +1  packages/omo-opencode/src/hooks/lesson-nudge/message.test.ts     (NEW file, +18 lines)
+  +1  packages/omo-opencode/src/config/schema.test.ts                  (+11 lines)
+  +1  packages/omo-opencode/src/config/schema/lessons.test.ts          (+2 added, -1 removed = net +1)
+  +0  packages/omo-opencode/src/config/validate.test.ts                (assertions extended inside existing cases, no new case)
+  ------
+  +14  TOTAL  ==  observed pass delta of +14.  EXACT MATCH.
+
+The two NEW files (hook.test.ts, message.test.ts) account for the +2 file
+delta. Every added passing test is attributable to a PR test file; no
+unexplained pass appeared and no previously passing test disappeared.
+
+----------------------------------------------------------------
+6. FROZEN-PATH ASSERTIONS (all four)
+----------------------------------------------------------------
+$ git diff --stat a39320716...HEAD -- packages/rules-engine
+<EMPTY>  -> PASS: rules-engine READ path untouched.
+
+$ git diff --stat a39320716...HEAD -- packages/omo-opencode/src/tools/record-lesson
+<EMPTY>  -> PASS: previously shipped record-lesson WRITE path untouched.
+
+$ git diff a39320716...HEAD -- packages/omo-opencode/src/shared/prompt-async-route-audit.test.ts
+<EMPTY>  -> PASS: audit test unchanged, so NO allowlist entry was added.
+
+$ bun test packages/omo-opencode/src/shared/prompt-async-route-audit.test.ts
+bun test v1.3.14 (d1632b29)
+
+ 10 pass
+ 0 fail
+ 10 expect() calls
+Ran 10 tests across 1 file. [962.00ms]
+-> PASS: GREEN.
+
+COMBINED SIGNIFICANCE OF ASSERTIONS 3 + 4:
+The raw-prompt audit test is byte-identical to its state at a39320716 (no new
+allowlist entry) AND it passes on this branch. A new session.prompt /
+session.promptAsync route would have required an allowlist edit to keep the
+audit green; no such edit exists and the audit is green. Therefore this PR
+introduces ZERO prompt-dispatch routes - the load-bearing safety property of
+the design holds.
+
+----------------------------------------------------------------
+7. OVERALL VERDICT
+----------------------------------------------------------------
+  build:schema     PASS (exit 0, no diff)
+  typecheck        PASS (exit 0)
+  bun test         13015 pass / 5 fail / 3 skip, exit 1 as expected
+  failure set      IDENTICAL to baseline - NO REGRESSION
+  pass delta       +14, fully accounted to PR test files
+  frozen paths     4/4 PASS
+  install-dist     clean, measurement uncontaminated
+
+No product file was edited. No test was weakened, skipped, or deleted.
+No commit was made. Evidence only.

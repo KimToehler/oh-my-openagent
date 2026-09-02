@@ -1,0 +1,392 @@
+TODO 10 LIVE QA FOR LESSON NUDGE: PASS
+========================================
+
+Date: 2026-08-14
+Worktree: /Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge
+Branch: feat/lesson-nudge
+Commit: bbc4db98320aad723146fdbcb83f0d9bfc16752f
+Runtime: opencode 1.18.15, bun 1.3.12, macOS
+
+VERDICT
+  PASS. S0, S1, S2, S3 all passed. Both per-case positive controls passed.
+  All three cross-checks behaved as required. Real user config and real opencode
+  DB were not touched. No source change or commit was made by this QA run.
+
+The prior failure record remains intact at:
+  .omo/evidence/20260814-lesson-nudge/task-10-live-qa-BLOCKED.txt
+
+
+WHAT WAS TESTED
+===============
+
+1. Preflight
+
+  Confirmed worktree was clean before work, on branch feat/lesson-nudge at
+  bbc4db98320aad723146fdbcb83f0d9bfc16752f.
+
+  Confirmed source fix exists at:
+    packages/omo-opencode/src/plugin/event-hook-dispatcher.ts:64
+
+    await runEventHookSafely("lessonNudge", hooks.lessonNudge, input);
+
+  The hook is passed bare. This matches its factory return type
+  `(input: LessonNudgeEvent) => Promise<void>` and the existing bare
+  `sessionNotification` precedent.
+
+2. Build and shipped bundle proof
+
+  Ran:
+    bun run build
+
+  Result: exit 0. Before live QA, bundle gate proved:
+
+    grep -acF 'runEventHookSafely("lessonNudge"' dist/index.js = 1
+
+  Bundle context:
+    await runEventHookSafely("lessonNudge", hooks2.lessonNudge, input);
+
+  Required plugin log strings remained in dist/index.js:
+
+    [lesson-nudge] registered nudge                         1
+    [context-injector] Inserted synthetic part with hook content 1
+    [oh-my-openagent] ENTRY - plugin loading                 1
+
+  `bun run build` dirtied exactly four tracked generated artifacts. Restored each
+  immediately with `git checkout --`:
+
+    packages/omo-codex/plugin/components/codegraph/dist/cli.js
+    packages/omo-codex/scripts/install-dist/install-local.mjs
+    packages/omo-senpi/plugin/extensions/omo-member.js
+    packages/omo-senpi/plugin/extensions/omo.js
+
+  The mutation cross-check rebuild dirtied those same four paths again. Restored
+  all four again. Final worktree status is empty.
+
+3. Exact live QA script
+
+  Re-ran the exact unmodified 296-line script already extracted from plan lines
+  262 through 557:
+
+    .omo/evidence/20260814-lesson-nudge/qa-script.sh
+
+  Byte identity assertion passed:
+
+    sed -n '262,557p' /Users/tim/git/oh-my-openagent/.omo/plans/2026-08-14-lesson-nudge.md \
+      | diff - .omo/evidence/20260814-lesson-nudge/qa-script.sh
+
+  The script used ONE long-lived `opencode serve` per case, isolated XDG dirs,
+  sandbox-local HOME config written after oqa_mk_isolated_xdg, a local reachable
+  mock model, the bracketed `[opencode]` config key, per-agent/category mock model
+  pins, unique session-ID log slicing, plugin-log assertions, and completed-turn
+  polling. `opencode run` was never used.
+
+4. Cross-check (b), config-key discriminator
+
+  Created a temporary script copy differing from qa-script.sh at exactly one line:
+
+    { "[opencode]": { "model": "mockprov/mock-model", ... }
+
+  changed to:
+
+    { "opencode": { "model": "mockprov/mock-model", ... }
+
+  No other diff. Ran it against a fresh isolated sandbox.
+
+5. Cross-check (c), log-provenance discriminator
+
+  Temporarily removed only the four-line `logger("[lesson-nudge] registered nudge",
+  ...)` call from:
+
+    packages/omo-opencode/src/hooks/lesson-nudge/hook.ts
+
+  Rebuilt, proved the registration string was absent from dist/index.js, then ran
+  the exact unchanged qa-script.sh. Restored hook.ts byte-for-byte from its
+  pre-mutation copy, rebuilt, restored generated tracked artifacts, and proved:
+
+    source SHA-1 before: 5fa8085b6c8ba7010a299770dc6b3c733ea2fc33
+    source SHA-1 after:  5fa8085b6c8ba7010a299770dc6b3c733ea2fc33
+    bundle dispatch count after restore: 1
+    bundle registration string count after restore: 1
+
+
+WHAT WAS OBSERVED
+=================
+
+Main exact-script run raw output: qa-run-pass.log
+
+  nudge length: 276
+  session: ses_ffffb2e8cffezGj9btICcmoC7S
+  S0 PASS
+  insertions=1 matching_len=1
+  insertions=1 registrations=1
+  default session: ses_ffffafe99ffe5c1lo6S6pAjqIT
+  reg=0 ins=0
+  S3 PASS (plugin loaded, gate off, zero lines)
+  ISOLATION OK
+  REAL DB UNCHANGED
+
+S0: PASS
+--------
+
+Artifact: main-s0-gate.txt (immutable main-run copy; shared s0-gate.txt was later overwritten by cross-check runs)
+
+  S0 PASS
+
+Gate-on session: ses_ffffb2e8cffezGj9btICcmoC7S
+Source-derived nudge length: 276, artifact nudge-length.txt
+
+Actual plugin registration line, exact session:
+
+  [2026-08-14T11:25:12.787Z] [rt:88685:7107] [lesson-nudge] registered nudge
+  {"sessionID":"ses_ffffb2e8cffezGj9btICcmoC7S","contentLength":276}
+
+Registration count for session: 1
+Required count: at least 1 within 30 seconds
+
+S1: PASS
+--------
+
+Artifact: main-insert-count-after-prompt2.txt (immutable main-run copy)
+
+  insertions=1 matching_len=1
+
+Actual plugin insertion line, exact session:
+
+  [2026-08-14T11:25:13.938Z] [rt:88685:7107] [context-injector] Inserted synthetic
+  part with hook content {"sessionID":"ses_ffffb2e8cffezGj9btICcmoC7S","contentLength":276}
+
+Insertion count after prompt 2: 1
+Insertion count whose contentLength exactly equals source-derived 276: 1
+Required counts: exactly 1 and exactly 1
+
+S2: PASS
+--------
+
+Artifact: main-insert-count-after-prompt3.txt (immutable main-run copy)
+
+  insertions=1 registrations=1
+
+After prompt 3:
+
+  insertion count: 1
+  registration count: 1
+
+Required counts: exactly 1 and exactly 1. No redelivery and no re-registration.
+
+S3: PASS
+--------
+
+Artifact: main-default-install-counts.txt (immutable main-run copy)
+
+  reg=0 ins=0
+  S3 PASS (plugin loaded, gate off, zero lines)
+
+Default-install session: ses_ffffafe99ffe5c1lo6S6pAjqIT
+
+  registration count: 0
+  insertion count: 0
+
+Required counts: exactly 0 and exactly 0.
+
+Positive controls: PASS for BOTH cases
+---------------------------------------
+
+Case A plugin-loaded control, artifact main-plugin-loaded-gate-on.txt:
+
+  [2026-08-14T11:25:10.751Z] [rt:88685:7107] [oh-my-openagent] ENTRY - plugin loading
+  {"directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.tLbnNkpGm1/proj"}
+
+Case A mock request count, artifact main-mock-requests-gate-on.txt:
+
+  2
+
+Case B plugin-loaded control, artifact main-plugin-loaded-default.txt:
+
+  [2026-08-14T11:25:23.061Z] [rt:88973:1d46] [oh-my-openagent] ENTRY - plugin loading
+  {"directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.TqbwwtkKaU/proj"}
+
+Case B mock request count, artifact main-mock-requests-default.txt:
+
+  2
+
+The plugin-loaded entries name different per-case sandbox project directories.
+Both cases also passed the script's completed assistant-turn polling before any
+count was trusted. This prevents a dead model or unexecuted idle event from
+masquerading as a default-install zero.
+
+Cross-check (a): PASS
+----------------------
+
+  grep -ac "context-injector" "$LOG" = 127
+
+Nonzero. Shared plugin-log surface was live. `-a` was used, so a binary-classified
+log could not silently convert valid matches into a false zero.
+
+Cross-check (b): PASS
+----------------------
+
+Artifact: xcheck-b-unbracketed.log
+
+Temporary script mutation: only `[opencode]` became unbracketed `opencode`.
+Result:
+
+  nudge length: 276
+  session: ses_ffff9a902ffeFwkaGrlDxp4I7k
+  FAIL S0: plugin IS loaded and a turn DID complete, but no [lesson-nudge] line
+           - the gate is off or the hook never ran
+
+This is required behavior. The positive controls still passed before the S0
+failure, proving the gate is not vacuous and the bracketed key matters.
+
+Cross-check (c): PASS
+----------------------
+
+Artifact: xcheck-c-log-removed.log
+
+Temporary source mutation: only hook.ts registration logger call removed. After
+rebuild:
+
+  grep -acF '[lesson-nudge] registered nudge' dist/index.js = 0
+  grep -acF 'runEventHookSafely("lessonNudge"' dist/index.js = 1
+
+Then exact qa-script.sh result:
+
+  nudge length: 276
+  session: ses_ffff82868ffeoKYjluG8wE22tC
+  FAIL S0: plugin IS loaded and a turn DID complete, but no [lesson-nudge] line
+           - the gate is off or the hook never ran
+
+This is required behavior. It proves S0 counts the specific hook logger line, not
+an unrelated source. hook.ts was restored exactly afterward, then rebuilt.
+
+Isolation and teardown: PASS
+----------------------------
+
+Artifacts: real-user-rules-before.txt, real-user-rules-after.txt, isolation.txt,
+session-count-before.txt, session-count-after.txt, log-inode.txt
+
+  Real ~/.omo/rules listing: byte-identical before and after
+  isolation.txt: ISOLATION OK
+
+  Real opencode DB session count before main live run: 2020
+  Real opencode DB session count after main live run:  2020
+
+  Plugin log inode before main live run: 53193481
+  Plugin log inode after main live run:  53193481
+
+No log rotation. Counts remain reliable.
+
+Teardown receipts, after main run and both cross-checks:
+
+  opencode serve processes: 0
+  mock-model.mjs processes: 0
+  tmux: no server running
+  Worktree git status: empty
+
+All sandboxes created by this QA run were removed by common.sh's EXIT trap:
+
+  main Case A: oqa-xdg.XXXXXX.tLbnNkpGm1
+  main Case B: oqa-xdg.XXXXXX.TqbwwtkKaU
+  cross-check B: sandbox removed
+  cross-check C: sandbox removed
+
+Only two pre-existing oqa-xdg directories remain. They date from 10:47 and 10:53,
+predate this run, and were deliberately left untouched:
+
+  oqa-xdg.XXXXXX.dfPpivIn1a
+  oqa-xdg.XXXXXX.O7pvpxn7nd
+
+
+WHY IT IS ENOUGH
+================
+
+This is a real live proof of the requested behavior, not a unit-only claim.
+
+The shipped dist bundle was rebuilt and checked before the live run. Its dispatch
+count changed from the previously broken 0 to 1. The three required plugin log
+strings remained bundled. This rules out spending a live run against stale code.
+
+The main run used separate isolated sandboxes and a local model for both cases.
+For each case, the plugin-loaded control named that case's own project directory,
+the mock-request control showed 2 real model requests, and completed-turn polling
+succeeded. Therefore S0 through S3 are not interpreted from silent no-op cases.
+
+Case A proves registration, delivery, matching source-derived content length, and
+once-only behavior. The log has exactly one registration at contentLength 276 and
+exactly one insertion at contentLength 276. Counts remain exactly one after a
+third prompt. Case B proves a default config produces zero registration and zero
+insertion while its plugin and model controls still work.
+
+The three cross-checks close the remaining vacuity routes:
+
+  1. Log surface exists and is readable: 127 context-injector entries.
+  2. Unbracketed config makes S0 fail despite valid plugin/model controls.
+  3. Removing the source logger makes S0 fail despite the dispatch remaining.
+
+The real rules listing and real DB count were unchanged across the main live run.
+The QA session did not touch real HOME config or real opencode storage. Plugin log
+inode did not change, so no rotation invalidated session-ID scoped counts.
+
+All acceptance items hold:
+
+  S0 registration at least once: PASS, 1
+  S1 insertion exactly once and length exactly matched: PASS, 1 and 1
+  S2 no second insertion or registration: PASS, 1 and 1
+  S3 default install silent: PASS, 0 and 0
+  Real user rules unchanged: PASS
+  Real DB unchanged: PASS, 2020 to 2020
+  Log inode unchanged: PASS, 53193481 to 53193481
+  Cross-check a, b, c: PASS
+
+
+WHAT WAS OMITTED
+================
+
+No API keys, auth headers, server passwords, or tokens are copied into evidence.
+The per-sandbox server password was random `oqa-*`, used only inside deleted temp
+directories. The mock provider used 127.0.0.1 with apiKey "not-needed". No vendor
+endpoint or real model was contacted.
+
+No source change was retained. The cross-check (c) mutation was mandated by the
+plan, limited to the logger call, captured in xcheck-c-log-removed.log, restored
+byte-for-byte, rebuilt, and verified clean by source checksum and git status.
+
+No commit was made. .omo is gitignored, so evidence files are not tracked. The
+prior BLOCKED evidence file was preserved unchanged. The build-generated tracked
+artifacts were restored after both builds. `dist/` is untracked and intentionally
+left with the rebuilt fixed bundle.
+
+No pre-existing oqa-xdg directories were deleted. Only directories created by this
+run were removed. No real ~/.codex or ~/.config/opencode file was touched.
+
+Artifact index:
+
+  qa-script.sh                    Exact plan script, unmodified
+  qa-run-pass.log                 Raw main live run output
+  main-session-id.txt             Immutable main-run gate-on session ID
+  main-default-session-id.txt     Immutable main-run default-install session ID
+  nudge-length.txt                Source-derived 276
+  main-s0-gate.txt                Immutable main-run S0 PASS
+  main-insert-count-after-prompt2.txt Immutable main-run S1 counts 1 and 1
+  main-insert-count-after-prompt3.txt Immutable main-run S2 counts 1 and 1
+  main-default-install-counts.txt Immutable main-run S3 counts 0 and 0
+  main-plugin-loaded-gate-on.txt  Immutable main-run Case A load proof
+  main-plugin-loaded-default.txt  Immutable main-run Case B load proof
+  main-mock-requests-gate-on.txt  Immutable main-run Case A request count 2
+  main-mock-requests-default.txt  Immutable main-run Case B request count 2
+  main-registration-line.txt      Exact main-run registration log line
+  main-insertion-line.txt         Exact main-run insertion log line
+
+  Note: qa-script.sh writes several generic artifact names. Cross-checks b/c
+  intentionally run that same script and overwrite those generic names. The
+  main-* copies above were captured from qa-run-pass.log and session-ID-scoped
+  plugin log lines after the main run, preserving immutable main-run evidence.
+  xcheck-b-unbracketed.log        Required failed S0 under unbracketed key
+  xcheck-c-log-removed.log        Required failed S0 after temporary logger removal
+  real-user-rules-before.txt      Real rules listing before main run
+  real-user-rules-after.txt       Real rules listing after main run
+  isolation.txt                   ISOLATION OK
+  session-count-before.txt        2020
+  session-count-after.txt         2020
+  log-inode.txt                   53193481 before and after
+  task-10-live-qa-BLOCKED.txt     Preserved previous defect record

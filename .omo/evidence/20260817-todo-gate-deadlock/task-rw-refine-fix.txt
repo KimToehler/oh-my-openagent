@@ -1,0 +1,60 @@
+WHAT WAS TESTED
+- TDD RED: bun test packages/omo-opencode/src/config/schema/background-task.test.ts after adding five truth-table regression cases.
+- GREEN: same focused schema suite after effective-value refine fix.
+- Type check: bun run typecheck.
+- Runtime regression: bun test packages/omo-opencode/src/features/background-agent/.
+- Schema generator: bun run build:schema.
+- Manual data-shaped surface QA: /tmp/todo-gate-schema-probe.ts imported BackgroundTaskConfigSchema and safeParsed all truth-table rows plus equality and one-millisecond boundary probes.
+
+WHAT WAS OBSERVED
+RED output:
+Expected: false
+Received: true
+at background-task.test.ts:137 for {"taskTtlMs":300000}
+
+Expected: false
+Received: true
+at background-task.test.ts:151 for {"taskTtlMs":500000}
+
+GREEN output:
+22 pass
+0 fail
+28 expect() calls
+Ran 22 tests across 1 file.
+The prior suite contained 17 tests. Those 17 remain unchanged; five cases were added.
+
+Typecheck: exit 0.
+Background-agent runtime suite:
+878 pass
+0 fail
+2304 expect() calls
+Ran 878 tests across 77 files.
+
+Schema generator: exit 0. It reported both assets generated. git status --short after generation listed only:
+ M packages/omo-opencode/src/config/schema/background-task.test.ts
+ M packages/omo-opencode/src/config/schema/background-task.ts
+Neither assets/omo.schema.json nor assets/oh-my-opencode.schema.json changed.
+
+Manual truth-table and boundary output:
+{"taskTtlMs":300000} success: false
+issue: ["taskTtlMs"] taskTtlMs must be greater than the todoGateGraceMs default (600000); set todoGateGraceMs explicitly to a lower value
+{"taskTtlMs":500000} success: false
+issue: ["taskTtlMs"] taskTtlMs must be greater than the todoGateGraceMs default (600000); set todoGateGraceMs explicitly to a lower value
+{"taskTtlMs":300000,"todoGateGraceMs":60000} success: true
+{"taskTtlMs":700000} success: true
+{} success: true
+{"taskTtlMs":600000} success: false
+issue: ["taskTtlMs"] taskTtlMs must be greater than the todoGateGraceMs default (600000); set todoGateGraceMs explicitly to a lower value
+{"taskTtlMs":600001} success: true
+
+Cleanup receipt: deleted /tmp/todo-gate-schema-probe.ts.
+
+WHY IT IS ENOUGH
+The regression tests pin every required default and explicit grace/TTL pairing and issue path. Manual QA exercises actual exported schema parsing. Equality rejection and one-millisecond acceptance verify >= boundary. Typecheck and 878 runtime tests show schema-only change did not disturb background agent behavior.
+
+WHAT WAS OMITTED
+- malformed_input: covered by exact equality and one-millisecond boundary probes.
+- stale_state: covered by post-generator git status; no unrelated generated files dirtied.
+- misleading_success_output: covered by recorded RED output and unchanged original 17 tests.
+- authorization, concurrency, resource_exhaustion, and persistence: not applicable. Pure local synchronous schema validation has no identity, concurrent state, resource lifecycle, or persistence surface.
+- LSP diagnostics: unavailable because workspace TypeScript LSP initialization failed: Could not find a valid TypeScript installation. bun run typecheck passed instead.

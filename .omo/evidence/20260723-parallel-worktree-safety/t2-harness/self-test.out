@@ -1,0 +1,7 @@
+== assert-dispatch --self-test ==
+-- running checks against synthetic (planted) data (MODE=override) --
+CHECK (ii) git-add-broad:   FAIL - found 'git add -A' / 'git add .' in a bash tool call
+CHECK (i)  burst-overlap:    FAIL(override) - overlapping de.json lanes (todo1&2) dispatched in same burst
+CHECK (iii) out-of-scope:     FAIL - committed file(s) outside any declared Files: scope: src/z_stray.ts
+
+SELF-TEST PASS: detector flagged all 3 planted violations (git add -A, same-burst overlap, stray commit)

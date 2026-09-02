@@ -1,0 +1,4 @@
+[qa-sandbox] isolated env ready under /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.UTAmCqJssl
+[qa-sandbox]   XDG_CONFIG_HOME=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.UTAmCqJssl/config
+[qa-sandbox]   CODEX_HOME=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.UTAmCqJssl/codex
+[qa-sandbox] host ~/.config/opencode and ~/.codex are untouched. Clean up: rm -rf "/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.UTAmCqJssl"

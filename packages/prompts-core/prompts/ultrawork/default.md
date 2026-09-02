@@ -150,8 +150,6 @@ task(task_id="ses_abc123", load_skills=[], run_in_background=false, prompt="Here
 | Hard problem (non-conventional) | task(category="artistry", load_skills=[...], run_in_background=true) | Different approach needed |
 | Implementation | task(category="...", load_skills=[...], run_in_background=true) | Domain-optimized models |
 
-**CODEGRAPH-FIRST:** When `codegraph_*` tools exist, use `codegraph_explore` for codebase how/where/what/flow questions and before edits; if absent, inactive/uninitialized, or cold-start unavailable, continue with explore agents, Read/Grep/Glob/LSP, and the ast-grep skill.
-
 **CATEGORY + SKILL DELEGATION:**
 ```
 // Frontend work
@@ -256,7 +254,7 @@ The real-surface artifact is always required. A test is required only where a co
 | Adds/modifies a CLI command | Run the command with Bash. Show the output. |
 | Changes build output | Run the build. Verify the output files exist and are correct. |
 | Modifies API behavior | Call the endpoint. Show the response. |
-| Changes UI rendering | Use Chrome to drive the REAL page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Capture screenshot + action log. |
+| Changes UI rendering | Use Chrome to drive the REAL page; if Chrome is not available, download and use agent-browser (https://github.com/vercel-labs/agent-browser). Capture screenshot + action log. NEVER clear cookies, cache, or site data (`Network.clearBrowserCookies`, `Storage.clearCookies`, `chrome.browsingData.remove`, "clear browsing data") on the user's real/main browser profile — it wipes their logged-in state. If you need that profile's login state, clone it first (`rsync -a <profile>/ <tmp-clone>/`) and launch Chrome / agent-browser against the clone as the user-data-dir; run any clearing there only. |
 | Changes UI rendering or a TUI/terminal layout (incl. CJK/Korean/Japanese/Chinese text) | Load the visual-qa skill: capture reference + actual screenshots (web) or the xterm.js web terminal render (TUI; NEVER `tmux capture-pane` - it degrades color and CJK width), run its bundled pixel-diff / column-width script, and get the dual read-only verdict (design-system + functional integrity, and visual fidelity + CJK precision). Record the diff/score artifact. |
 | Changes a desktop/GUI (non-page) surface | Computer use: OS-level GUI automation against the running app. Capture action log + screenshot. |
 | Adds a new tool/hook/feature | Test it end-to-end in a real scenario. |

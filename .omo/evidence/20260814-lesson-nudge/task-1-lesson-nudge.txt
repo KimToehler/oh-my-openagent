@@ -1,0 +1,82 @@
+TASK 1 - BASELINE TEST MEASUREMENT (measurement only, no product files edited)
+
+Worktree: /Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge
+Branch:   feat/lesson-nudge
+Commit:   a39320716e2a152eac4acfa4cb3772b9397685c3
+
+WHAT WAS TESTED
+---------------
+Full root Bun test suite, to establish the pre-change failure baseline that a
+later todo compares against by exact failure-name set.
+
+Commands run (in the worktree):
+  1. bun install --frozen-lockfile        # worktree had NO node_modules; see NOTE
+  2. bun test > /tmp/lesson-nudge-baseline-full.txt 2>&1 ; echo "EXIT=$?"
+  3. tail -40 /tmp/lesson-nudge-baseline-full.txt      -> baseline-dev.txt
+  4. grep -a "(fail)" /tmp/lesson-nudge-baseline-full.txt | sort
+                                                       -> baseline-failure-names.txt
+  5. bun test script/codex-installer-version.test.ts   # targeted re-check, see FINDING
+
+WHAT WAS OBSERVED
+-----------------
+PASS=13002
+FAIL=4
+SKIP=3
+TOTAL=13009 tests across 1704 files, 83284 expect() calls, runtime 130.38s
+EXIT=1 (non-zero is expected with pre-existing failures)
+
+Failing test names (complete, 4 of 4):
+(fail) resolveSkillContentAsync > #given the shared ulw-plan skill source #when OpenCode skills are resolved #then ulw-plan is path-backed with workflow resources
+(fail) skill loader MCP parsing > deduplication > prioritizes project Agents ulw-plan over shared ulw-plan
+(fail) skill loader MCP parsing > deduplication > prioritizes project Claude ulw-plan over shared ulw-plan
+(fail) skill loader MCP parsing > deduplication > treats a project skill literally named shared/ulw-plan as a plain name, not a canonical alias
+
+All 4 live in packages/skills-loader-core (opencode-skill-loader ulw-plan dedup);
+assertions fail with Received: "opencode" against Expected: "project" / "shared".
+
+FINDING - BASELINE MOVED (4, not the expected 5)
+------------------------------------------------
+Expected baseline was 5 failures: 4 in packages/skills-loader-core + 1 in
+script/codex-installer-version.test.ts. The 4 skills-loader-core failures match
+exactly. The 5th does NOT reproduce here.
+
+Verification of the missing 5th:
+  - script/codex-installer-version.test.ts exists in this worktree.
+  - It does not appear anywhere in the full-run output as a failure.
+  - Re-run in isolation: "1 pass, 0 fail, 2 expect() calls".
+So codex-installer-version now PASSES at commit a39320716 in this worktree.
+
+Per instructions this is reported, not repaired. No test was fixed, skipped, or
+deleted. Later comparisons must use the 4-name set above, not the expected 5.
+
+NOTE ON THE ENVIRONMENT (why the first run was discarded)
+---------------------------------------------------------
+The fresh worktree had no node_modules. The first `bun test` aborted early with
+module-resolution errors ("Cannot find package 'typebox'", "Cannot find module
+'@mariozechner/pi-tui'", unresolved @oh-my-opencode/omo-opencode/config-migration)
+and produced only 295 lines - not a valid baseline. After
+`bun install --frozen-lockfile` (1102 packages, postinstall build to dist/index.js),
+the suite ran to completion with the numbers above. Only the completed run is
+recorded as the baseline.
+
+WHY THIS IS ENOUGH
+------------------
+The run is a complete, uninterrupted full-suite pass over all 1704 test files with
+an explicit terminal summary line, so the pass/fail counts and the failure-name set
+are exact rather than sampled. Failure names were enumerated mechanically from the
+raw output via grep on the "(fail)" marker, so the later post-change comparison can
+be done as an exact set diff. The one deviation from the expected baseline was
+independently re-verified by running that single test file on its own.
+
+WHAT WAS OMITTED
+----------------
+No secrets, tokens, env dumps, or auth headers were involved or captured. The full
+raw log is a local temp artifact at /tmp/lesson-nudge-baseline-full.txt; only the
+tail and the failure-name list are committed as evidence to keep the files
+reviewer-readable.
+
+FILES WRITTEN
+-------------
+.omo/evidence/20260814-lesson-nudge/baseline-dev.txt
+.omo/evidence/20260814-lesson-nudge/baseline-failure-names.txt
+.omo/evidence/20260814-lesson-nudge/task-1-lesson-nudge.txt

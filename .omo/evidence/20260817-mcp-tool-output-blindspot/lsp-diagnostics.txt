@@ -1,0 +1,3 @@
+LSP diagnostics attempted on tool-execute-after.ts, tracker.ts, hook.ts, tool-output-text.ts.
+Result: unavailable. MCP LSP could not initialize: Could not find a valid TypeScript installation, despite worktree node_modules installed.
+Fallback verification: bunx tsgo --noEmit -p packages/omo-opencode/tsconfig.json exited 0; see typecheck.log.

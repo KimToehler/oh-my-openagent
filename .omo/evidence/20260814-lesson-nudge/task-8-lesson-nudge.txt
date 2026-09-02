@@ -1,0 +1,83 @@
+Evidence: todo 8 - hook counts and lesson-nudge scope documentation
+Branch: feat/lesson-nudge
+Worktree: /Users/tim/git/oh-my-openagent/.worktrees/lesson-nudge
+
+=== Ground-truth commands ===
+
+1. Hook directory count
+$ ls -d packages/omo-opencode/src/hooks/*/ | wc -l
+63
+
+2. Session tier slot count (counting properties in `SessionHooks` type)
+Source: packages/omo-opencode/src/plugin/hooks/create-session-hooks.ts
+Result: 25
+
+3. Hook enum size (counting entries in `HookNameSchema`)
+Source: packages/omo-opencode/src/config/schema/hooks.ts
+Result: 57
+
+4. `lesson-nudge` appears in docs/reference/configuration.md
+$ grep -c 'lesson-nudge' docs/reference/configuration.md
+1
+
+=== Doc-vs-enum recount ===
+
+Script: node -e (counts `SessionHooks` slots, `HookNameSchema` entries, and configuration.md "Available hooks" list)
+Output:
+SessionHooks slots: 25
+HookNameSchema entries: 57
+configuration.md list: 57
+Config equals enum: true
+
+=== Mutation check (vacuity test) ===
+
+A copy of docs/reference/configuration.md had one hook (`startup-toast`) removed from the inline list, then the same recount was run.
+Output:
+Enum count: 57
+Mutated config list (missing startup-toast): 56
+Mutated equals enum: false
+Restored config list: 57
+Restored equals enum: true
+
+=== Numbers changed (file, line, before, after, recomputation method) ===
+
+AGENTS.md (root)
+- line 61: 53-62 / 62 dirs -> 53-63 / 63 dirs
+  recomputed: ls -d packages/omo-opencode/src/hooks/*/ | wc -l = 63
+- line 76: 53-62 / 62 dirs -> 53-63 / 63 dirs
+  recomputed: same directory count
+- line 277: Session 24 -> 25; 58 -> 59; 5 gated -> 6 gated; 62 max -> 63 max
+  recomputed: counted the 25 properties in `SessionHooks`; 25+18+7+7+2=59; 6 config-gated-by-default slots (team-tool-gating, team-mode-status-injector, team-mailbox-injector, monitor-status-injector, goal, lesson-nudge); 59 + 4 direct team event handlers = 63
+
+packages/omo-opencode/src/AGENTS.md
+- line 76 (and surrounding): createSessionHooks() # 22 -> # 25, and added missing `codegraphBootstrap`, `astGrepSgProvision`, and `lessonNudge` to the name list
+  recomputed: counted the 25 properties in `SessionHooks`
+- line 105: 53 base, 60 with team-mode -> 53 base, 63 with team-mode
+  recomputed: 53 active by default unchanged; max = 59 composed slots + 4 direct team event handlers = 63
+- line 112: 53-60 / 60 dirs -> 53-63 / 63 dirs
+  recomputed: ls -d packages/omo-opencode/src/hooks/*/ | wc -l = 63
+  (This also corrected the pre-existing stale 53-60 / 60 dirs value that had survived from earlier count drift.)
+
+packages/omo-opencode/src/plugin/AGENTS.md
+- line 33: Session 24 -> 25
+  recomputed: counted the 25 properties in `SessionHooks`
+- line 37: create-core-hooks aggregator 49 -> 50
+  recomputed: 25 (Session) + 18 (Tool Guard) + 7 (Transform) = 50
+
+docs/reference/configuration.md
+- line 589: inserted `lesson-nudge` immediately after `category-skill-reminder` in the "Available hooks" list
+  recomputed: verified `HookNameSchema` order; `lesson-nudge` follows `category-skill-reminder`
+  doc-vs-enum recount after insertion: 57 entries match
+
+docs/reference/features.md
+- line 142: 54 base hooks / 61 with team-mode -> 59 total slots / 63 with team-mode
+  recomputed: 25+18+7+7+2 = 59; max = 59 + 4 direct team event handlers = 63
+- line 906-912: Session 24 -> 25, Tool Guard 16 -> 18, Transform 5 -> 7, Total base 54 -> Total slots 59, With team_mode enabled 61 -> 63
+  recomputed: counted each tier's return-type properties in the source files
+
+=== Exact limitation sentence added to docs/reference/features.md ===
+
+"The `lesson-nudge` hook is registered when a session goes idle and is delivered on the next user message. This makes it effective in the TUI and under `opencode serve`, but it does not fire under `oh-my-opencode run`, which exits between turns and takes that in-memory state with it."
+
+=== git diff --check ===
+exit 0 (no whitespace errors)

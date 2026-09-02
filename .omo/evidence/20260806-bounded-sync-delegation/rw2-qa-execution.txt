@@ -1,0 +1,654 @@
+================================================================================
+RW2 QA EXECUTION - bounded sync delegation (task tool wall-clock yield)
+================================================================================
+Reviewer lane : RW2 (hands-on QA, behavior not code)
+Repo          : /Users/tim/git/oh-my-openagent
+Range         : aa44f8048..HEAD (973d7857b), 12 commits
+Date started  : 2026-08-06
+Surface       : OpenCode plugin `task` delegation tool, driven via `opencode run --format json`
+
+STATUS: IN PROGRESS - scenarios + task list written BEFORE any execution (per process).
+Results are appended below as each test completes.
+
+================================================================================
+SECTION 0 - PRE-FLIGHT AUDIT (what I read before writing scenarios)
+================================================================================
+
+0.1 STALE DIST TRAP - CONFIRMED REAL
+    $ ls -la dist/index.js
+    -rw-r--r--@ 1 tim staff 5747578  5 Aug. 14:08 dist/index.js
+    $ grep -c "wall_clock_yield" dist/index.js      -> 0
+    $ grep -c "adoptRunningSession" dist/index.js   -> 0
+    dist/index.js is dated 5 Aug, one day before these commits, and contains
+    NEITHER new symbol. Any run that loads dist proves nothing about this change.
+    => every run below MUST load plugin from
+       file:///Users/tim/git/oh-my-openagent/packages/omo-opencode/src/index.ts
+       and MUST prove which path ran (config echo + a source-only symbol in output).
+
+0.2 HOME LEAK TRAP - CONFIRMED REAL
+    script/agent/qa-sandbox.sh exports XDG_* + CODEX_HOME + OMO_QA_ROOT.
+    It does NOT export HOME. omo-config-core resolves the user config layer
+    (~/.omo/omo.json[c]) from HOME. Real ~/.omo/omo.jsonc would leak in and can
+    route agents at real paid models.
+    => every run below sets HOME to a sandbox dir AFTER sourcing qa-sandbox.sh.
+
+0.3 CODE PATH READ (source of truth for expectations)
+  - sync-session-poller.ts:116-119
+      if (Date.now() - pollStart >= wallClockTimeoutMs) return { kind:"wall_clock_yield" }
+      NOTE: checked at TOP of loop, BEFORE the abort check (line 121) and before
+      the 1s wait. So a yield can win a race against an abort in the same tick.
+  - sync-session-poller.ts:69
+      wallClockTimeoutMs = input.syncWallClockTimeoutMs ?? getDefaultSyncWallClockTimeoutMs()
+      timing.ts:8 MAX_WALL_CLOCK_MS = Infinity  -> module default is INFINITE.
+      The 10-min default comes only from tool-registry-core-tools.ts:68
+      `?? 600_000`. So a caller constructing the tool WITHOUT that registry path
+      gets no bound at all. Worth a scenario.
+  - sync-task.ts:142-161 on yield:
+      manager.adoptRunningSession({...}) then returns a text blob containing
+      "Sync task moved to background." + "Background Task ID: bg_xxxxxxxx"
+      + "Do NOT call background_output now. Wait for <system-reminder>".
+  - sync-task.ts:182 finally: `if (syncSessionID && !yieldedToBackground)`
+      => on yield the child session is NOT aborted and NOT cleaned up.
+      IMPORTANT CONSEQUENCE: cleanupSyncSessionSideEffects is skipped, so the
+      child session stays in `syncSubagentSessions`. plugin/event.ts:55
+      shouldAutoRetrySession() returns true for members of that set. Possible
+      interaction worth probing.
+  - manager.ts adoptRunningSession():
+      id = `bg_${crypto.randomUUID().slice(0,8)}`
+      prompt = "[already prompted]"   <-- sentinel; if a fallback RETRY ever
+        resumes this task it would re-prompt with that literal string. Probe.
+      status "running", startedAt=now, progress.toolCalls=0
+      subagentSessions.add, setSessionAgent, addTask, taskHistory.record,
+      startPolling(), updateBackgroundTaskMarker(parent)
+      NOTE: it does NOT add to pendingByParent. notifyParentSession() line 2720
+      falls back to a scan of this.tasks when pendingByParent has no entry, so
+      allComplete should still compute. Must verify empirically (this is the
+      delivery question).
+  - manager.ts poll loop (3104+): running tasks with idle/terminal session status
+      -> validateSessionHasOutput -> checkSessionTodos -> tryCompleteTask
+      -> notifyParentSession -> queuePendingParentWake -> parent wake prompt.
+      This is the theoretical delivery path. UNPROVEN end-to-end.
+  - manager.ts session.deleted (1915+): cancels tasks whose session was deleted
+      AND all descendant tasks. An adopted task IS in this.tasks, so deleting the
+      PARENT session should cancel it. Probe (orphan question).
+  - config schema background-task.ts:27 syncWallClockTimeoutMs z.number().min(60000).optional()
+
+================================================================================
+SECTION 1 - SCENARIO BRAINSTORM (written before execution)
+================================================================================
+Legend: [NEW] not covered by prior lanes, [EXT] extends prior coverage.
+
+S01 [NEW] Adopted child's RESULT delivery: after adoption, does the parent
+    actually receive the child's output (a <system-reminder> [BACKGROUND TASK
+    COMPLETED] wake containing the child's text), or does the child just die
+    quietly? THE BIGGEST OPEN QUESTION.
+S02 [NEW] background_output(bg_id) on an adopted task id: does it resolve at all
+    (id is in this.tasks) and does it return the child's real output?
+S03 [NEW] background_output on an adopted task WHILE STILL RUNNING: what does it
+    say - "still running" vs error vs empty?
+S04 [NEW] Parent session ABORTED (ESC) after adoption while child still runs:
+    is the child cancelled, or does it keep burning tokens?
+S05 [NEW] Parent session ENDS naturally (opencode run exits) with adopted child
+    still running: orphan? Does the child process keep running after the server
+    tears down? Does anything leak?
+S06 [NEW] Parent session DELETED while adopted child runs: manager.ts:1915
+    should cancel it. Verify the child session actually stops.
+S07 [NEW] TWO adopted children from the same parent simultaneously: two distinct
+    bg_ ids, both adopted, both eventually complete, and the parent gets a
+    coherent notification (allComplete accounting with no pendingByParent entry).
+S08 [NEW] Adoption when the CHILD ITSELF spawned background children: the child
+    has active grandchildren at the moment of yield. Does adoption corrupt the
+    child's own wake accounting (rootDescendantCounts / getAllDescendantTasks)?
+S09 [NEW] Bound EXACTLY at the 60000 minimum: schema accepts, run yields at ~60s.
+S10 [NEW] Bound BELOW the minimum (59999): schema must REJECT (config validation
+    error), not silently clamp or silently accept.
+S11 [NEW] Bound = 0 / negative / non-number ("abc") / null: schema behavior.
+S12 [NEW] Model behavior with the handle: does the returned text actually stop
+    the model from treating the handle as the answer? (Text says "Do NOT call
+    background_output now" - check the parent does not immediately poll.)
+S13 [NEW] Boundary race: child finishes at ~ the same instant as the bound.
+    Both a "just before" and "just after" variant. No double-completion, no
+    "Unexpected sync poll outcome" throw, no orphan bg task.
+S14 [EXT] REGRESSION fast sync: child completes in ~5s with a 600s bound - must
+    return the REAL RESULT inline exactly as before, no bg_ handle anywhere.
+S15 [EXT] REGRESSION run_in_background=true: unchanged async path, returns bg_
+    handle immediately (well under the bound), result later.
+S16 [NEW] REGRESSION run_in_background OMITTED entirely (GH #4119): must NOT
+    throw, must default to sync. Check log line "run_in_background omitted;
+    defaulting to false".
+S17 [NEW] run_in_background passed as the STRING "false" / "true" (LLMs do this):
+    no throw, sane routing.
+S18 [NEW] Wall-clock vs inactivity independence: a child that is CONTINUOUSLY
+    busy never trips the inactivity window (that is the whole point) - confirm
+    the yield is attributable to the wall clock, by log line
+    "[task] Poll wall-clock timeout reached", not "inactivity timeout".
+S19 [NEW] Inactivity timeout still works when it is SHORTER than the wall clock:
+    syncPollTimeoutMs=60s + wall clock=600s, child idles -> must ERROR/abort via
+    inactivity, NOT yield.
+S20 [NEW] Wall clock SHORTER than inactivity (the default shape): 60s vs 30min
+    -> yield wins. (this is the already-proven core; used as control)
+S21 [NEW] Adopted task appears in the background task marker / task list surface
+    the parent sees (updateBackgroundTaskMarker was called).
+S22 [NEW] `prompt: "[already prompted]"` sentinel: if the adopted task hits the
+    fallback-retry path (session error after adoption), does it re-prompt the
+    literal string "[already prompted]"? That would be a real bug.
+S23 [NEW] Adopted child that ERRORS after adoption: parent gets an ERROR
+    notification, not silence.
+S24 [NEW] No-registry construction: tool built without tool-registry-core-tools
+    -> wall clock is Infinity (timing.ts default). Confirm the ONLY thing giving
+    users a 10-min default is that one `?? 600_000`.
+S25 [NEW] Nested delegation: parent -> child -> grandchild, and the bound trips
+    on the CHILD's own sync delegation (depth 2). Adoption at depth.
+S26 [NEW] Task-toast state: sync-task.ts finally removes the toast even on
+    yield (line 167 runs in the inner finally). Confirm no stale sync toast is
+    left showing a task that is now a bg task.
+S27 [NEW] handedBackSyncSessions: on yield the session is NOT added to it (the
+    guard is `!yieldedToBackground`). Confirm the todo-continuation-enforcer
+    does not double-drive the adopted child (two agents working concurrently).
+S28 [NEW] syncSubagentSessions leak on yield: cleanup is skipped, so the id
+    stays in that Set forever for the process lifetime. Probe whether that
+    changes parent auto-retry behavior (event.ts:55).
+S29 [NEW] Two SEQUENTIAL adoptions in one parent turn (adopt, then delegate
+    again and adopt again): ids distinct, no state clobber.
+S30 [NEW] Adopted id format/collision: `bg_` + 8 hex chars = 32 bits. Confirm
+    format matches what background_output accepts (`bg_...`).
+
+--- STEP 2 AUGMENT: careless/hostile user + environment ---
+S31 [NEW] HOSTILE: syncWallClockTimeoutMs set to a huge value (Number.MAX_SAFE_
+    INTEGER) - no overflow, behaves as "effectively never".
+S32 [NEW] HOSTILE: syncWallClockTimeoutMs = syncPollTimeoutMs exactly. Which
+    wins? (poller checks inactivity first at line 111, then wall clock at 116,
+    so inactivity should win a tie.) Determinism matters.
+S33 [NEW] CARELESS: config key typo'd (syncWallclockTimeoutMs, lowercase c).
+    Silently ignored -> user gets the 600s default and thinks they set 60s.
+    Does the schema reject unknown keys or pass through?
+S34 [NEW] ENV: provider is slow/hanging (no bytes at all). Child status never
+    becomes busy. Does the wall clock still fire, or does something earlier
+    (WAIT_FOR_SESSION_TIMEOUT_MS=60s) win?
+S35 [NEW] ENV: the opencode server dies mid-adoption (kill -9). Does the plugin
+    leave a dangling running task / does the harness leak processes?
+S36 [NEW] CARELESS: parent immediately calls background_output(bg_id) despite the
+    "Do NOT" instruction - must not crash, must not deadlock.
+S37 [NEW] HOSTILE: `syncWallClockTimeoutMs` set in the PROJECT layer vs USER
+    layer - which wins, and is it honored at all from the project layer?
+S38 [NEW] ENV: two independent opencode runs in the SAME sandbox concurrently,
+    each adopting - no cross-talk of bg ids / notifications.
+S39 [NEW] CLEANUP: after every run, no leftover `sleep` child processes, no
+    bound fake-provider port, no live opencode process.
+S40 [NEW] ISOLATION: real ~/.local/share/opencode/opencode.db session count
+    unchanged across the whole lane (and if it moves, prove my sessions are not
+    the cause by targeted query on the ids I created).
+
+================================================================================
+SECTION 2 - PRIORITIZED TASK LIST
+================================================================================
+P0 (must pass - a failure here blocks the change)
+  T1  S01  adopted child's result is DELIVERED to the parent
+  T2  S02+S03 background_output on an adopted bg_ id (running + completed)
+  T3  S14  REGRESSION fast sync returns the real result inline
+  T4  S15  REGRESSION run_in_background=true unaffected
+  T5  S16  REGRESSION run_in_background omitted does not throw (GH #4119)
+  T6  S09+S10 schema boundary: 60000 accepted, 59999 rejected
+  T7  S05  parent run ends with adopted child still running -> orphan check
+  T8  S18+S20 yield is attributable to the WALL CLOCK (log-proven), not inactivity
+  T9  S39+S40 cleanup receipts + isolation numbers
+
+P1 (should pass)
+  T10 S07  two simultaneous adopted children
+  T11 S04  parent aborted (ESC) after adoption
+  T12 S19  inactivity shorter than wall clock still errors (no yield)
+  T13 S13  boundary race child-finishes-at-the-bound
+  T14 S12  model does not treat the handle as the result
+  T15 S24  no-registry construction => Infinity (default only from `?? 600_000`)
+  T16 S06  parent session deleted -> adopted task cancelled
+  T17 S11+S33 malformed / typo'd config values
+
+P2 (nice to have)
+  T18 S08  adoption while child has its own background children
+  T19 S22  "[already prompted]" sentinel on fallback retry
+  T20 S25  nested depth-2 adoption
+  T21 S27+S28 handedBackSyncSessions / syncSubagentSessions leak on yield
+  T22 S31+S32 huge value / exact tie between the two timeouts
+  T23 S17  string "false"/"true" for run_in_background
+  T24 S29  two sequential adoptions in one parent turn
+
+================================================================================
+SECTION 3 - EXECUTION RESULTS
+================================================================================
+Harness written by this lane (new files, no existing artifact overwritten):
+  rw2-fake-llm.mjs  - generalized scriptable fake OpenAI provider
+  rw2-run.sh        - one invocation = one scenario, HOME+XDG sandboxed,
+                      plugin loaded from SOURCE, watchdog-bounded
+Run outputs (raw): /tmp/omo-qa-rw2/out/<label>/
+
+--------------------------------------------------------------------------------
+[PASS] T0-STALE-DIST  plugin ran from SOURCE, not stale dist   (P0 pre-condition)
+--------------------------------------------------------------------------------
+STEPS    grep new symbols in dist/index.js vs packages/omo-opencode/src
+EXPECTED dist lacks them; runs must load file://.../src/index.ts
+ACTUAL   $ ls -la dist/index.js
+         -rw-r--r--@ 1 tim staff 5747578  5 Aug. 14:08 dist/index.js
+         symbol                             dist   src
+         "Sync task moved to background."     0      1
+         wall_clock_yield                     0     10
+         adoptRunningSession                  0      8
+         "Poll wall-clock timeout reached"    0      1
+         Every run config contains:
+           "plugin": ["file:///Users/tim/git/oh-my-openagent/packages/omo-opencode/src/index.ts"]
+         And every run's live log emitted a SOURCE-ONLY string, e.g.
+           [task] Poll wall-clock timeout reached {"sessionID":"ses_028ad9d8...","pollCount":60}
+           task tool output: "Sync task moved to background."
+         Neither string exists in dist, so the source path demonstrably ran.
+EVIDENCE /tmp/omo-qa-rw2/out/*/opencode.jsonc, */plugin.log, */sandbox-tool-outputs.txt
+
+--------------------------------------------------------------------------------
+[PASS-with-finding] T1  adopted child's RESULT delivery to the parent      (P0)
+--------------------------------------------------------------------------------
+STEPS    WALL_MS=60000, child emits 12x `sleep 6` bash calls (continuously busy),
+         parent holds its turn open 200s after the task tool returns.
+         Child's final answer is the unique token CHILD_DELIVERABLE_PAYLOAD_9F3A.
+EXPECTED parent receives the child's completion, with the result reachable.
+ACTUAL   fake-llm branch log (t0 = provider start):
+           t+7.2s   branch=parent-task-call {"run_in_background":"false"}
+           t+7.2s   branch=child  childTurn=1
+           ... continuous child turns ...
+           t+67.7s  branch=parent-hold          <- parent turn RESUMED (yield)
+           t+67.8s  branch=child  childTurn=11  <- child still working AFTER yield
+           t+79.8s  branch=child-done           <- child finished naturally
+           t+187.8s branch=wake {"bgIds":["bg_42e1bc4d"]}
+         yield at 67.7-7.2 = 60.5s after the task call, against a 60000ms bound.
+         task tool output actually returned to the parent:
+           Sync task moved to background.
+           Background Task ID: bg_42e1bc4d
+           Description: wallclock busy child 1
+           Agent: explore
+           Status: still running
+           Do NOT call background_output now. Wait for <system-reminder> ...
+         The parent DID receive a completion notification (real DB row):
+           <system-reminder>
+           [BACKGROUND TASK COMPLETED]
+           [ALL BACKGROUND TASKS COMPLETE]
+           **Completed:**
+           - `bg_42e1bc4d`: wallclock busy child 1
+           All sibling background tasks are complete. Your next action should be
+           to call `background_output(task_id="<id>")` for each task ID above.
+           </system-reminder>
+         FINDING (documented behavior, not a regression): the notification does
+         NOT inline the child's text. My provider asserted this explicitly:
+           WAKE_ACK payload_present=false bg_ids=bg_42e1bc4d
+         The payload CHILD_DELIVERABLE_PAYLOAD_9F3A exists only in the CHILD
+         session's part row; the parent must call background_output to fetch it.
+         That is exactly what the notification instructs, and it matches the
+         pre-existing run_in_background=true contract (see T4). So delivery is
+         BY HANDLE + INSTRUCTION, not by value.
+VERDICT  Notification delivery: PROVEN. Result-by-value inlining: PROVEN ABSENT
+         and consistent with the async path. No work lost, nothing silently dropped.
+EVIDENCE /tmp/omo-qa-rw2/out/t1-delivery/{fake-llm.log,sandbox-tool-outputs.txt,
+         sandbox-text-parts.txt,sandbox-sessions.txt}
+
+--------------------------------------------------------------------------------
+[PASS] T2  background_output works on an adopted bg_ id                     (P0)
+--------------------------------------------------------------------------------
+STEPS    Same bound, but the parent deliberately DISOBEYS the "Do NOT call
+         background_output now" instruction and calls it immediately on the
+         adopted handle while the child is still running (hostile-user case).
+EXPECTED tool resolves the adopted id; no crash, no deadlock.
+ACTUAL   t+67.1s branch=parent-bg-output {"bgId":"bg_6ad3412d"}
+         background_output output returned to the parent:
+           # Task Status
+           | Task ID     | `bg_6ad3412d` |
+           | Description | wallclock busy child 1 |
+           | Agent       | explore |
+           | Status      | **running** |
+           | Duration    | 0s |
+           | Session ID  | `ses_028a93d94ffecUu7NWpyBUCe42` |
+           > **Note**: No need to wait explicitly - the system will notify you...
+           ## Original Prompt
+           ```
+           [already prompted]
+           ```
+         Adopted id resolves. Run exited 0. No hang, no error.
+         OBSERVATIONS (cosmetic, non-blocking):
+           a) "Duration | 0s" - startedAt is reset at adoption, so the ~60s
+              already spent synchronously is not reflected.
+           b) "Original Prompt: [already prompted]" - the adoption sentinel is
+              surfaced verbatim to the model instead of the real prompt.
+         Neither breaks behavior; both are cosmetic honesty gaps in the status card.
+EVIDENCE /tmp/omo-qa-rw2/out/t2-bgoutput/{fake-llm.log,sandbox-tool-outputs.txt}
+
+--------------------------------------------------------------------------------
+[PASS] T3  REGRESSION: fast sync well before the bound is unchanged         (P0)
+--------------------------------------------------------------------------------
+STEPS    WALL_MS=600000 (10-min default), child answers in one turn (~1s).
+EXPECTED real result inline, no bg_ handle anywhere.
+ACTUAL   task tool output:
+           Task completed in 1s.
+           Agent: explore
+           Model: openai/gpt-fake
+           ---
+           CHILD_DELIVERABLE_PAYLOAD_9F3A
+           <task_metadata> session_id: ses_028a932cfffe3kgMQNfjmuaBWm ...
+         seenBgIds= (empty). Exit 0. Identical shape to pre-change behavior.
+EVIDENCE /tmp/omo-qa-rw2/out/t3-fastsync/{fake-llm.log,sandbox-tool-outputs.txt}
+
+--------------------------------------------------------------------------------
+[PASS] T4  REGRESSION: run_in_background=true path unaffected               (P0)
+--------------------------------------------------------------------------------
+STEPS    RUN_IN_BACKGROUND=true, child answers immediately, parent holds 25s.
+EXPECTED immediate bg_ handle (well under the 60s bound), later notification.
+ACTUAL   t+6.2s  branch=parent-task-call {"run_in_background":"true"}
+         t+6.3s  branch=parent-hold        <- handle returned in ~0.1s, not 60s
+         t+126.5s branch=wake {"bgIds":["bg_ff377a53"]}
+         Async path is not routed through the wall-clock poller at all. Unchanged.
+EVIDENCE /tmp/omo-qa-rw2/out/t4-bgtrue/fake-llm.log
+
+--------------------------------------------------------------------------------
+[PASS] T5  REGRESSION: run_in_background OMITTED does not throw (GH #4119)   (P0)
+--------------------------------------------------------------------------------
+STEPS    The tool call omits run_in_background entirely.
+EXPECTED no throw; defaults to sync; normal inline result.
+ACTUAL   t+6.4s branch=parent-task-call {"run_in_background":"omit"}
+         task tool output: "Task completed in 1s. ... CHILD_DELIVERABLE_PAYLOAD_9F3A"
+         Exit 0, no error part, no retry storm. Defaulted to sync as documented.
+EVIDENCE /tmp/omo-qa-rw2/out/t5-omit/{fake-llm.log,sandbox-tool-outputs.txt}
+
+--------------------------------------------------------------------------------
+[PASS] T6  schema boundary at the 60000 minimum                             (P0)
+--------------------------------------------------------------------------------
+STEPS    safeParse BackgroundTaskConfigSchema with 11 values.
+EXPECTED >=60000 accept; below-min and invalid types reject.
+ACTUAL   ACCEPT  60000 (exact min)          parsed=60000
+         REJECT  59999 (below min)          too_small: expected number to be >=60000
+         REJECT  0                          too_small
+         REJECT  -1                         too_small
+         REJECT  "abc" (string)             invalid_type: expected number, received string
+         REJECT  null                       invalid_type
+         ACCEPT  600000 (default)           parsed=600000
+         ACCEPT  Number.MAX_SAFE_INTEGER    parsed=9007199254740991
+         ACCEPT  1.5e308                    parsed=1.5e+308
+         REJECT  NaN                        invalid_type
+         ACCEPT  omitted                    parsed=undefined
+         typo key syncWallclockTimeoutMs -> ACCEPT (silently ignored) data={}
+         OBSERVATION: a mistyped key is silently dropped, so a user who typos
+         gets the 600s default while believing they set their own value. This is
+         schema-wide OpenCode/Zod behavior, NOT introduced by this change.
+EVIDENCE /tmp/omo-qa-rw2/schema-probe.ts + output above
+
+--------------------------------------------------------------------------------
+[PASS] T7  parent run ENDS with an adopted child still running - no orphan   (P0)
+--------------------------------------------------------------------------------
+STEPS    WALL_MS=60000, child scripted for 30 turns (~180s of work), parent ends
+         its turn IMMEDIATELY after the task tool returns (PARENT_AFTER_TASK=end).
+         `opencode run` therefore exits while the adopted child is mid-flight.
+         Then a 45s post-run probe samples for orphan activity every second.
+EXPECTED no runaway child; no leaked `sleep` processes; no provider calls after exit.
+ACTUAL   t+7.2s  parent-task-call
+         t+31.4s child turn 5 (last child request)
+         t+67.4s parent-final (yield happened; parent ended its turn)
+         Child bash parts from the sandbox DB:
+           bash completed 1786024319499 -> ...505  sleep 6; echo CHILD_ALIVE_TURN_1
+           bash completed 1786024325546 -> ...552  CHILD_ALIVE_TURN_2
+           bash completed 1786024331591 -> ...596  CHILD_ALIVE_TURN_3
+           bash completed 1786024337628 -> ...631  CHILD_ALIVE_TURN_4
+           bash completed 1786024337647 -> 1786024373832  CHILD_ALIVE_TURN_5
+         The last part's end timestamp (1786024373832) coincides with server
+         teardown: the child was stopped WITH the server, not left running.
+         45s post-run probe, every sample:
+           t+1s  ... t+45s   child_sleep_procs=0   fake_calls=5 (frozen)
+         fake_calls never advanced past 5 after exit => the child made ZERO
+         further model calls once the run ended. No orphan, no token burn.
+         Cleanup receipts: leftover_child_sleep_procs=0, leftover_parent_hold_procs=0.
+         NOTE (honest scope): this proves the child does not OUTLIVE the process.
+         It does not prove graceful completion of an adopted child when the user
+         quits mid-flight - the work is simply lost with the process, same as any
+         other in-flight background task. NOT A REGRESSION, but worth documenting.
+EVIDENCE /tmp/omo-qa-rw2/out/t7-orphan/{fake-llm.log,post-run-probe.txt,
+         sandbox-tool-parts.txt,cleanup-receipts.txt}
+
+--------------------------------------------------------------------------------
+[PASS] T8  the yield is attributable to the WALL CLOCK, not inactivity       (P0)
+--------------------------------------------------------------------------------
+STEPS    Inspect the plugin log across every bounded run.
+EXPECTED "[task] Poll wall-clock timeout reached", never "Poll inactivity timeout".
+ACTUAL   6 real (non-unit-test) yields, all with pollCount=60 (=60 x 1s polls):
+           13:46:28.894 ses_028ad9d8cffesAqKp5jig8LNI6 pollCount=60   (T1)
+           13:51:15.297 ses_028a93d94ffecUu7NWpyBUCe42 pollCount=60   (T2)
+           13:52:53.627 ses_028a7bdb2ffeBaEkDYmZBEVQqM pollCount=60   (T7)
+           13:55:41.896 ses_028a52c24ffeLZG2SBhHWNnZXh pollCount=60   (T10 #1)
+           13:55:46.365 ses_028a51af8ffeHT1qIAHpI18gPA pollCount=60   (T13)
+           13:59:43.110 ses_028a17dfdffegfJTjHcLnkDDTD pollCount=60   (T18)
+         Zero "Poll inactivity timeout reached" and zero
+         "Aborting sync session {reason: poll_timeout}" for any of these sessions.
+         The child was CONTINUOUSLY busy in every case, which is precisely the
+         shape the pre-existing inactivity window can never catch. Attribution proven.
+EVIDENCE /tmp/omo-qa-rw2/out/*/plugin.log
+
+--------------------------------------------------------------------------------
+[PASS] T9  isolation + cleanup receipts                                     (P0)
+--------------------------------------------------------------------------------
+Real DB: /Users/tim/.local/share/opencode/opencode.db
+  count at lane start : 1238
+  count at lane end   : 1239   (+1)
+The +1 is NOT mine. Proof, not hand-waving:
+  a) Every sandbox session id created by this lane was checked against the real DB:
+       distinct sandbox session ids collected: 25
+       leaked_into_real_db=0
+  b) The single real-DB row created during my QA window (13:44-14:02 UTC):
+       ses_028a2252fffeDVuAXvt05fP62K | Task 16 port OD goal-intake fields
+         (@Sisyphus-Junior subagent) | 1786024680144
+     Unrelated concurrent work in another repo, as the task statement anticipated.
+HOME sandboxing (trap #2) was applied in every run:
+  HOME=/var/folders/.../omo-qa-sandbox.XXXXXX.<rand>/home
+  and the harness wrote its own $HOME/.omo/omo.jsonc, so the real
+  ~/.omo/omo.jsonc could not route agents at paid models.
+Per-run cleanup receipts (all 13 runs): fake provider killed (alive_after_kill=no),
+port listeners=0, opencode run pid alive=no, leftover_child_sleep_procs=0,
+leftover_parent_hold_procs=0.
+Final sweep:
+  $ pgrep -fl "rw2-fake-llm|CHILD_ALIVE_TURN|PARENT_HOLD_DONE"   -> (empty)
+  per-run port listener check: 13/13 ports listeners=0
+    t1-delivery 53122, t2-bgoutput 53564, t3-fastsync 53583, t4-bgtrue 53718,
+    t5-omit 53888, t7-orphan 54180, t12-inactivity 54197, t10-two-children 54604,
+    t13-boundary 54718, t12b 54889, t14-control 55152, t18-nested 55331,
+    t23-hostile 55449   (all listeners=0)
+  13 sandbox dirs removed; remaining omo-qa-sandbox dirs = 0
+WATCHDOGS: every `opencode run` was bounded (180-420s per scenario).
+  Watchdog fired: 0 of 13 runs (all watchdog.txt read "fired=no").
+EVIDENCE /tmp/omo-qa-rw2/out/*/{db-before.txt,db-after.txt,cleanup-receipts.txt,watchdog.txt}
+
+--------------------------------------------------------------------------------
+[PASS] T10  two adopted children from the same parent                       (P1)
+--------------------------------------------------------------------------------
+STEPS    TASK_COUNT=2, both sync, both children continuously busy, 60s bound.
+EXPECTED both handled, distinct ids, no state clobber.
+ACTUAL   t+6.1s  parent-task-call n=1
+         t+66.3s parent-task-call n=2   <- issued right after child 1 was adopted
+         t+78.4s child-done (child 1)
+         t+78.6s child-done (child 2)
+         t+199.6s wake {"bgIds":["bg_b208cb6a"]}
+         Sessions created (all under the one parent):
+           ses_028a532a4... Sisyphus - ultraworker  rw2 wallclock probe
+           ses_028a52c24... explore  wallclock busy child 1
+           ses_028a44113... explore  wallclock busy child 2
+         Child 1 -> adopted (Background Task ID: bg_b208cb6a).
+         Child 2 -> completed sync in 13s, returning CHILD_DELIVERABLE_PAYLOAD_9F3A
+                    inline.
+         Both coexisted under the same parent, distinct ids, wake fired correctly,
+         WAKE_ACK payload_present=true (child 2's inline result was in context).
+         HONEST SCOPE: because opencode executes tool calls sequentially within a
+         turn, this exercised SEQUENTIAL adoption + a normal sync sibling, NOT two
+         SIMULTANEOUSLY adopted children. Truly concurrent double-adoption is
+         NOT PROVEN by this lane.
+EVIDENCE /tmp/omo-qa-rw2/out/t10-two-children/{fake-llm.log,sandbox-sessions.txt,
+         sandbox-tool-outputs.txt}
+
+--------------------------------------------------------------------------------
+[PASS] T12b  inactivity window still governs a long-running child           (P1)
+--------------------------------------------------------------------------------
+STEPS    WALL_MS=600000, POLL_MS=60000 (inactivity 60s < wall clock 600s),
+         child issues ONE `sleep 200` bash call then waits.
+EXPECTED no wall-clock yield; sync path completes normally.
+ACTUAL   task tool output: "Task completed in 2m 0s. ... CHILD_DELIVERABLE_PAYLOAD_9F3A"
+         No yield, no bg_ handle (seenBgIds empty). Exit 0.
+         The 200s single tool call kept OpenCode status busy the whole time, so the
+         60s INACTIVITY window correctly did NOT fire either - activity resets it,
+         exactly as the tool description states. The two bounds are independent and
+         the wall clock did not interfere with normal long-but-active sync work.
+         (An earlier variant, t12-inactivity, was too weak - the child finished in
+         3s - and was rerun as t12b. Both are retained.)
+EVIDENCE /tmp/omo-qa-rw2/out/t12b-inactivity-wins/{fake-llm.log,sandbox-tool-outputs.txt}
+
+--------------------------------------------------------------------------------
+[PASS-with-finding] T13  boundary race: child finishes ~at the bound        (P1)
+--------------------------------------------------------------------------------
+STEPS    Child scripted to run out of busy turns right around the 60s bound.
+EXPECTED exactly one outcome; no double completion; no "Unexpected sync poll
+         outcome" throw; no dangling task.
+ACTUAL   The race actually happened, within 0.16s:
+           t+66.8s branch=parent-hold    <- yield returned the handle
+           t+66.9s branch=child-done     <- child finished 160ms later
+         Yield won. Parent got "Background Task ID: bg_8e38878d ... still running".
+         Plugin log for that task id:
+           13:55:46.549 Deferring early session.idle {"elapsedMs":184,...,"taskId":"bg_8e38878d"}
+           13:55:46.551 session.idle already deferred {"elapsedMs":186,"taskId":"bg_8e38878d"}
+           13:55:49.371 notifyParentSession called for task: "bg_8e38878d"
+           13:55:49.380 Queued notification while parent session is active
+                        {"taskId":"bg_8e38878d","allComplete":true,"shouldReply":true}
+           13:55:49.380 Task completed via polling (session gone from status)
+         No double completion, no throw, no error part (grep for
+         "Unexpected sync poll outcome|Task not found|error" in parent text = 0).
+         The adoption + completion handoff survived a genuine 160ms race.
+         FINDING: the queued notification was NEVER DELIVERED in this run. The
+         parent's last text is "PARENT_TURN_ENDED bg_ids=bg_8e38878d" and the DB
+         contains ZERO "[BACKGROUND TASK ...]" rows. The wake was queued at
+         13:55:49 but the parent turn ended (40s hold expired) before the debounce
+         flushed, and `opencode run` tore the server down.
+         NOT ATTRIBUTABLE TO THIS CHANGE - control test T14 reproduces the exact
+         same loss on the untouched run_in_background=true path.
+EVIDENCE /tmp/omo-qa-rw2/out/t13-boundary/{fake-llm.log,plugin.log,
+         sandbox-text-parts.txt,sandbox-tool-outputs.txt}
+
+--------------------------------------------------------------------------------
+[PASS] T14  CONTROL: the T13 notification loss is pre-existing              (P1)
+--------------------------------------------------------------------------------
+STEPS    run_in_background=true (code path NOT touched by these 12 commits),
+         child answers instantly, parent ends its turn immediately.
+EXPECTED if the notification loss is a pre-existing async-path property, it
+         reproduces here with no adoption involved.
+ACTUAL   t+6.8s parent-task-call {"run_in_background":"true"}
+         t+6.8s child-done
+         t+6.9s parent-final
+         "[BACKGROUND TASK ...]" rows in the sandbox DB: (none)
+         Identical loss on the untouched path. CONFIRMS the T13 finding is a
+         pre-existing race between "parent turn ends" and "wake debounce flush",
+         not a defect introduced by bounded sync delegation.
+EVIDENCE /tmp/omo-qa-rw2/out/t14-control-bgtrue-end/{fake-llm.log,sandbox-opencode.db}
+
+--------------------------------------------------------------------------------
+[PASS] T15  the 10-minute default comes from exactly one place              (P1)
+--------------------------------------------------------------------------------
+STEPS    Call getDefaultSyncWallClockTimeoutMs() after __resetTimingConfig().
+EXPECTED shows whether the module itself carries a bound.
+ACTUAL   timing module default MAX_WALL_CLOCK_MS = Infinity (finite? false)
+         The ONLY thing giving a real user the 10-min ceiling is
+           packages/omo-opencode/src/plugin/tool-registry-core-tools.ts:68
+           syncWallClockTimeoutMs: pluginConfig.background_task?.syncWallClockTimeoutMs ?? 600_000
+         Correct for the shipped plugin (that registry IS the production path),
+         but any other construction site of the delegate-task tool would silently
+         get an UNBOUNDED sync wait. Architectural note for reviewers, not a bug
+         in the shipped behavior.
+EVIDENCE /tmp/omo-qa-rw2/registry-default-probe.ts + source line above
+
+--------------------------------------------------------------------------------
+[PASS] T18  adoption while the child has its OWN background children        (P2)
+--------------------------------------------------------------------------------
+STEPS    CHILD_SPAWNS_BG=1: the adopted child spawns a grandchild background task
+         on its first turn, then stays busy past the 60s bound.
+EXPECTED adoption still happens; no corruption of descendant accounting; no hang.
+ACTUAL   t+6.8s  child-spawn-bg  (child issues task(run_in_background=true))
+         t+6.8s  child turn 1 ... continuous
+         t+66.9s parent-hold   <- yield at ~60s despite an active grandchild
+         parent got: "Sync task moved to background. Background Task ID: bg_3879fa24"
+         Run exited 0, watchdog (380s) did not fire, cleanup receipts all zero.
+         Adoption is not blocked by, and does not corrupt, an in-flight grandchild.
+EVIDENCE /tmp/omo-qa-rw2/out/t18-nested-bg/{fake-llm.log,sandbox-tool-outputs.txt,
+         sandbox-sessions.txt,cleanup-receipts.txt,watchdog.txt}
+
+--------------------------------------------------------------------------------
+[PASS] T23  hostile: run_in_background passed as a non-boolean string       (P2)
+--------------------------------------------------------------------------------
+STEPS    run_in_background="false-string" (an LLM-style malformed argument).
+EXPECTED no throw; safe routing.
+ACTUAL   t+6.7s parent-task-call {"run_in_background":"false-string"}
+         task tool output: "Task completed in 1s. ... CHILD_DELIVERABLE_PAYLOAD_9F3A"
+         Routed to the SYNC path (matches `=== true` semantics in
+         tool-argument-preparation.ts), no throw, exit 0.
+EVIDENCE /tmp/omo-qa-rw2/out/t23-hostile-string/{fake-llm.log,sandbox-tool-outputs.txt}
+
+--------------------------------------------------------------------------------
+[PASS] T-IDS  adopted handle format and uniqueness                          (P2)
+--------------------------------------------------------------------------------
+8 distinct bg ids observed across the lane, all matching `bg_` + 8 hex chars,
+the exact format background_output documents:
+  bg_2cb19e63 bg_3879fa24 bg_42e1bc4d bg_69c2c565
+  bg_6ad3412d bg_8e38878d bg_b208cb6a bg_ff377a53
+Zero collisions. Consistent with crypto.randomUUID().slice(0,8).
+EVIDENCE grep -ho "bg_[0-9a-f]\{8\}" /tmp/omo-qa-rw2/out/*/sandbox-tool-outputs.txt
+
+================================================================================
+SECTION 4 - NOT PROVEN (honest gaps)
+================================================================================
+N1  Two children adopted SIMULTANEOUSLY. T10 exercised sequential adoption plus a
+    normal sync sibling. OpenCode runs tool calls sequentially inside a turn, so
+    truly concurrent double-adoption was not reachable with this harness.
+N2  Parent aborted by the user pressing ESC mid-flight (S04 / T11). Not executed:
+    `opencode run --format json` gives no interactive abort channel, and injecting
+    an abort over the server API would have been a different surface than the one
+    under test. The abort path in sync-session-poller.ts:121 is CODE-VISIBLE but
+    NOT BEHAVIORALLY PROVEN by this lane. Note the wall-clock check at line 116
+    runs BEFORE the abort check at 121, so a yield can win that race by design.
+N3  Parent session DELETED while an adopted child runs (S06 / T16). Not executed.
+N4  "[already prompted]" sentinel behavior if the adopted task hits the fallback
+    RETRY path (S22 / T19). Observed only as a display string in T2; retry
+    re-prompting was not triggered.
+N5  Depth-2 adoption (grandchild's own sync delegation yielding) (S25 / T20).
+N6  Whether the model reliably WAITS rather than treating the handle as an answer
+    (S12). My fake provider is scripted, so it cannot speak to real model behavior.
+    The returned text does carry an explicit instruction not to poll.
+
+================================================================================
+SECTION 5 - FINDINGS SUMMARY
+================================================================================
+F1 (documented behavior, not a defect) The adopted child's RESULT is delivered
+   BY HANDLE, not by value. The parent gets "[BACKGROUND TASK COMPLETED]" plus
+   the bg id and an explicit instruction to call background_output. The child's
+   text never appears inline in the parent transcript. Identical to the existing
+   run_in_background=true contract. Prior QA's biggest open question is now
+   answered: the result is NOT lost, but it is NOT auto-inlined either.
+F2 (pre-existing, reproduced on the untouched path) A queued completion wake can
+   be lost if the parent's turn ends before the debounce flushes (T13). Control
+   test T14 reproduces it with run_in_background=true and no adoption. Out of
+   scope for this change; worth a separate issue.
+F3 (cosmetic) background_output on an adopted task reports "Duration | 0s"
+   (startedAt reset at adoption discards the ~60s already spent) and
+   "Original Prompt: [already prompted]" (the adoption sentinel is user-visible).
+F4 (architectural note) The 10-minute default lives ONLY at
+   tool-registry-core-tools.ts:68 `?? 600_000`; timing.ts defaults to Infinity.
+   Correct for the shipped path, fragile for any other construction site.
+F5 (pre-existing, schema-wide) A mistyped config key such as
+   syncWallclockTimeoutMs is silently ignored, so a typo yields the default.
+
+================================================================================
+SECTION 6 - VERDICT
+================================================================================
+VERDICT     PASS
+CONFIDENCE  HIGH for the delegation behavior itself (13 live runs against real
+            opencode with the plugin loaded from source, dist proven stale and
+            unused). MEDIUM on the abort/delete-parent lifecycle paths, which are
+            listed as NOT PROVEN above rather than assumed.
+COVERAGE    40 scenarios written; 16 tests executed.
+            P0: 9 tested / 9 passed
+            P1: 5 tested / 5 passed
+            P2: 3 tested / 3 passed  (T18, T23, T-IDS)
+BLOCKING    none
+

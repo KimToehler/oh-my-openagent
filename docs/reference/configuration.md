@@ -29,7 +29,6 @@ Complete reference for Oh My OpenCode plugin configuration. Every omo harness re
   - [Notification](#notification)
   - [MCPs](#mcps)
   - [LSP](#lsp)
-  - [CodeGraph](#codegraph)
 - [Advanced](#advanced)
   - [Runtime Fallback](#runtime-fallback)
   - [Model Capabilities](#model-capabilities)
@@ -45,7 +44,7 @@ Complete reference for Oh My OpenCode plugin configuration. Every omo harness re
 
 ### File Locations
 
-One unified file configures every omo harness: the OpenCode plugin, Senpi (task, codegraph, config-watch), and the Codex codegraph loader. The legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files and `~/.omo/config.jsonc` are read by nothing but the migration engine (see [Migration](#migration)).
+One unified file configures every omo harness: the OpenCode plugin, Senpi (task, config-watch), and Codex. The legacy `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` files and `~/.omo/config.jsonc` are read by nothing but the migration engine (see [Migration](#migration)).
 
 1. User layer (lowest precedence): `~/.omo/omo.jsonc` on every platform (`omo.json` is accepted as a fallback basename).
 2. Project layers: `.omo/omo.jsonc` (then `.omo/omo.json`) in every directory from the working directory up to `$HOME`. Farther ancestors merge first, so the nearest project file wins and beats the user layer. `$HOME` itself is skipped by the walk because `~/.omo` is already the user layer. If the working directory is outside `$HOME`, the walk continues to the filesystem root.
@@ -97,7 +96,8 @@ Run `bunx oh-my-openagent install` for guided setup. Run `opencode models` to li
 The first time a current harness starts (and again on install or via the CLI), a lock-and-journal migration engine imports the legacy files into the unified file:
 
 - Sources: `oh-my-openagent.json[c]` / `oh-my-opencode.json[c]` in the OpenCode user config directory, in each of its `profiles/<name>/` directories, and in walked project `.opencode/` directories, plus `~/.omo/config.jsonc`.
-- Targets: the legacy user file imports into `~/.omo/omo.jsonc` under `[opencode]`; each legacy profile becomes `profiles.<name>."[opencode]"` holding only the keys that differ from the user file; a project file imports into that project's `.omo/omo.jsonc`. `~/.omo/config.jsonc` imports its shared `codegraph` settings plus its `[opencode]` / `[codex]` blocks, and a legacy `[omo]` block maps to `[senpi]`.
+- Targets: the legacy user file imports into `~/.omo/omo.jsonc` under `[opencode]`; each legacy profile becomes `profiles.<name>."[opencode]"` holding only the keys that differ from the user file; a project file imports into that project's `.omo/omo.jsonc`. `~/.omo/config.jsonc` imports its `[opencode]` / `[codex]` blocks, and a legacy `[omo]` block maps to `[senpi]`.
+- OpenCode legacy files import only model/provider controls (`disabled_providers`, `model_fallback`, `models`, and `omo_agent` renamed to `sisyphus_agent`); agent and category registries, agent disable lists, hooks, and unrelated plugin settings are not imported.
 - Conflict policy: no-clobber. A value already present in the target wins, and every skipped legacy value is reported as a diagnostic instead of overwriting. Prior legacy migration history is preserved under the target's `legacy_migrations` key.
 - Markers: each applied migration records its id in the target's `_migrations` array, so re-runs are no-ops. `2026-07-opencode-config-unification` covers the `oh-my-*` files; `2026-07-codex-config-jsonc` covers `~/.omo/config.jsonc`; `2026-08-reasoning-unification` rewrites persisted model and reasoning fields. Codex startup runs only the second group; OpenCode plugin startup, Senpi startup, install, and the CLI run both groups, so whichever side runs first applies each group exactly once.
 - Backups: sources move to `~/.omo/migration-backup-<UTC timestamp>-opencode-config/` (project sources to `<project>/.omo/migration-backup-<UTC timestamp>/`). An interrupted run resumes from its journal on the next start.
@@ -127,9 +127,6 @@ Here's a practical starting `~/.omo/omo.jsonc`. OpenCode plugin settings live in
       // Architecture consultation: GPT-5.6 Sol or Claude Opus
       "oracle": { "model": "openai/gpt-5.6-sol", "reasoning": "high" },
 
-      // Independent implementation review: Claude keeps this lane distinct from Oracle's GPT model
-      "auditor": { "model": "anthropic/claude-opus-5", "model_family": "claude-opus-5" },
-
       // Prometheus inherits sisyphus model; just add prompt guidance
       "prometheus": {
         "prompt_append": "Leverage deep & quick agents heavily, always in parallel.",
@@ -141,7 +138,7 @@ Here's a practical starting `~/.omo/omo.jsonc`. OpenCode plugin settings live in
       "quick": { "model": "kimi-for-coding/kimi-for-coding-highspeed" },
 
       // unspecified-low - moderate tasks
-      "unspecified-low": { "model": "openai/gpt-5.6-luna", "reasoning": "xhigh" },
+      "unspecified-low": { "model": "xai/grok-4.6", "reasoning": "xhigh" },
 
       // unspecified-high - complex work
       "unspecified-high": { "model": "kimi-for-coding/kimi-k3", "reasoning": "max" },
@@ -212,10 +209,11 @@ Agent tab cycling defaults to Sisyphus, Hephaestus, Prometheus, Atlas. Override 
 
 #### Agent Options
 
+This table is the `[opencode].agents` surface only. Shared-base agents use the core field set (`description`, `prompt`, `model`, `models`, `reasoning`, `tools`, `execution_mode`, `background`, `max_depth`, `allowed_subagents`, `disallowed_tools`, `max_turns`, `temperature`, `disable`, and deprecated `variant` / `reasoningEffort`) documented in the [omo.json reference](./omo-json.md); OpenCode-only fields are rejected there.
+
 | Option            | Type                    | Description                                                     |
 | ----------------- | ----------------------- | --------------------------------------------------------------- |
 | `model`           | string                  | Model override (`provider/model`)                               |
-| `model_family`    | architecture enum       | Static intended-primary architecture for startup prompt, reasoning, and tool routing. Values: `claude-opus-4.6`, `claude-opus-4.7`, `claude-opus-4.8`, `claude-opus-5`, `claude-fable-5`, `gemini`, `glm`, `gpt`, `gpt-5.5`, `gpt-5.6`, `kimi-k2`, `kimi-k2.7`, `kimi-k3`, `minimax` |
 | `models`          | array                   | Ordered model chain; entries are strings or per-model objects   |
 | `fallback_models` | string\|array           | Deprecated compatibility fallback chain                         |
 | `reasoning`       | string                  | Canonical reasoning level or harness-native preset token        |
@@ -242,8 +240,6 @@ Agent tab cycling defaults to Sisyphus, Hephaestus, Prometheus, Atlas. Override 
 | `compaction`      | object                  | Compaction model and reasoning override                         |
 
 Prometheus is the exception for prompt replacement: its mandatory planner prompt always remains active so it can load `ulw-plan` first. For `agents.prometheus`, both `prompt` and `prompt_append` are appended to the mandatory base prompt instead of replacing it.
-
-`model_family` is resolved once during startup from explicit config. It describes intended primary model architecture, not provider model ID. Runtime combo fallback can serve another architecture without rebuilding startup prompts, reasoning settings, tools, or agent roster.
 
 #### Anthropic Extended Thinking
 
@@ -354,13 +350,13 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 | Category             | Default Model                   | Description                                    |
 | -------------------- | ------------------------------- | ---------------------------------------------- |
 | `visual-engineering` | `anthropic/claude-opus-5` (max) | Frontend, UI/UX, design, animation            |
-| `ultrabrain`         | `openai/gpt-5.6-sol` (xhigh)    | Deep logical reasoning, complex architecture   |
+| `ultrabrain`         | `openai/gpt-5.6-sol` (xhigh)    | Deep logical reasoning, complex architecture. The fallback-chain primary rung runs at (max). |
 | `deep`               | `openai/gpt-5.6-sol` (medium)   | Autonomous problem-solving, thorough research  |
 | `artistry`           | `anthropic/claude-fable-5` (xhigh) | Creative/unconventional approaches             |
 | `quick`              | `kimi-for-coding/kimi-for-coding-highspeed` | Trivial tasks, typo fixes, single-file changes |
-| `unspecified-low`    | `openai/gpt-5.6-luna` (xhigh)   | General tasks, low effort                      |
-| `unspecified-high`   | `kimi-for-coding/kimi-k3` (max)  | General tasks, high effort                     |
-| `writing`            | `kimi-for-coding/kimi-k3` (low)  | Documentation, prose, technical writing        |
+| `unspecified-low`    | `xai/grok-4.6` (xhigh)          | General tasks, low effort                      |
+| `unspecified-high`   | `kimi-for-coding/k3` (max)  | General tasks, high effort                     |
+| `writing`            | `kimi-for-coding/k3` (low)  | Documentation, prose, technical writing        |
 
 > **Note**: Built-in category defaults are available automatically. User-defined category config merges over the built-in defaults or adds custom categories.
 
@@ -385,20 +381,15 @@ Domain-specific model delegation used by the `task()` tool. When Sisyphus delega
 | `max_prompt_tokens` | number        | -       | Maximum prompt tokens for delegated tasks                           |
 | `variant`           | string        | -       | Deprecated compatibility input; use `reasoning`                     |
 | `description`       | string        | -       | Shown in `task()` tool prompt                                       |
-| `is_unstable_agent` | boolean       | `false` | Force background mode + monitoring. Auto-enabled for Gemini models. |
+| `is_unstable_agent` | boolean       | `false` | Force background mode + monitoring. Auto-enabled when the resolved model id contains "gemini" or "minimax". |
 | `disable`           | boolean       | `false` | Exclude this category from task delegation                          |
-| `warn_unavailable`  | boolean       | -       | Suppress the once-per-session dead-chain warning for this category. A category set here still respects the global `task.warnings.unavailable_categories` flag. |
+| `warn_unavailable`  | boolean       | -       | Present on the OpenCode schema. The dead-chain notice it suppresses is a Senpi/core `task` behavior. |
 
 Disable categories: `{ "categories": { "ultrabrain": { "disable": true } } }`
 
 ### Model Resolution
 
 Runtime priority:
-
-The same resolved chain drives spawn-time selection and runtime retry fallback, so a recovered task stays on the same category chain.
-
-A builtin category can be hidden from `availableCategories` when none of its fallback-chain rungs resolves against the live registry. Spawns then fail with `model_unavailable`, carry the attempted chain and missing providers, and emit a once-per-session warning unless `task.warnings.unavailable_categories` is false or `categories.<name>.warn_unavailable` is false. Setting an explicit category model is the forcing path.
-
 
 1. **UI-selected model** - model chosen in the OpenCode UI, for primary agents
 2. **User override** - model set in config → used exactly as-is. Even on cold cache, explicit user configuration takes precedence over hardcoded fallback chains
@@ -409,9 +400,7 @@ A builtin category can be hidden from `availableCategories` when none of its fal
 
 The same resolved chain drives spawn-time selection and runtime retry fallback, so a recovered task stays on the same category chain.
 
-A builtin category can be hidden from `availableCategories` when none of its fallback-chain rungs resolves against the live registry. Spawns then fail with `model_unavailable`, carry the attempted chain and missing providers, and emit a once-per-session warning unless `task.warnings.unavailable_categories` is false or `categories.<name>.warn_unavailable` is false. Setting an explicit category model is the forcing path.
-
-A builtin category can be hidden from `availableCategories` when none of its fallback-chain rungs resolves against the live registry. Spawns then fail with `model_unavailable`, carry the attempted chain and missing providers, and emit a once-per-session warning unless `task.warnings.unavailable_categories` is false or `categories.<name>.warn_unavailable` is false. Setting an explicit category model is the forcing path.
+In the OpenCode plugin, every merged category appears in `availableCategories`; hiding categories with a dead fallback chain is not implemented here. That dead-chain filtering, the `model_unavailable` spawn failure, and the `task.warnings.unavailable_categories` flag belong to the Senpi/core `task` system, documented in the [omo.json reference](./omo-json.md).
 
 #### Model Settings Compatibility
 
@@ -453,7 +442,7 @@ Capability data comes from provider runtime metadata first. OmO also ships bundl
 
 #### Category Provider Chains
 
-This table mirrors the authoritative hardcoded category fallback chains, including each default first rung and its remaining provider priority.
+This table mirrors the authoritative hardcoded category fallback chains: the chain's primary rung and its remaining provider priority. A chain's primary rung can carry a different reasoning level than the category config default (for example `ultrabrain`: config default xhigh, chain primary max).
 
 | Category | Provider Chain Primary | Provider Priority |
 | --- | --- | --- |
@@ -461,8 +450,8 @@ This table mirrors the authoritative hardcoded category fallback chains, includi
 | **Ultrabrain** | `gpt-5.6-sol` | `openai\|quotio-openai\|vercel/gpt-5.6-sol (max)` → `github-copilot/gpt-5.6-sol (max)` → `openai\|opencode\|vercel/gpt-5.6-sol (max)` |
 | **Deep** | `gpt-5.6-sol` | `openai\|quotio-openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (medium)` |
 | **Artistry** | `claude-fable-5` | `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-fable-5 (xhigh)` → `kimi-for-coding\|moonshotai\|opencode-go\|opencode\|vercel/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-opus-5 (xhigh)` |
-| **Quick** | `kimi-for-coding-highspeed` | `kimi-for-coding/kimi-for-coding-highspeed` → `quotio-openai/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan\|opencode-go\|vercel/qwen3.6-flash (low)` → `opencode-go\|vercel/minimax-m3 (max)` → `opencode-go\|vercel/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `anthropic\|anthropic-api\|github-copilot\|vercel/claude-haiku-4-5 (off)` |
-| **Unspecified Low** | `gpt-5.6-terra` | `openai\|quotio-openai\|github-copilot\|opencode\|vercel/gpt-5.6-terra (high)` → `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go\|vercel/deepseek-v4-pro (max)` → `xiaomi\|opencode-go\|vercel/mimo-v2.5-pro (max)` |
+| **Quick** | `kimi-for-coding-highspeed` | `kimi-for-coding/kimi-for-coding-highspeed` → `openai-codex/gpt-5.6-luna-fast (low)` → `deepseek/deepseek-v4-flash (off)` → `qwen-token-plan\|alibaba-token-plan\|bailian-coding-plan\|vercel/qwen3.6-flash (low)` → `opencode-go\|vercel/minimax-m3 (max)` → `opencode-go\|vercel/minimax-m2.7 (max)` → `xai/grok-4.20-0309-non-reasoning` → `anthropic\|anthropic-api\|github-copilot\|vercel/claude-haiku-4-5 (off)` |
+| **Unspecified Low** | `grok-4.6` | `xai\|github-copilot\|opencode\|vercel/grok-4.6 (xhigh)` → `openai\|quotio-openai\|github-copilot\|opencode\|vercel/gpt-5.6-terra (high)` → `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-sonnet-5 (low)` → `qwen-token-plan\|alibaba-token-plan\|qwen-token-plan-cn\|alibaba-token-plan-cn/qwen3.8-max-preview (max)` → `deepseek\|opencode-go\|vercel/deepseek-v4-pro (max)` → `xiaomi\|opencode-go\|vercel/mimo-v2.5-pro (max)` |
 | **Unspecified High** | `kimi-k3` | `kimi-for-coding\|moonshotai\|opencode-go\|opencode\|vercel/kimi-k3 (max)` → `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-opus-5 (xhigh)` → `openai\|quotio-openai\|github-copilot\|opencode\|vercel/gpt-5.6-sol (high)` |
 | **Writing** | `kimi-k3` | `kimi-for-coding\|moonshotai\|opencode-go\|opencode\|vercel/kimi-k3 (low)` → `anthropic\|anthropic-api\|github-copilot\|opencode\|vercel/claude-opus-5 (low)` → `google\|github-copilot\|opencode\|vercel/gemini-3.6-flash` |
 
@@ -474,13 +463,13 @@ Run `bunx oh-my-openagent doctor --verbose` to see effective model resolution fo
 
 ### Background Tasks
 
-Control parallel agent execution and concurrency limits.
+Control parallel agent execution and concurrency limits. `background_task` (camelCase) is the OpenCode plugin key; the shared/Senpi/Codex equivalent is the core `task` object (snake_case: `default_concurrency`, `provider_concurrency`, `model_concurrency`, `max_depth`, `ttl_ms`). They are separate objects, not aliases; `background_task` at the shared base fails core validation. Setting a concurrency value to `0` means unlimited (no cap) in both places: `background_task` (`defaultConcurrency`, `providerConcurrency`, `modelConcurrency`) and the core `task` object.
 
 ```json
 {
   "background_task": {
     "defaultConcurrency": 5,
-    "staleTimeoutMs": 180000,
+    "staleTimeoutMs": 2700000,
     "providerConcurrency": { "anthropic": 3, "openai": 5, "google": 10 },
     "modelConcurrency": { "anthropic/claude-opus-5": 2 }
   }
@@ -493,15 +482,14 @@ Control parallel agent execution and concurrency limits.
 | `providerConcurrency`       | -         | Per-provider limits (key = provider name)                             |
 | `modelConcurrency`          | -         | Per-model limits (key = `provider/model`). Overrides provider limits. |
 | `maxDepth`                  | -         | Maximum nested subagent depth (min: 1)                                |
-| `staleTimeoutMs`            | `180000`  | Interrupt tasks with no activity (min: 60000)                         |
-| `messageStalenessTimeoutMs` | `1800000` | Timeout when no progress update was ever received (min: 60000)        |
+| `staleTimeoutMs`            | `2700000` | Interrupt tasks with no activity (min: 60000)                         |
+| `messageStalenessTimeoutMs` | `3600000` | Timeout when no progress update was ever received (min: 60000)        |
 | `taskTtlMs`                 | `1800000` | Absolute non-terminal task TTL (min: 300000)                          |
 | `sessionGoneTimeoutMs`      | `60000`   | Timeout when a task session disappears (min: 10000)                   |
 | `taskCleanupDelayMs`        | `600000`  | Delay before terminal tasks are removed (min: 60000)                  |
-| `todoGateGraceMs`           | `600000`  | How long a task may stay continuously idle with valid output but incomplete todos before completing anyway (min: 60000). Must stay below `taskTtlMs`; lowering `taskTtlMs` below this default is rejected. |
 | `syncPollTimeoutMs`         | -         | Synchronous polling timeout in milliseconds (min: 60000)             |
-| `maxToolCalls`              | `200`     | Maximum tool calls per subagent task (min: 10)                        |
-| `circuitBreaker`            | -         | Circuit-breaker object: `enabled`, `maxToolCalls`, `consecutiveThreshold` |
+| `maxToolCalls`              | `4000`    | Maximum tool calls per subagent task (min: 10)                        |
+| `circuitBreaker`            | -         | Circuit-breaker object: `enabled` (default `true`), `maxToolCalls`, `consecutiveThreshold` |
 
 Priority: `modelConcurrency` > `providerConcurrency` > `defaultConcurrency`
 
@@ -523,6 +511,7 @@ Configure the main orchestration system.
 | Option                    | Default | Description                                                     |
 | ------------------------- | ------- | --------------------------------------------------------------- |
 | `disabled`                | `false` | Disable all Sisyphus orchestration, restore original build/plan |
+| `tdd`                     | `true`  | TDD mode for Sisyphus orchestration                             |
 | `default_builder_enabled` | `false` | Enable OpenCode-Builder agent (off by default)                  |
 | `planner_enabled`         | `true`  | Enable Prometheus (Planner) agent                               |
 | `replace_plan`            | `true`  | Demote default plan agent to subagent mode                      |
@@ -539,7 +528,6 @@ The `sisyphus.tasks` section configures **storage options** only:
 {
   "sisyphus": {
     "tasks": {
-      "storage_path": ".omo/tasks",
       "claude_code_compat": false
     }
   }
@@ -548,7 +536,7 @@ The `sisyphus.tasks` section configures **storage options** only:
 
 | Option               | Default           | Description                                |
 | -------------------- | ----------------- | ------------------------------------------ |
-| `storage_path`       | `.omo/tasks` | Storage path (relative to project root)    |
+| `storage_path`       | OpenCode config dir `/tasks/<list-id>` | Optional override; relative paths join the working directory |
 | `task_list_id`       | -                 | Force task list ID (alternative to env `ULTRAWORK_TASK_LIST_ID`) |
 | `claude_code_compat` | `false`           | Enable Claude Code path compatibility mode |
 
@@ -568,7 +556,7 @@ To disable the task system entirely, set `experimental.task_system` to `false`:
 
 Skills bring domain-specific expertise and embedded MCPs.
 
-Built-in skills: `playwright`, `playwright-cli`, `agent-browser`, `dev-browser`, `git-master`, `frontend`
+Built-in skills: `playwright`, `playwright-cli`, `agent-browser`, `dev-browser`, `git-master`, `frontend`, `review-work`, `remove-ai-slops`, `init-deep`, `debugging`, `security-research`, `security-review`, `visual-qa`, `team-mode`. The `team-mode` skill is only rendered when `team_mode.enabled` is true.
 
 Disable built-in skills: `{ "disabled_skills": ["playwright"] }`
 
@@ -704,6 +692,12 @@ Records about individuals, stored as cards with an observation ledger.
 | ------------------ | ------- | ------------------------------------------------------ |
 | `soul.edit_notice` | `true`  | Surface a notice when the persona or identity changes   |
 
+#### Write Notice
+
+| Option                  | Default | Description                                                        |
+| ----------------------- | ------- | ------------------------------------------------------------------ |
+| `write_notice.enabled`  | `true`  | Render memory writes as a notice row instead of the plain commit line |
+
 #### Sync and Search
 
 | Option           | Default | Description                                    |
@@ -712,8 +706,8 @@ Records about individuals, stored as cards with an observation ledger.
 | `sync.remote`    | -       | Optional git remote for the memory repository   |
 | `search.enabled` | `true`  | Enable memory search                            |
 
-Run `/sleeptime` in a session to see every resolved value, including which ones a per-agent
-override changed.
+In Senpi, run `/sleeptime` to see every resolved memory value, including which ones a per-agent
+override changed. OpenCode has no `/sleeptime` command; inspect the `memory` block in `omo.jsonc` instead.
 
 ### Hooks
 
@@ -723,7 +717,7 @@ Disable built-in hooks via `disabled_hooks`:
 { "disabled_hooks": ["comment-checker"] }
 ```
 
-Available hooks: `todo-continuation-enforcer`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `codegraph-bootstrap`, `ast-grep-sg-provision`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `tool-pair-validator`, `monitor-status-injector`, `goal`, `category-skill-reminder`, `lesson-nudge`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `prometheus-md-only`, `sisyphus-junior-notepad`, `team-tool-gating`, `no-sisyphus-gpt`, `no-hephaestus-non-gpt`, `hephaestus-agents-md-injector`, `start-work`, `atlas`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `notepad-write-guard`, `bash-file-read-guard`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `plan-format-validator`, `legacy-plugin-toast`
+Available hooks: `todo-continuation-enforcer`, `session-notification`, `comment-checker`, `tool-output-truncator`, `question-label-truncator`, `directory-agents-injector`, `directory-readme-injector`, `empty-task-response-detector`, `think-mode`, `model-fallback`, `anthropic-context-window-limit-recovery`, `preemptive-compaction`, `rules-injector`, `background-notification`, `auto-update-checker`, `ast-grep-sg-provision`, `startup-toast`, `keyword-detector`, `agent-usage-reminder`, `non-interactive-env`, `interactive-bash-session`, `tool-pair-validator`, `monitor-status-injector`, `goal`, `category-skill-reminder`, `compaction-context-injector`, `compaction-todo-preserver`, `claude-code-hooks`, `auto-slash-command`, `edit-error-recovery`, `json-error-recovery`, `delegate-task-retry`, `prometheus-md-only`, `sisyphus-junior-notepad`, `team-tool-gating`, `no-sisyphus-gpt`, `no-hephaestus-non-gpt`, `hephaestus-agents-md-injector`, `ulw-execute`, `atlas`, `unstable-agent-babysitter`, `task-resume-info`, `stop-continuation-guard`, `tasks-todowrite-disabler`, `runtime-fallback`, `write-existing-file-guard`, `notepad-write-guard`, `bash-file-read-guard`, `hashline-read-enhancer`, `read-image-resizer`, `todo-description-override`, `webfetch-redirect-guard`, `fsync-skip-warning`, `plan-format-validator`, `legacy-plugin-toast`
 
 Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-read-guard`, `webfetch-redirect-guard`, `prometheus-md-only`, `rules-injector`, and `tool-pair-validator` protect safety, permissions, or provider protocol correctness. Disable them only for audited local debugging in a trusted environment.
 
@@ -738,10 +732,10 @@ Guard hooks such as `team-tool-gating`, `write-existing-file-guard`, `bash-file-
 Disable built-in commands via `disabled_commands`:
 
 ```json
-{ "disabled_commands": ["refactor", "start-work"] }
+{ "disabled_commands": ["refactor", "ulw-execute"] }
 ```
 
-Available commands: `goal`, `refactor`, `start-work`, `stop-continuation`, `remove-ai-slops`, `handoff`, `hyperplan`. The `disabled_commands` option currently accepts only the schema enum, which does not include `handoff`.
+Available commands: `goal`, `refactor`, `ulw-execute`, `stop-continuation`, `remove-ai-slops`, `handoff`, `hyperplan`. The `disabled_commands` option currently accepts only the schema enum, which does not include `handoff`.
 
 ### Browser Automation
 
@@ -792,6 +786,10 @@ Configure git commit behavior:
 { "git_master": { "commit_footer": true, "include_co_authored_by": true } }
 ```
 
+This key configures the OpenCode plugin inside `[opencode]`. The Senpi harness reads the typed shared `git_master` section instead, documented in the [omo.json reference](./omo-json.md#git_master-senpi-harness).
+
+`git_env_prefix` (default `"GIT_MASTER=1"`) is prepended to git commands; set it to `""` to disable.
+
 ### Comment Checker
 
 Customize the comment quality checker:
@@ -814,12 +812,14 @@ Force-enable session notifications:
 
 `force_enable` (`false`) - force session-notification even if external notification plugins are detected.
 
+OpenCode also has native TUI Attention notifications in `tui.json`. Use either native Attention or OmO `session-notification` for the same events, not both, or you may receive duplicate desktop notifications. OmO auto-disables `session-notification` when it detects known external notification plugins such as `opencode-notifier`, but native Attention is OpenCode TUI config rather than a plugin entry, so OmO cannot detect it through the plugin list. Keep `session-notification` enabled when you want OmO's richer idle notification body with session title and recent message context; otherwise prefer native Attention for basic TUI notification and sound events.
+
 ### MCPs
 
-Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library docs), `grep_app` (GitHub code search), `lsp` (local language-server tools), and `codegraph`. Structural search and rewrite is provided by the `ast-grep` skill instead of a built-in MCP.
+Built-in MCPs (enabled by default): `websearch` (Exa AI), `context7` (library docs), `grep_app` (GitHub code search), and `lsp` (local language-server tools). Structural search and rewrite is provided by the `ast-grep` skill instead of a built-in MCP.
 
 ```json
-{ "disabled_mcps": ["websearch", "context7", "grep_app", "lsp", "codegraph"] }
+{ "disabled_mcps": ["websearch", "context7", "grep_app", "lsp"] }
 ```
 
 ### LSP
@@ -838,51 +838,7 @@ To disable the LSP MCP entirely:
 { "disabled_mcps": ["lsp"] }
 ```
 
-### CodeGraph
-
-The `codegraph` MCP ships a pinned CodeGraph 1.5.0 binary; managed installs provisioned at 1.0.1 or 1.4.1 upgrade automatically, and project stores built by older versions remain compatible without a manual re-index. The OpenCode plugin block supports the full surface below:
-
-| Option | Type | Default |
-| ------ | ---- | ------- |
-| `auto_init` | boolean | `true` |
-| `auto_provision` | boolean | `true` |
-| `daemon` | boolean | `true` |
-| `enabled` | boolean | `true` |
-| `excluded_roots` | string[] | - |
-| `install_dir` | string | - |
-| `telemetry` | boolean | - |
-| `watch_debounce_ms` | number >= 0 | - |
-
-```jsonc
-{
-  "codegraph": {
-    "auto_init": true,
-    "auto_provision": true,
-    "daemon": true,
-    "enabled": true,
-    "excluded_roots": ["~/scratch/codegraph"],
-    "install_dir": "~/.omo/codegraph/bin",
-    "telemetry": false,
-    "watch_debounce_ms": 500
-  }
-}
-```
-
-`session_start_cooldown_ms` is not an OpenCode plugin `codegraph` key. It is a Codex-only shared key, so place it under top-level `codegraph` or `[codex].codegraph` in the unified file:
-
-```jsonc
-{
-  "[codex]": {
-    "codegraph": { "session_start_cooldown_ms": 900000 }
-  }
-}
-```
-
-The Codex SessionStart bootstrap checks only `<projectRoot>/.codegraph/codegraph.db`; it never calls `codegraph status`. An ancestor database covers nested projects, while per-project locks and persistent cooldown stamps suppress duplicate or repeatedly failing background initializers. Suppressions are recorded in `~/.omo/codegraph/session-start.jsonl` as actions including `skipped-cooldown`, `skipped-locked`, and `skipped-nested-root`.
-
-An ambient `CODEGRAPH_NO_DAEMON=1` forces daemon-off even when `codegraph.daemon` is `true`. Inspect or stop running daemons with the upstream `codegraph daemon` command, an interactive picker that lists running daemons and stops the one you select.
-
-Process hygiene is unconditional and has no config keys: a parent-liveness watchdog exits MCP server processes when their parent dies, a newly started lsp daemon reaps older-version daemons at startup, and a best-effort family sweep removes orphaned codegraph and lsp processes at startup on every adapter (OpenCode plugin startup, the Codex `SessionStart` hook, and Senpi session start).
+Process hygiene is unconditional and has no config keys: a parent-liveness watchdog exits MCP server processes when their parent dies, a newly started lsp daemon reaps older-version daemons at startup, and a best-effort family sweep removes orphaned lsp processes at startup on every adapter (OpenCode plugin startup, the Codex `SessionStart` hook, and Senpi session start).
 
 ---
 
@@ -1233,15 +1189,26 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
 
 ### Telemetry
 
+Two distinct keys exist. The `[opencode]` block takes a boolean:
+
 ```jsonc
 {
-  "telemetry": false
+  "[opencode]": { "telemetry": false }
+}
+```
+
+The shared base and Senpi use an object:
+
+```jsonc
+{
+  "telemetry": { "enabled": false }
 }
 ```
 
 | Option      | Default | Description                                                            |
 | ----------- | ------- | ---------------------------------------------------------------------- |
-| `telemetry` | `true`  | Enable anonymous daily-active telemetry. Set to `false` to disable it. |
+| `[opencode].telemetry` | `true` (enabled when omitted) | Enable anonymous daily-active telemetry for the OpenCode plugin. Set to `false` to disable it. |
+| `telemetry.enabled` (shared base) | `true` | Object form used by the shared base and Senpi. A bare boolean at the shared base fails validation. |
 
 ---
 
@@ -1252,6 +1219,7 @@ When enabled, OmO registers the hash-anchored `edit` tool and activates the `has
 | Variable              | Description                                                       |
 | --------------------- | ----------------------------------------------------------------- |
 | `OPENCODE_CONFIG_DIR` | Override OpenCode config directory (useful for profile isolation) |
+| `OPENGATEWAY_API_KEY` | API key for the OpenGateway provider; without this or an `opengateway` auth entry, the plugin does not inject the provider |
 | `OMO_SEND_ANONYMOUS_TELEMETRY` | Set to `0`, `false`, or `no` to disable anonymous telemetry |
 | `OMO_DISABLE_POSTHOG` | Legacy telemetry opt-out flag. Set to `1`, `true`, or `yes` to disable PostHog |
 | `OMO_CODEX_DISABLE_POSTHOG` | Set to `1`, `true`, or `yes` to disable PostHog telemetry for the `omo-codex` adapter. Global `OMO_DISABLE_POSTHOG` also disables Codex telemetry. |
@@ -1350,3 +1318,7 @@ support 1M context. Keep the Antigravity lane explicit when you want predictable
 Common models: `ollama/qwen3-coder`, `ollama/ministral-3:14b`, `ollama/lfm2.5-thinking`
 
 See [Ollama Troubleshooting](../troubleshooting/ollama.md) for `JSON Parse error: Unexpected EOF` issues.
+
+#### OpenGateway
+
+The `omo-opencode` plugin exposes the OpenAI-compatible `opengateway` provider at `https://apis.opengateway.ai/v1` when `OPENGATEWAY_API_KEY` is set or an `opengateway` auth entry exists. No provider is injected if neither credential is present.

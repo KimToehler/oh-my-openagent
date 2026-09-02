@@ -23,7 +23,6 @@ export { createClaudeCodeHooksHook } from "./claude-code-hooks";
 export { createRulesInjectorHook } from "./rules-injector";
 export { createBackgroundNotificationHook } from "./background-notification"
 export { createAutoUpdateCheckerHook } from "./auto-update-checker";
-export { createCodegraphBootstrapHook } from "./codegraph-bootstrap";
 export { createAstGrepSgProvisionHook } from "./ast-grep-sg-provision";
 
 export { createAgentUsageReminderHook } from "./agent-usage-reminder";
@@ -46,7 +45,7 @@ export { createEditErrorRecoveryHook } from "./edit-error-recovery";
 export { createPrometheusMdOnlyHook } from "./prometheus-md-only";
 export { createSisyphusJuniorNotepadHook } from "./sisyphus-junior-notepad";
 export { createTaskResumeInfoHook } from "./task-resume-info";
-export { createStartWorkHook } from "./start-work";
+export { createUlwExecuteHook } from "./ulw-execute";
 export { createAtlasHook } from "./atlas";
 export { createTeamToolGating } from "./team-tool-gating"
 export { createDelegateTaskRetryHook } from "./delegate-task-retry";

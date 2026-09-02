@@ -1,0 +1,8 @@
+sandbox session ids created by THIS run, checked against the REAL db:
+  ses_fffee0882ffeMUx5oXoQgFe7VU -> real_db_hits=0
+  ses_fffedd868ffetPIvTYySwAv3pU -> real_db_hits=0
+
+newest real-db sessions around the run window (title truncated):
+ses_fffede918ffeyfBUKWjYCTmjG1 | /Users/tim/git/onara | Rename field, ship vocabulary (@Sisyphus-Junior subagent) | 2026-08-14 13:39:40
+ses_fffefd394ffelI8UlCLVZE7v3X | /Users/tim/git/oh-my-openagent | F4 scope fidelity and frozen-path audit (@Sisyphus-Junior su | 2026-08-14 13:37:35
+ses_ffff01879ffe35vDjm9BadKOHR | /Users/tim/git/oh-my-openagent | F3 independent QA re-run clean sandbox (@Sisyphus-Junior sub | 2026-08-14 13:37:17

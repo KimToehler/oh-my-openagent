@@ -1,0 +1,177 @@
+=== TASK 5: coalesce discriminator consumed on parent-wake reply path ===
+Date: Sat Aug  8 16:30:14 CEST 2026
+Worktree: /Users/tim/git/oh-my-openagent/.worktrees/bg-wake-sse-render, branch fix/bg-wake-sse-render, base HEAD f5b46e8ce
+
+=== WHAT WAS TESTED ===
+Unit gate: sendParentWakePrompt drives the REAL prompt-async gate (no gate mocks).
+A first dispatch lands, then Date.now is advanced past the 2s reservation hold but
+inside the 15s semantic dedupe hold, so the retry coalesces as already-delivered.
+Assertions: (a) reply path requeues, never trackDispatchedWake/markRetainedNoReplyAdmission;
+(b) admit-only path (forceNoReply+retainPendingWake) never requeues on coalesce;
+(c) requeues terminate at exactly MAX_COALESCE_REQUEUE_ATTEMPTS=3; in-flight and plain
+queued results are NOT classified as discarded.
+
+=== NEW TEST FILE run ===
+(pass) sendParentWakePrompt coalesce requeue > #given the coalesce discriminator #when classifying dispatch results #then only already-delivered counts as discarded [0.04ms]
+
+ 4 pass
+ 0 fail
+ 27 expect() calls
+Ran 4 tests across 1 file. [72.00ms]
+exit=0
+
+=== FULL background-agent suite (baseline 777 pass) ===
+
+ 781 pass
+ 0 fail
+ 2045 expect() calls
+Ran 781 tests across 66 files. [28.21s]
+exit=0
+
+=== prompt-async-gate suite (baseline 83 pass) ===
+
+ 83 pass
+ 0 fail
+ 191 expect() calls
+Ran 83 tests across 11 files. [221.00ms]
+exit=0
+
+=== typecheck ===
+typecheck exit=0
+
+=== PRODUCTION DIFF ===
+diff --git a/packages/omo-opencode/src/features/background-agent/parent-wake-dedupe.ts b/packages/omo-opencode/src/features/background-agent/parent-wake-dedupe.ts
+index 9b28dfd41..81d164351 100644
+--- a/packages/omo-opencode/src/features/background-agent/parent-wake-dedupe.ts
++++ b/packages/omo-opencode/src/features/background-agent/parent-wake-dedupe.ts
+@@ -18,6 +18,7 @@ export type PendingParentWake = {
+   toolCallDeferralStartedAt?: number
+   allowEmptyAssistantTurnRetry?: boolean
+   noAssistantOutputRetryCount?: number
++  coalesceRequeueCount?: number
+ }
+ 
+ export function resolveParentWakePromptContext(promptContext: ParentWakePromptContext): ParentWakePromptContext {
+@@ -49,6 +50,9 @@ export function cloneParentWake(wake: PendingParentWake): PendingParentWake {
+     ...(wake.noAssistantOutputRetryCount !== undefined
+       ? { noAssistantOutputRetryCount: wake.noAssistantOutputRetryCount }
+       : {}),
++    ...(wake.coalesceRequeueCount !== undefined
++      ? { coalesceRequeueCount: wake.coalesceRequeueCount }
++      : {}),
+   }
+ }
+ 
+diff --git a/packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.ts b/packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.ts
+index 386bd5ca5..25a64d146 100644
+--- a/packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.ts
++++ b/packages/omo-opencode/src/features/background-agent/parent-wake-pending-queue.ts
+@@ -63,6 +63,7 @@ export class ParentWakePendingQueue {
+         delete pendingWake.noReplyAdmittedAt
+         delete pendingWake.lastAdmitOnlyDepositAt
+         delete pendingWake.noAssistantOutputRetryCount
++        delete pendingWake.coalesceRequeueCount
+       }
+       return
+     }
+@@ -99,6 +100,13 @@ export class ParentWakePendingQueue {
+       if (noAssistantOutputRetryCount > 0) {
+         pendingWake.noAssistantOutputRetryCount = noAssistantOutputRetryCount
+       }
++      const coalesceRequeueCount = Math.max(
++        pendingWake.coalesceRequeueCount ?? 0,
++        latestWake.coalesceRequeueCount ?? 0,
++      )
++      if (coalesceRequeueCount > 0) {
++        pendingWake.coalesceRequeueCount = coalesceRequeueCount
++      }
+       return
+     }
+     const clonedWake = cloneParentWake(latestWake)
+diff --git a/packages/omo-opencode/src/features/background-agent/parent-wake-prompt-dispatch.ts b/packages/omo-opencode/src/features/background-agent/parent-wake-prompt-dispatch.ts
+index d00ebdc06..459f26e54 100644
+--- a/packages/omo-opencode/src/features/background-agent/parent-wake-prompt-dispatch.ts
++++ b/packages/omo-opencode/src/features/background-agent/parent-wake-prompt-dispatch.ts
+@@ -5,7 +5,7 @@ import {
+   withInternalNoReplyMarker,
+ } from "../../shared"
+ import { dispatchInternalPrompt, isInternalPromptDispatchAccepted } from "../../hooks/shared/prompt-async-gate"
+-import type { PromptDispatchClient } from "../../shared/prompt-async-gate/types"
++import type { InternalPromptDispatchResult, PromptDispatchClient } from "../../shared/prompt-async-gate/types"
+ import { getErrorText } from "./error-classifier"
+ import {
+   createEmptyAssistantTurnRetryDedupeKey,
+@@ -14,6 +14,26 @@ import {
+ import { cloneParentWake, isRedundantParentWake, type PendingParentWake } from "./parent-wake-dedupe"
+ import type { ToolWaitDeferralDecision } from "./parent-wake-session-history"
+ 
++// Explicit termination bound for coalesce-originated requeues. An
++// "already-delivered" coalesce means the gate DISCARDED this wake, so
++// recording it as dispatched would lose it; requeue instead, but only this
++// many times per wake so the loop terminates by invariant, not by the
++// semantic-dedupe hold happening to expire. Deliberately distinct from
++// MAX_NO_ASSISTANT_OUTPUT_RETRIES (parent-wake-window-recovery.ts): that
++// budget covers post-dispatch window recovery, this one covers pre-dispatch
++// gate discards.
++export const MAX_COALESCE_REQUEUE_ATTEMPTS = 3
++// Mirrors the reserved-branch backoff below: retrying faster than the gate's
++// post-dispatch hold would spin against the same recent-dispatch record.
++const COALESCE_REQUEUE_FLUSH_DELAY_MS = 2_000
++
++// The gate discarded this prompt as a duplicate of one already delivered.
++// An "in-flight" coalesce is NOT discarded: an identical prompt is still on
++// its way, so treating it as dispatched is correct.
++export function isDiscardedCoalesceDispatchResult(result: InternalPromptDispatchResult): boolean {
++  return result.status === "queued" && result.coalesceKind === "already-delivered"
++}
++
+ type ParentWakePromptDispatchInput = {
+   readonly client: PromptDispatchClient
+   readonly directory: string
+@@ -95,6 +115,23 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
+       })
+       return
+     }
++    if (isDiscardedCoalesceDispatchResult(promptResult) && !isAdmitOnlyDispatch(input)) {
++      const coalesceRequeueCount = input.latestWake.coalesceRequeueCount ?? 0
++      if (coalesceRequeueCount < MAX_COALESCE_REQUEUE_ATTEMPTS) {
++        input.latestWake.coalesceRequeueCount = coalesceRequeueCount + 1
++        input.requeueWake(input.latestWake)
++        input.scheduleFlush(COALESCE_REQUEUE_FLUSH_DELAY_MS)
++        log("[background-agent] Requeued parent wake discarded as an already-delivered coalesce:", {
++          sessionID: input.sessionID,
++          coalesceRequeueCount: coalesceRequeueCount + 1,
++        })
++        return
++      }
++      log("[background-agent] Coalesce requeue budget exhausted; recording parent wake as dispatched:", {
++        sessionID: input.sessionID,
++        coalesceRequeueCount,
++      })
++    }
+     if (!isInternalPromptDispatchAccepted(promptResult)) {
+       input.requeueWake(input.latestWake)
+       input.scheduleFlush()
+@@ -116,6 +153,13 @@ export async function sendParentWakePrompt(input: ParentWakePromptDispatchInput)
+   }
+ }
+ 
++// The admit-only path deposits a retained noReply admission and MUST NOT
++// requeue on a coalesce: requeuing would re-deposit identical noReply text and
++// skip the markRetainedNoReplyAdmission write that #4874/#5086 depend on.
++function isAdmitOnlyDispatch(input: ParentWakePromptDispatchInput): boolean {
++  return input.forceNoReply === true && input.retainPendingWake === true
++}
++
+ function markRetainedNoReplyAdmission(input: ParentWakePromptDispatchInput, dispatchStartedAt: number): void {
+   if (input.retainPendingWake !== true || input.forceNoReply !== true) {
+     return
+
+=== WHY IT IS ENOUGH ===
+Tests drive the real gate end-to-end (semantic dedupe record + reservation expiry via
+a controlled clock), asserting the named coalesceKind field, not position. Full suite
+green at 781 (777 baseline + 4 new) proves no regression in sibling wake paths.
+
+=== WHAT WAS OMITTED ===
+No secrets involved. Live opencode QA deferred to the umbrella task for this branch
+(bg-wake-sse-render) which drives the full SSE render QA for all its commits.

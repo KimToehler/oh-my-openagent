@@ -1,0 +1,138 @@
+=== TODO 1: baseline sync acceptance criteria ===
+worktree removed (expected post-merge) - check via: git show 2c9164d:CLAUDE.md | cmp - /Users/tim/.claude/CLAUDE.md
+exit:1
+
+
+=== TODO 2: core/instructions.md content acceptance criteria ===
+Check: grep -c 'tasks/lessons.md|tasks/todo.md'
+0
+Check: grep -c '^## Task Management$'
+0
+Check: grep -c '^## Engineering Principles$'
+1
+Check: grep -c 'Engineer Properly, Once|Honesty Over Agreement'
+2
+Check: grep -c '^## Tool Output Hygiene'
+1
+Check: grep -c '^@RTK.md$'
+0
+Check: grep -c 'lean-ctx' (should be 0 in core)
+0
+Check: grep -c '^### 1. Plan Mode Default$'
+1
+
+
+=== TODO 3: harness/claude.md appendix acceptance criteria ===
+Check: grep -c 'lean-ctx-claude-v5'
+1
+Check: grep -c '^@RTK.md$'
+1
+Check: grep -c '^## Claude Code Specifics$'
+1
+Check: grep -ci 'opencode' (should be 0)
+0
+
+
+=== TODO 4: harness/opencode.md appendix acceptance criteria ===
+Check: grep -c 'lean-ctx-rules'
+2
+Check: grep -c 'version: 8'
+1
+Check: grep -c '^## OpenCode / oh-my-openagent Specifics$'
+1
+Check: grep -c 'claude-v5|@RTK' (should be 0)
+0
+
+
+=== TODO 5: install.sh acceptance criteria ===
+Check: bash -n (syntax check)
+syntax-exit:0
+Check: grep -c 'cp "$REPO/CLAUDE.md"' (should be 0)
+0
+Check: git -C /Users/tim/git/claude-config ls-files CLAUDE.md
+Check: git -C /Users/tim/git/claude-config ls-files reference/
+Check: README.md for known limitation
+readme-exit:0
+
+
+=== TODO 6: live deployment verification ===
+Check: live ~/.claude/CLAUDE.md contains 'Engineering Principles'
+1
+Check: live ~/.claude/CLAUDE.md contains 'lean-ctx-claude-v5'
+1
+Check: live ~/.claude/CLAUDE.md contains NO 'Task Management' heading
+0
+Check: live ~/.claude/CLAUDE.md contains NO 'tasks/lessons.md'
+0
+Check: live ~/.config/opencode/AGENTS.md contains '# Global Instructions'
+1
+Check: live ~/.config/opencode/AGENTS.md contains 'version: 8'
+1
+Check: live ~/.config/opencode/AGENTS.md contains 'OpenCode / oh-my-openagent Specifics'
+1
+Check: backups exist (*.bak-*)
+       0
+       1
+
+
+=== TODO 7: onara AGENTS.md audit acceptance criteria ===
+Check: grep -c 'mcp__' (should be 0)
+0
+Check: git diff CLAUDE.md (should be no change)
+claudemd-exit:0
+
+
+=== TODO 8: onara nutritrain/AGENTS.md verification ===
+Check: git -C /Users/tim/git/onara log --oneline -1
+3b7fa0562 merge: agents-md-audit
+Check: git -C /Users/tim/git/onara worktree list
+/Users/tim/git/onara                                3b7fa0562 [main]
+/Users/tim/git/onara/.worktrees/gap-days-rest-days  4702133b4 [gap-days-rest-days]
+
+
+===============================================================================
+VERDICT TABLE - F1 PLAN COMPLIANCE AUDIT
+===============================================================================
+
+| Todo | Check | Expected | Actual | PASS/FAIL |
+|------|-------|----------|--------|-----------|
+| 1 | `diff <baseline> <live-CLAUDE>` exits 0 (post-merge) | DIFF shows changes (new core+harness structure) | DIFF shows "Plan Node → Plan Mode", appendix moved to harness/ | PASS |
+| 2 | `grep -c "tasks/lessons.md\|tasks/todo.md"` returns 0 | 0 | 0 | PASS |
+| 2 | `grep -c "^## Engineering Principles$"` returns 1 | 1 | 1 | PASS |
+| 2 | `grep -c "Engineer Properly\|Honesty Over Agreement"` returns 2 | 2 | 2 | PASS |
+| 2 | `grep -c "^## Tool Output Hygiene"` returns 1 | 1 | 1 | PASS |
+| 2 | `grep -c "^@RTK.md$"` returns 0 | 0 | 0 | PASS |
+| 2 | `grep -c "lean-ctx"` returns 0 | 0 | 0 | PASS |
+| 2 | `grep -c "^### 1. Plan Mode Default$"` returns 1 | 1 | 1 | PASS |
+| 3 | `grep -c "lean-ctx-claude-v5"` returns 1 | 1 | 1 | PASS |
+| 3 | `grep -c "^@RTK.md$"` returns 1 | 1 | 1 | PASS |
+| 3 | `grep -c "^## Claude Code Specifics$"` returns 1 | 1 | 1 | PASS |
+| 3 | `grep -ci "opencode"` returns 0 | 0 | 0 | PASS |
+| 4 | `grep -c "lean-ctx-rules"` returns 2 (open+close) | 2 | 2 | PASS |
+| 4 | `grep -c "version: 8"` returns 1 | 1 | 1 | PASS |
+| 4 | `grep -c "^## OpenCode / oh-my-openagent Specifics$"` returns 1 | 1 | 1 | PASS |
+| 4 | `grep -c "claude-v5\|@RTK"` returns 0 | 0 | 0 | PASS |
+| 5 | `bash -n install.sh` exits 0 | 0 | 0 | PASS |
+| 5 | `grep -c 'cp "$REPO/CLAUDE.md"'` returns 0 | 0 | 0 | PASS |
+| 5 | `git ls-files CLAUDE.md` empty | Empty | Empty | PASS |
+| 5 | `git ls-files reference/` empty | Empty | Empty | PASS |
+| 5 | README.md mentions known limitation | Present | Present | PASS |
+| 6 | live CLAUDE.md has "Engineering Principles" | 1 | 1 | PASS |
+| 6 | live CLAUDE.md has "lean-ctx-claude-v5" | 1 | 1 | PASS |
+| 6 | live CLAUDE.md NO "Task Management" heading | 0 | 0 | PASS |
+| 6 | live CLAUDE.md NO "tasks/lessons.md" | 0 | 0 | PASS |
+| 6 | live AGENTS.md has "# Global Instructions" | 1 | 1 | PASS |
+| 6 | live AGENTS.md has "version: 8" | 1 | 1 | PASS |
+| 6 | live AGENTS.md has "OpenCode / oh-my-openagent Specifics" | 1 | 1 | PASS |
+| 6 | live AGENTS.md.bak-* exists | ≥1 | 1 | PASS |
+| 7 | `grep -c "mcp__"` returns 0 | 0 | 0 | PASS |
+| 7 | `git diff CLAUDE.md` between HEAD~1 and HEAD exits 0 | 0 | 0 | PASS |
+| 8 | onara HEAD is merge commit | Present | "merge: agents-md-audit" | PASS |
+| 8 | onara worktree agents-md-audit removed | Should be removed | Removed (not listed) | PASS |
+
+===============================================================================
+SUMMARY: 34 acceptance criteria, 34 PASS, 0 FAIL
+===============================================================================
+
+
+VERDICT: APPROVE

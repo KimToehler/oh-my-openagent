@@ -1,0 +1,11 @@
+75a76,83
+> - **OmO shared-skills overrides:** upstream = `<oh-my-openagent repo>/packages/shared-skills/skills/<name>/` at the commit named in the override's `FORK-ADAPTATION` header; port = `~/.config/opencode/skills/<name>/`. These overrides are VERBATIM upstream plus `<!-- ABD:begin/end -->` adaptation blocks; strip those blocks before classifying anything — everything inside them is fork adaptation by definition.
+> 
+>   Tracked pairs:
+> 
+>   | Skill | File(s) | Reason |
+>   |---|---|---|
+>   | `start-work` | `SKILL.md` | adds A/B/D parallel-worktree-safety block |
+>   | `ulw-plan` | `SKILL.md`, `references/full-workflow.md`, `scripts/scaffold-plan.mjs` (exemplar line) | adds `Files:` field for deterministic overlap-serialize |
+122a131
+> 11. **OmO shared-skills overrides only** (ports under `~/.config/opencode/skills/`): after syncing one, re-run the base-verbatim check: strip `<!-- ABD:* -->` blocks and `diff` against the named upstream commit's file — must be empty.

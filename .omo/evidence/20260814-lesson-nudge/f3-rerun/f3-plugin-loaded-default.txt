@@ -1,0 +1,1 @@
+[2026-08-14T11:39:44.793Z] [rt:14669:dc59] [oh-my-openagent] ENTRY - plugin loading {"directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.B0ngY60keD/proj"}

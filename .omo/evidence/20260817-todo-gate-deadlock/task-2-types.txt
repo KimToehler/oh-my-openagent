@@ -1,0 +1,60 @@
+TASK 2: Add todo-gate fields to BackgroundTask interface
+
+WHAT WAS TESTED
+===============
+1. TypeScript compilation: `bun run typecheck` on entire project
+2. Field presence verification: grep for new field names in types.ts
+3. Field type verification: confirmed Date and number types
+4. Surface assignability: fields are optional (?) and have correct types
+
+WHAT WAS OBSERVED
+=================
+Test 1 - TypeScript compilation
+  Command: bun run typecheck (full project)
+  Exit code: 0
+  Result: PASS - No type errors, no warnings
+  
+Test 2 - Field presence
+  grep "todoGateFirstObservedAt?" packages/omo-opencode/src/features/background-agent/types.ts
+  Output: Line found with JSDoc comment
+  grep "unfinishedTodoCount?" packages/omo-opencode/src/features/background-agent/types.ts
+  Output: Line found with JSDoc comment
+
+Test 3 - Type verification
+  - todoGateFirstObservedAt?: Date - PASS
+  - unfinishedTodoCount?: number - PASS
+  
+Test 4 - Surface assignability (manual inspection)
+  - Fields placed alongside existing optional poll-state fields
+  - Indentation matches surrounding code
+  - JSDoc comments present and formatted correctly
+  - Both fields are optional (?) as required
+  - Date type used for timestamp field
+  - number type used for count field
+  - Semicolons in JSDoc preserved as specified
+
+WHY IT IS ENOUGH
+================
+This is a type-only change with no runtime behavior. The evidence proves:
+1. The TypeScript compiler accepts the new field additions (exit code 0)
+2. The fields are syntactically correct and properly positioned in the interface
+3. The types are exactly as specified (Date for timestamp, number for count)
+4. No consumers exist yet - these fields are consumed by task #4 (not yet implemented)
+5. The change is additive and backward-compatible (optional fields don't break existing code)
+
+The typecheck pass is definitive proof that:
+- All imports resolve correctly
+- The interface is valid TypeScript
+- No type errors exist in consumers (there are none yet)
+- The change does not introduce any compilation problems
+
+WHAT WAS OMITTED
+================
+- Runtime behavior: not applicable (no behavior exists yet)
+- Real harness test: not applicable (no surface to test; fields consumed in task #4)
+- Generated artifacts: none exist for type-only changes
+- Secret/credential scrubbing: not applicable (no secrets in this change)
+
+File paths used:
+  /Users/tim/git/oh-my-openagent/.worktrees/todo-gate-deadlock/packages/omo-opencode/src/features/background-agent/types.ts
+  (verified via typecheck at worktree root)

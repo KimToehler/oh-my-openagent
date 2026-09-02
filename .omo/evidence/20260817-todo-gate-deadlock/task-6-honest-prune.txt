@@ -1,0 +1,48 @@
+WHAT WAS TESTED
+- TDD RED: bun test packages/omo-opencode/src/features/background-agent/task-poller.test.ts before production changes.
+- GREEN: bun test packages/omo-opencode/src/features/background-agent/ twice after changes.
+- Type safety: bun run typecheck.
+- Manual log-surface QA: /tmp/todo6-manual-qa.ts injected BackgroundManager logger, used manual Date.now, pruned a stale-output task, and polled an incomplete-todo gate 20 times within one simulated minute. Script deleted after capture.
+
+WHAT WAS OBSERVED
+RED output:
+Expected to contain: "1800s"
+Received: ""
+Expected to contain: "stuck with output present"
+Received: "Task timed out after 30 minutes of inactivity"
+Expected: 1
+Received: 20
+
+GREEN output, run 1:
+875 pass
+0 fail
+2299 expect() calls
+Ran 875 tests across 77 files. [31.87s]
+
+GREEN output, run 2:
+875 pass
+0 fail
+2299 expect() calls
+Ran 875 tests across 77 files. [31.52s]
+
+Typecheck output:
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+exit 0
+
+Manual QA output:
+PRUNE: Task stuck with output present after 1801s of inactivity (30 minute TTL)
+GATE_LOG_LINES: 1
+SCRIPT_DELETED: yes
+
+Adversarial probes:
+- misleading_success_output: before wording was "Task timed out after 30 minutes of inactivity" and manager logged startedAt age. After wording says stuck with output present and age is based on lastUpdate, matching TTL basis. No other age log in these files reports task prune age.
+- stale_state: terminal cleanup deletes todoGateLogLastEmittedAt entry in tryCompleteTask finally; removeTask also deletes it. New task first observation logged immediately after prior task cleanup.
+- flaky_tests: manual Date.now only, no sleeps. Scoped suite ran twice with identical 875 pass / 0 fail result.
+- dirty_worktree: checked before commit.
+- remaining ultraqa classes: not applicable. No auth, external API, persistence format, UI, config schema, or concurrency behavior changed.
+
+WHY IT IS ENOUGH
+Tests pin callback prune message age and output-state wording while leaving TTL predicates untouched. Polling test proves first log, one-minute emission, new-task independence, and terminal cleanup. Manual QA shows exact incident-facing log surface under deterministic clock control.
+
+WHAT WAS OMITTED
+Raw logger timestamps and environment data omitted. No secrets, tokens, or auth headers captured.

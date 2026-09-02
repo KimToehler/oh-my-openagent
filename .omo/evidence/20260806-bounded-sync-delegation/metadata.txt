@@ -1,0 +1,107 @@
+metadata.txt - task 6 (option A QA) isolation proof
+====================================================
+
+Date:        2026-08-06
+Repo:        /Users/tim/git/oh-my-openagent
+Branch:      dev (main checkout, NO worktree - deliberate user override)
+HEAD:        3f7caef6a docs(prompts): allow backgrounded task delegation in atlas variants
+opencode:    1.18.5
+Driver:      /tmp/omo-qa-t6/run-qa.sh (retained on disk)
+
+REAL DB ISOLATION PROOF
+-----------------------
+Command:  sqlite3 "$(opencode db path)" "SELECT count(*) FROM session"
+DB path:  /Users/tim/.local/share/opencode/opencode.db
+
+  session count BEFORE whole QA run : 1204
+  session count AFTER  whole QA run : 1204
+
+  IDENTICAL -> the real DB was never written. PASS.
+
+The real DB was only ever READ (two count queries). Every opencode write went
+to the sandbox DB below.
+
+SANDBOX
+-------
+Created by:  source script/agent/qa-sandbox.sh
+Sandbox root: /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.MJbLw4VHus
+  XDG_DATA_HOME   = <root>/data
+  XDG_CONFIG_HOME = <root>/config
+  XDG_CACHE_HOME  = <root>/cache
+  XDG_STATE_HOME  = <root>/state
+  CODEX_HOME      = <root>/codex
+  OPENCODE_DISABLE_AUTOUPDATE=1
+  OPENCODE_DISABLE_MODELS_FETCH=1
+
+ADDITIONAL isolation applied by the driver, beyond qa-sandbox.sh:
+  HOME = <root>/home
+
+  Reason (important, and NOT covered by qa-sandbox.sh): the omo config loader
+  resolves the USER config layer from HOME, not from XDG_CONFIG_HOME. See
+  packages/omo-config-core/src/loader/paths.ts:
+     resolveUserOmoConfigDirectory() -> join(resolveHomeDir(env), ".omo")
+     resolveHomeDir() -> env.HOME ?? env.USERPROFILE
+  With only qa-sandbox.sh sourced, the host's real ~/.omo/omo.jsonc would still
+  have been loaded into the sandboxed run and would have routed every agent at
+  the real `onara/*` models, defeating the hermetic fake provider. Sandboxing
+  HOME closes that leak. The host's ~/.omo/omo.jsonc was READ-ONLY inspected
+  and never modified.
+
+  $HOME/.opencode/bin was symlinked into the sandbox home (the same trick
+  oqa_preserve_home_opencode_bin uses in the opencode-qa common.sh harness) so
+  the opencode launcher still resolves after HOME is rewritten.
+
+SANDBOX DB (where the QA writes actually landed)
+------------------------------------------------
+  <root>/data/opencode/opencode.db  ->  2 sessions
+  (1 parent session + 1 delegated child session, exactly as expected)
+
+HOST CONFIG UNTOUCHED
+---------------------
+  ~/.config/opencode : not read, not written (XDG_CONFIG_HOME redirected)
+  ~/.codex           : not read, not written (CODEX_HOME redirected)
+  ~/.omo/omo.jsonc   : read-only inspection only; sandboxed HOME meant the run
+                       itself never loaded it
+
+
+================================================================================
+TASK 11 - OPTION C REAL-OPENCODE QA (appended 2026-08-06)
+================================================================================
+
+HEAD:   c92d136e2 feat(delegate-task): yield sync tasks to background at wall-clock bound
+Driver: /tmp/omo-qa-t11/run-qa.sh (copied to task-11-run-qa.sh)
+
+REAL DB SESSION COUNTS (host DB /Users/tim/.local/share/opencode/opencode.db,
+READ-ONLY throughout)
+
+  bounded run (syncWallClockTimeoutMs = 60000)
+    BEFORE : 1215
+    AFTER  : 1217
+
+  negative control run (syncWallClockTimeoutMs unset)
+    BEFORE : 1217
+    AFTER  : 1217
+
+  The bounded run's +2 is NOT a QA leak. Both rows are unrelated concurrent host
+  activity in a different repository:
+
+    ses_028d725ecffegus065fpVu4R4V  librarian  /Users/tim/git/onara  "Serena JetBrains mode requirements (@lib..."
+    ses_028d6e598ffeEVN5dTMzc87KqL  librarian  /Users/tim/git/onara  "Serena memory + LS lifecycle costs (@lib..."
+
+  The three leak-detection queries all return 0:
+    SELECT count(*) FROM session WHERE directory LIKE '%omo-qa-sandbox%'    -> 0
+    SELECT count(*) FROM session WHERE title LIKE '%wallclock%'             -> 0
+    SELECT count(*) FROM session WHERE id IN (<this QA's parent/child ids>) -> 0
+
+  Everything this QA created landed in the sandbox DBs instead: 2 sessions per
+  run (1 parent + 1 delegated child). The control run, which ran alone with no
+  concurrent host activity, shows BEFORE == AFTER exactly.
+
+SANDBOX ROOTS (retained during evidence extraction, then removed)
+  bounded : /var/folders/.../T/omo-qa-sandbox.XXXXXX.LmgdLzdxDq
+  control : /var/folders/.../T/omo-qa-sandbox.XXXXXX.GBujOxRDQS
+
+Same two-layer isolation as task 6 (qa-sandbox.sh + sandboxed HOME + the
+.opencode/bin symlink), for the same reason documented above.
+
+Full detail: task-11-option-c-qa.txt

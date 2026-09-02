@@ -1,0 +1,52 @@
+WHAT WAS TESTED
+- RED: bun test packages/omo-opencode/src/features/background-agent/manager.test.ts --test-name-pattern='todo gate log entry'
+- GREEN: same focused test command after structural cleanup change.
+- Scoped suite: bun test packages/omo-opencode/src/features/background-agent/
+- Type check: bun run typecheck
+- Frozen file: git diff dev..HEAD -- packages/omo-opencode/src/features/background-agent/session-idle-event-handler.ts
+- Manual real-surface probe: temporary /tmp/todo-gate-leak-probe.ts instantiated BackgroundManager, seeded gate state, TTL-pruned task, then terminal-reaped it. Script deleted after run.
+
+WHAT WAS OBSERVED
+RED output:
+Expected: false
+Received: true
+at BackgroundManager.pruneStaleTasksAndNotifications > clears todo gate log entry when TTL pruning removes task
+
+Expected: false
+Received: true
+at BackgroundManager - Non-blocking Queue Integration > cancelTask > clears todo gate log entry when task is cancelled
+
+GREEN output:
+3 pass
+0 fail
+5 expect() calls
+
+Scoped suite output:
+878 pass
+0 fail
+2304 expect() calls
+Ran 878 tests across 77 files.
+Baseline: 875 pass / 0 fail. After: 878 pass / 0 fail.
+
+Type check completed with exit 0.
+Frozen session-idle-event-handler diff was empty.
+
+Manual probe output:
+A) after gate log, entry present = true
+B) task status after prune = error | entry present = true
+C) task still in tasks map = false | gate entry LEAKED = false
+cleanup receipt: /tmp/todo-gate-leak-probe.ts deleted
+
+Terminal-path enumeration:
+- completed: tryCompleteTask finally clears todoGateLogLastEmittedAt directly.
+- error: onTaskPruned sets error, then terminal reaper invokes onTaskRemoved and BackgroundManager.removeTask clears map. failBlockedTask schedules removeTask and is covered by removeTask.
+- cancelled: cancelTask clears map directly. expireBlockedTask schedules removeTask and is covered by removeTask.
+- interrupt: checkAndInterruptStaleTasks terminal cleanup schedules removeTask and is covered by removeTask.
+- generic terminal reaping: task-poller now invokes manager removeTask through onTaskRemoved, covering every terminal task regardless of terminal source.
+
+WHY IT IS ENOUGH
+Task-poller preserves every TTL decision branch and timing rule. Only terminal deletion delegates to BackgroundManager.removeTask, centralizing cleanup for all manager-owned per-task state. Focused tests prove cancellation, TTL prune plus raw terminal reap, and completion cleanup. Full background-agent suite and workspace type check pass.
+
+WHAT WAS OMITTED
+- No secrets, credentials, auth headers, or environment dumps captured.
+- LSP diagnostics unavailable: workspace TypeScript installation could not be resolved by LSP. bun run typecheck completed successfully instead.

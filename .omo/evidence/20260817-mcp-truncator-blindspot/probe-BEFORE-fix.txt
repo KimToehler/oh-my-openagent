@@ -1,0 +1,35 @@
+[qa-mcp] returning 20888998 chars
+=== MCP server advertised tools ===
+diagnostics
+
+=== payload as the hook receives it (MCP path) ===
+has .output          : false
+typeof .output       : undefined
+content[] blocks     : 1
+content[0].text chars: 20888998
+content[0].text lines: 200004
+
+=== after the hook ran ===
+content[0].text chars: 20888998
+content[0].text lines: 200004
+
+=== what the model actually receives ===
+chars                : 20888998
+lines                : 200004
+header preserved     : true
+truncation marker    : false
+tail sentinel gone   : false
+
+--- first 3 lines ---
+QA_MCP_HEADER_LINE_1
+QA_MCP_HEADER_LINE_2
+QA_MCP_HEADER_LINE_3
+--- last 2 lines ---
+QA_MCP_BODY_LINE_199999 xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+QA_MCP_TAIL_SENTINEL_SHOULD_BE_TRUNCATED_AWAY
+
+=== shrink ===
+chars 20888998 -> 20888998
+lines 200004 -> 200004
+
+RESULT: FAIL

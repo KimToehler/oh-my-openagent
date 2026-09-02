@@ -1,0 +1,264 @@
+# Task 1 - delegate-task tool text: remove the 5+ queries / exploration-only gate on run_in_background
+Date: 2026-08-06T11:36:07Z
+Branch: dev  Base commit: aa44f8048
+NOTE: main checkout, NO worktree - deliberate user override recorded in the task brief.
+
+## WHAT WAS TESTED
+Two model-facing strings that steer delegation mode:
+  - packages/omo-opencode/src/tools/delegate-task/tool-description.ts (run_in_background bullet)
+  - packages/omo-opencode/src/tools/delegate-task/tools.ts (zod .describe() on run_in_background)
+Goal: background delegation reads as the norm for work the parent does not immediately consume;
+sync reads as the case where the parent's very next step depends on the result.
+Method: failing-first (RED) unit assertions on the rendered strings, then reword, then GREEN,
+plus a manual print of the ACTUAL generated description a model would receive.
+
+## BASELINE - PRE-EXISTING DIRTY WORKTREE (adversarial class: dirty_worktree)
+$ git status --porcelain   # captured BEFORE any edit
+ M packages/omo-codex/plugin/components/codegraph/dist/cli.js
+ M packages/omo-codex/scripts/install-dist/install-local.mjs
+ M packages/omo-senpi/plugin/extensions/omo-member.js
+ M packages/omo-senpi/plugin/extensions/omo.js
+These 4 build artifacts are NOT mine. git add -A / git add . were NEVER run.
+Staging was done by explicit path only. Proof after staging is below.
+
+## COMMANDS RUN
+1. git status --porcelain                                   # baseline dirty state
+2. git log --oneline -20 ; git log --oneline -5 -- packages/omo-opencode/src/tools/delegate-task/   # commit convention
+3. bun test .../tool-description.test.ts .../task-schema.test.ts   # RED (before edits)
+4. <edit tool-description.ts + tools.ts>
+5. rg -n "5\+ independent queries|ONLY for parallel exploration" packages/omo-opencode/src/tools/delegate-task/ -g "!*.test.ts"
+6. rg -n -A2 "run_in_background: tool.schema" packages/omo-opencode/src/tools/delegate-task/tools.ts
+7. rg -n "\.default\(" packages/omo-opencode/src/tools/delegate-task/tools.ts
+8. bun test packages/omo-opencode/src/tools/delegate-task/           # GREEN, full scoped suite
+9. bun run typecheck                                                 # exit 0
+10. bun /tmp/task1-print-description.ts                              # manual QA, prints real strings
+11. bun test .../tool-description.test.ts 2>&1 | tail -30            # required manual-QA invocation
+
+## RED OUTPUT (before the production edit) - exit code 1
+Assertion that failed (adversarial class: misleading_success_output - this is a real
+assertion failure on the forbidden phrases, NOT a syntax or import error):
+  error: expect(received).not.toContain(expected)
+  Expected to not contain: "ONLY for parallel exploration"
+  Received: "Optional; defaults to false (sync). true=async (returns background task ID `bg_...` for background_output), false=sync (waits). Use true ONLY for parallel exploration; otherwise omit or pass false for task delegation."
+  at task-schema.test.ts:73:49
+  error: expect(received).not.toContain(expected)
+  Expected to not contain: "5+ independent queries"
+  at tool-description.test.ts:27:29
+Full RED transcript:
+--------------------------------------------------------------------
+bun test v1.3.14 (d1632b29)
+
+packages/omo-opencode/src/tools/delegate-task/task-schema.test.ts:
+68 | 
+69 | 		//#when
+70 | 		const runInBackgroundSchema = unsafeTestValue<{ description?: string }>(toolDefinition.args.run_in_background)
+71 | 
+72 | 		//#then
+73 | 		expect(runInBackgroundSchema.description).not.toContain("ONLY for parallel exploration")
+                                                     ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "ONLY for parallel exploration"
+Received: "Optional; defaults to false (sync). true=async (returns background task ID `bg_...` for background_output), false=sync (waits). Use true ONLY for parallel exploration; otherwise omit or pass false for task delegation."
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/tools/delegate-task/task-schema.test.ts:73:49)
+(fail) createDelegateTask schema > #given task schema #when describing async mode #then it does not gate background on parallel exploration or a query threshold [0.56ms]
+
+packages/omo-opencode/src/tools/delegate-task/tool-description.test.ts:
+22 | 
+23 |     //#when
+24 |     const description = presentation.description
+25 | 
+26 |     //#then
+27 |     expect(description).not.toContain("5+ independent queries")
+                                 ^
+error: expect(received).not.toContain(expected)
+
+Expected to not contain: "5+ independent queries"
+Received: "Spawn agent task with category-based or direct agent selection.\n\n  ⚠️  CRITICAL: You MUST provide EITHER category OR subagent_type. Omitting BOTH will FAIL.\n\n  **COMMON MISTAKE (DO NOT DO THIS):**\n  ```\n  task(description=\"...\", prompt=\"...\")  // ❌ FAILS - missing category AND subagent_type\n  ```\n\n  **CORRECT - Using category:**\n  ```\n  task(category=\"quick\", description=\"Fix type error\", prompt=\"...\")\n  ```\n\n  **CORRECT - Using subagent_type with parallel exploration:**\n  ```\n  task(subagent_type=\"explore\", description=\"Find patterns\", prompt=\"...\", run_in_background=true)\n  ```\n\n  REQUIRED: Provide ONE of:\n  - category: For task delegation (uses Sisyphus-Junior with category-optimized model)\n  - subagent_type: For direct agent invocation (explore, librarian, oracle, etc.)\n\n  **DO NOT provide both.** If category is provided, subagent_type is ignored.\n\n  - load_skills: Optional. Defaults to [] when omitted. Pass [\"skill-1\", \"skill-2\"] for skill-specific tasks.\n  - category: Use predefined category → Spawns Sisyphus-Junior with category config\n    Available categories:\n    - visual-engineering: Frontend, UI/UX, design, styling, animation\n  - artistry: Complex problem-solving with unconventional, creative approaches - beyond standard patterns\n  - ultrabrain: Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.\n  - deep: Goal-oriented autonomous problem-solving on hairy problems requiring deep research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one.\n  - quick: Trivial tasks - single file changes, typo fixes, simple modifications\n  - unspecified-low: Tasks that don't fit other categories, low effort required\n  - unspecified-high: Tasks that don't fit other categories, high effort required\n  - writing: Documentation, prose, technical writing\n  - subagent_type: Use specific agent directly (explore, librarian, oracle, metis, momus)\n  - run_in_background: Optional. Defaults to false (sync, waits). Set true=async (returns a background task ID like `bg_...` for `background_output`) ONLY for parallel exploration with 5+ independent queries.\n    Sync waits use a 30-minute inactivity window: OpenCode busy/retry/running status resets the window, so this is not a total wall-clock limit.\n  - task_id: Continuation session id (`ses_...`) from task metadata. Continues the same subagent session with FULL CONTEXT PRESERVED; not the background task id (`bg_...`).\n  - command: The command that triggered this task (optional, for slash command tracking).\n\n  **WHEN TO USE task_id:**\n  - Task failed/incomplete → `task(task_id=\"ses_...\", prompt=\"fix: [specific issue]\")`\n  - Need follow-up on previous result → `task(task_id=\"ses_...\", prompt=\"Also: [question]\")`\n  - Multi-turn conversation with same agent → always `task(task_id=\"ses_...\")` instead of new task\n\n  Prompts MUST be in English."
+
+      at <anonymous> (/Users/tim/git/oh-my-openagent/packages/omo-opencode/src/tools/delegate-task/tool-description.test.ts:27:29)
+(fail) createDelegateTaskPresentation > #given background delegation guidance #when description is rendered #then it does not gate background on parallel exploration or a query threshold [0.17ms]
+
+ 7 pass
+ 2 fail
+ 26 expect() calls
+Ran 9 tests across 2 files. [129.00ms]
+--------------------------------------------------------------------
+
+## GREEN OUTPUT (after the production edit)
+$ bun test packages/omo-opencode/src/tools/delegate-task/tool-description.test.ts 2>&1 | tail -30   # exit 0
+bun test v1.3.14 (d1632b29)
+
+ 4 pass
+ 0 fail
+ 12 expect() calls
+Ran 4 tests across 1 file. [75.00ms]
+
+$ bun test packages/omo-opencode/src/tools/delegate-task/   # exit 0
+bun test v1.3.14 (d1632b29)
+
+ 487 pass
+ 0 fail
+ 1142 expect() calls
+Ran 487 tests across 41 files. [2.05s]
+
+$ bun run typecheck   # exit 0
+$ tsgo --noEmit && bun run typecheck:script && bun run typecheck:packages
+$ tsgo --noEmit -p script/tsconfig.json
+$ tsgo --noEmit -p packages/rules-engine/tsconfig.json && tsgo --noEmit -p packages/delegate-core/tsconfig.json && tsgo --noEmit -p packages/mcp-stdio-core/tsconfig.json && tsgo --noEmit -p packages/mcp-client-core/tsconfig.json && tsgo --noEmit -p packages/git-bash-mcp/tsconfig.json && tsgo --noEmit -p packages/lsp-core/tsconfig.json && tsgo --noEmit -p packages/utils/tsconfig.json && tsgo --noEmit -p packages/model-core/tsconfig.json && tsgo --noEmit -p packages/omo-config-core/tsconfig.json && tsgo --noEmit -p packages/prompts-core/tsconfig.json && tsgo --noEmit -p packages/comment-checker-core/tsconfig.json && tsgo --noEmit -p packages/hashline-core/tsconfig.json && tsgo --noEmit -p packages/tmux-core/tsconfig.json && tsgo --noEmit -p packages/team-core/tsconfig.json && tsgo --noEmit -p packages/openclaw-core/tsconfig.json && tsgo --noEmit -p packages/boulder-state/tsconfig.json && tsgo --noEmit -p packages/telemetry-core/tsconfig.json && tsgo --noEmit -p packages/claude-code-compat-core/tsconfig.json && tsgo --noEmit -p packages/skills-loader-core/tsconfig.json && tsgo --noEmit -p packages/agents-md-core/tsconfig.json && tsgo --noEmit -p packages/omo-codex/plugin/shared/tsconfig.json && tsgo --noEmit -p packages/omo-codex/tsconfig.json && tsgo --noEmit -p packages/omo-senpi/tsconfig.json && tsgo --noEmit -p packages/senpi-task/tsconfig.json && tsgo --noEmit -p packages/pi-goal/tsconfig.json && tsgo --noEmit -p packages/pi-webfetch/tsconfig.json && tsgo --noEmit -p packages/omo-opencode/tsconfig.json
+
+## AUTOMATED ACCEPTANCE CRITERIA
+$ rg -n "5\+ independent queries|ONLY for parallel exploration" packages/omo-opencode/src/tools/delegate-task/ -g "!*.test.ts"
+  -> no matches (rg exit 1). The only remaining occurrences repo-wide in this dir are inside
+     the new .not.toContain() assertions in the two test files, which is the intended pin.
+$ rg -n -A2 "run_in_background: tool.schema" packages/omo-opencode/src/tools/delegate-task/tools.ts
+  68:  run_in_background: tool.schema
+  69-    .boolean()
+  70-    .optional()      <- .optional() PRESERVED
+$ rg -n "\.default\(" packages/omo-opencode/src/tools/delegate-task/tools.ts
+  -> no matches (rg exit 1). No .default(...) was added anywhere in the file.
+tool-argument-preparation.ts was READ (lines 34-45, the issue #4119 comment) and NOT modified;
+an omitted run_in_background still resolves to false via that code path and never throws.
+
+## MANUAL QA - FULL PRINTED DESCRIPTION THE MODEL RECEIVES
+Throwaway script /tmp/task1-print-description.ts imported the real builders and printed:
+====================================================================
+===== TOOL DESCRIPTION (model-facing) =====
+Spawn agent task with category-based or direct agent selection.
+
+  ⚠️  CRITICAL: You MUST provide EITHER category OR subagent_type. Omitting BOTH will FAIL.
+
+  **COMMON MISTAKE (DO NOT DO THIS):**
+  ```
+  task(description="...", prompt="...")  // ❌ FAILS - missing category AND subagent_type
+  ```
+
+  **CORRECT - Using category:**
+  ```
+  task(category="quick", description="Fix type error", prompt="...")
+  ```
+
+  **CORRECT - Using subagent_type with parallel exploration:**
+  ```
+  task(subagent_type="explore", description="Find patterns", prompt="...", run_in_background=true)
+  ```
+
+  REQUIRED: Provide ONE of:
+  - category: For task delegation (uses Sisyphus-Junior with category-optimized model)
+  - subagent_type: For direct agent invocation (explore, librarian, oracle, etc.)
+
+  **DO NOT provide both.** If category is provided, subagent_type is ignored.
+
+  - load_skills: Optional. Defaults to [] when omitted. Pass ["skill-1", "skill-2"] for skill-specific tasks.
+  - category: Use predefined category → Spawns Sisyphus-Junior with category config
+    Available categories:
+    - visual-engineering: Frontend, UI/UX, design, styling, animation
+  - artistry: Complex problem-solving with unconventional, creative approaches - beyond standard patterns
+  - ultrabrain: Use ONLY for genuinely hard, logic-heavy tasks. Give clear goals only, not step-by-step instructions.
+  - deep: Goal-oriented autonomous problem-solving on hairy problems requiring deep research. ONE goal + ONE deliverable per call — multiple goals must fan out as parallel `deep` calls, never bundled into one.
+  - quick: Trivial tasks - single file changes, typo fixes, simple modifications
+  - unspecified-low: Tasks that don't fit other categories, low effort required
+  - unspecified-high: Tasks that don't fit other categories, high effort required
+  - writing: Documentation, prose, technical writing
+  - subagent_type: Use specific agent directly (explore, librarian, oracle, metis, momus)
+  - run_in_background: Optional. Defaults to false (sync, waits). true=async: returns a background task ID like `bg_...` to collect later with `background_output`.
+    Prefer true whenever you do not consume the result in your very next step — fan-out work, long-running jobs, and anything you can keep working alongside. Blocking on a sync wait also blocks the user from typing.
+    Use false when your very next step depends on the result and you have nothing else to do until it lands.
+    Sync waits use a 30-minute inactivity window: OpenCode busy/retry/running status resets the window, so this is not a total wall-clock limit.
+  - task_id: Continuation session id (`ses_...`) from task metadata. Continues the same subagent session with FULL CONTEXT PRESERVED; not the background task id (`bg_...`).
+  - command: The command that triggered this task (optional, for slash command tracking).
+
+  **WHEN TO USE task_id:**
+  - Task failed/incomplete → `task(task_id="ses_...", prompt="fix: [specific issue]")`
+  - Need follow-up on previous result → `task(task_id="ses_...", prompt="Also: [question]")`
+  - Multi-turn conversation with same agent → always `task(task_id="ses_...")` instead of new task
+
+  Prompts MUST be in English.
+
+===== run_in_background .describe() (model-facing) =====
+Optional; defaults to false (sync). true=async (returns background task ID `bg_...` for background_output), false=sync (waits). Prefer true whenever the result is not consumed by your very next step, since a sync wait also blocks the user from typing; use false when your next step depends on the result.
+
+===== FORBIDDEN PHRASE CHECK =====
+description contains "5+ independent queries": false
+schema describe contains "5+ independent queries": false
+description contains "ONLY for parallel exploration": false
+schema describe contains "ONLY for parallel exploration": false
+description documents parameter: true
+description documents default false: true
+schema describe documents default false: true
+====================================================================
+
+## WHAT WAS OBSERVED
+Before: the bullet ended 'ONLY for parallel exploration with 5+ independent queries.' and the
+zod describe ended 'Use true ONLY for parallel exploration; otherwise omit or pass false'.
+After: both strings frame the choice by intent - prefer background unless the very next step
+consumes the result - and the description explicitly names the user-blocking cost of a sync wait.
+The 30-minute inactivity-window sentence is byte-for-byte unchanged (still asserted green by the
+pre-existing test that pins '30-minute inactivity window' / 'busy/retry/running' / 'not a total
+wall-clock limit'). The parameter and its false default are still documented in both surfaces.
+
+## STALE STATE (adversarial class)
+$ git status --porcelain assets/
+  -> empty. assets/oh-my-opencode.schema.json was NOT regenerated and NOT hand-edited.
+  bun run build:schema was NEVER run in this task - it is serialized into todo 12.
+
+## WHY IT IS ENOUGH
+These two strings are pure model-facing prompt text with no runtime branching, so a rendered-string
+assertion plus a full print of the generated text is the complete observable. RED proves the
+assertions actually bind to the old wording; GREEN plus the printed output proves the new wording
+ships. The schema/optionality regression risk (the #4119 retry-storm history) is pinned by an
+explicit test asserting .optional() + boolean inner type + a documented false default.
+
+## WHAT WAS OMITTED
+No opencode process was spawned, so there is no XDG-sandbox session-count isolation proof: this
+change cannot alter runtime behavior, only the text handed to the model. The end-to-end real-surface
+opencode-qa run for option A lives in todo 6, which depends on this todo plus todo 2. Schema
+regeneration is todo 12. No secrets, tokens, env dumps, or auth headers appear in this artifact.
+
+## STAGING PROOF + COMMIT (adversarial class: dirty_worktree)
+Staged by EXPLICIT PATH only. git add -A / git add . were NEVER used.
+$ git add packages/omo-opencode/src/tools/delegate-task/{tool-description.ts,tools.ts,tool-description.test.ts,task-schema.test.ts}
+$ git diff --cached --name-only
+  packages/omo-opencode/src/tools/delegate-task/task-schema.test.ts
+  packages/omo-opencode/src/tools/delegate-task/tool-description.test.ts
+  packages/omo-opencode/src/tools/delegate-task/tool-description.ts
+  packages/omo-opencode/src/tools/delegate-task/tools.ts
+
+$ git status --porcelain   # immediately before commit. Column 1 = staged, column 2 = unstaged.
+ M packages/omo-codex/plugin/components/codegraph/dist/cli.js            <- pre-existing, NOT staged
+ M packages/omo-codex/scripts/install-dist/install-local.mjs             <- pre-existing, NOT staged
+M  packages/omo-opencode/src/tools/delegate-task/task-schema.test.ts      <- mine, staged
+ M packages/omo-opencode/src/tools/delegate-task/timing.test.ts          <- concurrent lane (todo 3), NOT staged
+ M packages/omo-opencode/src/tools/delegate-task/timing.ts               <- concurrent lane (todo 3), NOT staged
+M  packages/omo-opencode/src/tools/delegate-task/tool-description.test.ts <- mine, staged
+M  packages/omo-opencode/src/tools/delegate-task/tool-description.ts      <- mine, staged
+M  packages/omo-opencode/src/tools/delegate-task/tools.ts                 <- mine, staged
+ M packages/omo-senpi/plugin/extensions/omo-member.js                    <- pre-existing, NOT staged
+ M packages/omo-senpi/plugin/extensions/omo.js                           <- pre-existing, NOT staged
+ M packages/prompts-core/prompts/atlas/*.md (5 files)                    <- concurrent lane (todo 2), NOT staged
+
+CONFIRMED: all 4 pre-existing dirty build artifacts were NOT staged and NOT committed.
+Additionally, files dirtied by concurrent lanes (timing.ts/timing.test.ts from todo 3,
+the 5 atlas prompts from todo 2) also stayed unstaged - only my 4 declared paths went in.
+
+COMMIT: 6f1b3982ed4c664f10997d6c70c95bc28ef92e70
+SUBJECT: docs(delegate-task): stop restricting run_in_background to 5+ query exploration
+  4 files changed, 57 insertions(+), 2 deletions(-)
+  No Co-Authored-By line. Not pushed. No PR opened.
+
+$ git show --stat --oneline 6f1b3982e | head -10
+6f1b3982e docs(delegate-task): stop restricting run_in_background to 5+ query exploration
+ .../src/tools/delegate-task/task-schema.test.ts    | 28 ++++++++++++++++++++++
+ .../tools/delegate-task/tool-description.test.ts   | 25 +++++++++++++++++++
+ .../src/tools/delegate-task/tool-description.ts    |  4 +++-
+ .../omo-opencode/src/tools/delegate-task/tools.ts  |  2 +-
+ 4 files changed, 57 insertions(+), 2 deletions(-)
+
+NOTE ON THIS ARTIFACT: .omo/evidence is gitignored in this repo, so this file is
+intentionally left UNTRACKED on disk rather than force-added with git add -f.
+
+## CLEANUP
+Throwaway QA script /tmp/task1-print-description.ts and the transcripts
+/tmp/task1-{red,green-desc,green-full,typecheck,printed-description,commit}.txt were
+deleted after their output was copied into this artifact. Nothing was left under /tmp.

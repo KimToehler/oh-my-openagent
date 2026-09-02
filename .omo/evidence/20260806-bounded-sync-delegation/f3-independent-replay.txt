@@ -1,0 +1,364 @@
+================================================================================
+F3. Real manual QA replay - INDEPENDENT VERIFICATION
+Plan: .omo/plans/bounded-sync-delegation.md (gate F3)
+Verifier: independent QA lane. Adversarial posture: the recorded artifacts were
+          treated as UNTRUSTED. Everything below was re-derived from scratch.
+Date: 2026-08-06, ~13:17-13:33 UTC
+Host: macOS (darwin). No `timeout` binary - a shell watchdog was used instead.
+Does NOT overwrite any task-11-* artifact. New file only.
+================================================================================
+
+VERDICT SUMMARY
+  Bounded run              REPRODUCED (bg_ handle, parent returned at the bound)
+  Child survived the bound REPRODUCED (proven 3 independent ways)
+  Negative control differs REPRODUCED (no handle, parent blocked 2x longer)
+  Isolation                HOLDS (sandbox rows provably absent from the real DB)
+  Harness rigging          NOT FOUND (see section 1)
+  Provenance               SOURCE, not stale dist (see section 2)
+
+================================================================================
+0. WHAT WAS TESTED
+================================================================================
+Claim under test: a synchronous `task` delegation exceeding the configured
+wall-clock bound returns control to the parent with a `bg_...` handle while the
+child subagent KEEPS RUNNING (adopted into BackgroundManager, not aborted).
+
+Two real `opencode run` executions against a hermetic fake provider, in two
+separate throwaway sandboxes:
+  A. bounded  - background_task.syncWallClockTimeoutMs = 60000
+  B. control  - the key omitted entirely (negative control)
+Everything else byte-identical between the two runs (same driver, same fake
+provider, same prompt, same child workload).
+
+================================================================================
+1. HARNESS AUDIT - is the prior lane's harness rigging the result?
+================================================================================
+Both prior-lane files were read in full before anything was executed:
+  .omo/evidence/20260806-bounded-sync-delegation/task-11-run-qa.sh
+  .omo/evidence/20260806-bounded-sync-delegation/task-11-fake-llm-busy.mjs
+
+FINDING: NO RIGGING FOUND. Specifically checked and cleared:
+  - The harness NEVER writes, greps for, or injects a `bg_` string. The handle
+    is only ever read back out of the tool output.
+  - The `bg_` id is generated in product code, not in the harness:
+      packages/omo-opencode/src/features/background-agent/manager.ts:666
+        id: `bg_${crypto.randomUUID().slice(0, 8)}`
+    Proof it is not a fixed/injected constant: the prior lane recorded
+    bg_75870ee5; my independent bounded run produced bg_74edac0b. A different
+    random id on each run is exactly what randomUUID predicts and what an
+    injected constant could not produce.
+  - The "busy child" is genuinely busy: the fake provider answers the child
+    session with a real `bash sleep N` tool call, so the busy-ness is opencode
+    executing a real subprocess, not a status string the harness asserts on.
+  - The bounded vs control switch is a single config key. The harness does not
+    branch on it anywhere else.
+
+I nonetheless wrote my OWN driver and my OWN fake provider rather than reusing
+theirs, so no prior-lane artifact could carry over:
+  /tmp/omo-f3/f3-run.sh
+  /tmp/omo-f3/fake-llm-f3.mjs
+My version adds one thing the prior lane lacked: the child's bash command
+appends TIMESTAMPED BEATS TO ITS OWN FILE
+  echo "$(date -u +%s) F3_CHILD_BEAT_START_<n>" >> child-beats.txt
+  sleep 6
+  echo "$(date -u +%s) F3_CHILD_BEAT_END_<n>"   >> child-beats.txt
+and the PARENT writes a DIFFERENT marker to a DIFFERENT file
+(F3_PARENT_HOLD_START/DONE -> parent-beats.txt). This makes child liveness
+provable from an artifact that neither the plugin nor the harness authors -
+the child's own shell writes it - and makes it impossible to mistake parent
+activity for child activity.
+
+CAVEAT ON MY OWN HARNESS (self-reported): I used `date -u +%s%3N`, which is a
+GNU extension BSD `date` does not implement, so beat lines read like
+"17860224233N" = 10-digit epoch SECONDS followed by a literal "3N". This cost
+no evidence: the seconds prefix is a valid timestamp and all comparisons below
+were redone at SECOND granularity. Reported rather than silently corrected.
+
+================================================================================
+2. PROVENANCE - source, NOT the stale dist (trap 1)
+================================================================================
+$ ls -la dist/index.js
+-rw-r--r--@ 1 tim staff 5747578  5 Aug. 14:08 dist/index.js         <- Aug 5
+
+$ grep -c "syncWallClockTimeoutMs" dist/index.js
+0                                        <- stale dist has NONE of the feature
+
+$ grep -c "syncWallClockTimeoutMs" packages/omo-opencode/src/tools/delegate-task/sync-session-poller.ts
+2
+
+The sandbox config loaded the plugin from SOURCE. Literal contents of
+/tmp/omo-f3/out/bounded/provenance.txt:
+
+  plugin_entry=file:///Users/tim/git/oh-my-openagent/packages/omo-opencode/src/index.ts
+  dist_index_mtime=Aug  5 14:08:57 2026
+  dist_has_syncWallClockTimeoutMs=0
+  src_has_syncWallClockTimeoutMs=.../sync-session-poller.ts:2
+
+RUNTIME CONFIRMATION (the decisive proof, not just the config string): the
+bounded run emitted a log line that exists ONLY in the new source and has zero
+occurrences in dist/index.js:
+  [2026-08-06T13:21:23.705Z] [task] Poll wall-clock timeout reached
+    {"sessionID":"ses_028c49467ffeGiffUbTxE1F7YX","pollCount":60}
+A run against the Aug-5 dist could not have produced that line.
+
+CONCURRENT-EDIT CHECK: while I ran, a SIBLING LANE was editing this same
+checkout (git status went from 4 dirty files at my baseline to 22). I verified
+the code paths under test were unaffected:
+  $ git diff --stat HEAD -- .../sync-task.ts
+  (empty - the adopt/no-abort path is exactly the committed HEAD)
+  $ git diff HEAD -- .../sync-session-poller.ts
+  the ONLY changes are a return-type refactor (Promise<SyncPollOutcome>, and
+  null/string returns rewritten as {kind:"ok"} / {kind:"error"}). The yield
+  trigger itself is untouched:
+    sync-session-poller.ts:118    return { kind: "wall_clock_yield" }
+    sync-task.ts:142              if (... result.kind === "wall_clock_yield")
+
+================================================================================
+3. ISOLATION SETUP (trap 2 - HOME is not sandboxed by qa-sandbox.sh)
+================================================================================
+Confirmed the trap is real: omo-config-core resolves the user config layer from
+HOME, and script/agent/qa-sandbox.sh does not set HOME. My driver therefore
+sandboxes HOME explicitly, on top of qa-sandbox.sh:
+
+  . script/agent/qa-sandbox.sh          # XDG_*, CODEX_HOME, offline flags
+  export HOME="$OMO_QA_ROOT/home"       # <- the missing piece
+  export OPENCODE_TEST_HOME="$HOME"
+
+$ cat /tmp/omo-f3/out/bounded/isolation-env.txt
+  HOME=/var/folders/.../T/omo-qa-sandbox.XXXXXX.m7Ewh2J3YY/home
+  XDG_DATA_HOME=/var/folders/.../T/omo-qa-sandbox.XXXXXX.m7Ewh2J3YY/data
+  real_home_omo_exists_on_host=yes      # the host file exists...
+                                        # ...but HOME no longer points at it
+
+Host ~/.omo/omo.jsonc after both runs - untouched (mtime is 29 July, weeks old):
+  -rw-r--r-- 1 tim staff 2502 29 Juli 21:54 /Users/tim/.omo/omo.jsonc
+
+================================================================================
+4. ASSERTION 1 - bounded run returns a bg_ handle AT the bound
+================================================================================
+$ jq -r 'select(.type=="tool_use" and .part.tool=="task") | .part.state.output' \
+    /tmp/omo-f3/out/bounded/run.jsonl
+
+  Sync task moved to background.
+
+  Background Task ID: bg_74edac0b
+  Description: wallclock busy child
+  Agent: explore
+  Status: still running
+
+  Do NOT call background_output now. Wait for <system-reminder> notification
+  first. The system will deliver the result when the task completes; you do not
+  need to poll for it.
+
+$ jq -r 'select(.type=="tool_use" and .part.tool=="task") |
+    "start=\(.part.state.time.start) end=\(.part.state.time.end) dur_ms=\(.part.state.time.end - .part.state.time.start)"' \
+    /tmp/omo-f3/out/bounded/run.jsonl
+  start=1786022423434 end=1786022483710 dur_ms=60276
+
+  Configured bound 60000 ms. Observed 60276 ms. Overshoot 276 ms = well under
+  one 1s poll interval. The parent returned AT the bound, not after the child's
+  full ~121s runtime.
+
+  RESULT: REPRODUCED. (Prior lane recorded 60155 ms / bg_75870ee5; I observed
+  60276 ms / bg_74edac0b. Different id, same behavior - as expected.)
+
+================================================================================
+5. ASSERTION 2 - the child is GENUINELY still alive after the parent returns
+================================================================================
+Parent's task tool ended at epoch_ms 1786022483710 (= epoch_s 1786022483).
+Three INDEPENDENT lines of evidence, each from a different producer:
+
+(a) THE CHILD'S OWN SHELL (an artifact no plugin/harness code writes)
+$ awk -v p=1786022483 '{s=substr($1,1,10)+0; if (s>p) c++} END{print c+0}' \
+    /tmp/omo-f3/out/bounded/child-beats.txt
+  19                       <- 19 of 40 child beats landed AFTER the parent returned
+$ tail -2 /tmp/omo-f3/out/bounded/child-beats.txt
+  17860225383N F3_CHILD_BEAT_START_20
+  17860225443N F3_CHILD_BEAT_END_20
+  last child beat epoch_s 1786022544 = parent_return + 61s
+
+  Note these are F3_CHILD_BEAT markers written to child-beats.txt. The parent's
+  hold writes F3_PARENT_HOLD_* to parent-beats.txt - a different marker in a
+  different file - so this cannot be parent activity misread as child activity.
+
+(b) THE SANDBOX DB - child tool parts started after the parent returned
+$ sqlite3 bounded/sandbox-opencode.db "SELECT count(*) FROM part
+    WHERE json_extract(data,'$.type')='tool'
+      AND session_id='ses_028c49467ffeGiffUbTxE1F7YX'
+      AND json_extract(data,'$.state.time.start') > 1786022483710"
+  10
+
+(c) THE PLUGIN ITSELF - BackgroundManager polling the adopted live session
+  13:21:50 [background-agent] Session still running... {"taskId":"bg_74edac0b",
+    "sessionID":"ses_028c49467ffeGiffUbTxE1F7YX","sessionStatus":"busy","toolCalls":15}
+  ... toolCalls 15 -> 18 -> 21 -> 24 -> 27 -> 30 (rising, status busy throughout)
+  13:22:24 [background-agent] Task completed via session.idle event: "bg_74edac0b"
+  13:22:24 [background-agent] notifyParentSession called for task: "bg_74edac0b"
+
+  (c) also settles "is the bg_ handle real": bg_74edac0b is carried through the
+  BackgroundManager poll loop, completion detection, and parent-wake notification,
+  bound to the child's actual session id. It is a live tracked task, not a string.
+
+NO ABORT ON THE YIELD PATH:
+$ grep -c "Aborting sync session.*ses_028c49467ffeGiffUbTxE1F7YX" bounded/plugin.log
+  0                        <- our child was never aborted
+The log does contain 179 "Aborting sync session" lines, ALL for unit-test
+fixture ids (ses_test, ses_legacy, ses_guard, ses_default, ses_abort, ...) that
+the plugin's own in-process tests emit. None is our session.
+
+The child then reached NATURAL COMPLETION, 20 busy turns:
+  13:22:24 branch=child-done call=24 {"childTurn":21}
+  FINAL_COUNTS title=1 parent-task-call=1 parent-hold=1 parent-final=1
+               child=20 child-done=1 wake=0 default=0 childTurns=21
+
+  RESULT: REPRODUCED. (Prior lane: 11 further child calls, ~60.6s more work,
+  natural completion, zero aborts. Mine: 19 post-return child beats / 10
+  post-return tool parts, +61s more work, natural completion, zero aborts.)
+
+================================================================================
+6. ASSERTION 3 - the NEGATIVE CONTROL genuinely differs
+================================================================================
+Identical driver, identical child workload, ONLY syncWallClockTimeoutMs omitted.
+
+$ jq -r '...state.output' /tmp/omo-f3/out/control/run.jsonl
+  Task completed in 2m 1s.
+
+  Agent: explore
+  Model: openai/gpt-fake
+  ---
+  F3_CHILD_FINISHED_ALL_TURNS
+  <task_metadata>
+  session_id: ses_028c19207ffeMNXeRUMK2fxCJS
+  ...
+
+$ grep -c "bg_" /tmp/omo-f3/out/control/run.jsonl
+  0                                       <- NO handle anywhere in the control run
+
+$ jq -r '... .part.state.time.end - .part.state.time.start' control/run.jsonl
+  121357                                  <- parent blocked the child's FULL runtime
+
+$ grep -c "Poll wall-clock timeout reached.*ses_028c19207" control/plugin.log
+  0                                       <- the bound never fired (correct: unset)
+
+SIDE BY SIDE (the two runs are NOT the same - this gate's fail condition):
+  metric              bounded            control
+  task_dur_ms         60276              121357        (2.01x)
+  bg_ handle          bg_74edac0b        NONE
+  output              Status: still running   Task completed in 2m 1s.
+  parent got          a handle           the child's actual RESULT
+  child turns served  20                 20            (identical workload)
+  parent resumed at   t+67.6s            t+128.4s
+
+  The child workload was identical (20 turns both runs); only the parent's
+  behavior changed. That is the feature, not the harness.
+
+  RESULT: REPRODUCED.
+
+================================================================================
+7. ISOLATION NUMBERS AND MY JUDGEMENT OF THE PRIOR LANE'S +2
+================================================================================
+Real DB: /Users/tim/.local/share/opencode/opencode.db
+  F3 baseline (before anything)   1227
+  bounded  before -> after        1228 -> 1228   (delta 0)
+  control  before -> after        1228 -> 1229   (delta +1)
+  final                           1229
+
+The bounded run moved the real DB by ZERO. The control run shows +1, so I ran
+leak queries rather than assume:
+
+$ sqlite3 REAL_DB "SELECT count(*) FROM session WHERE id IN
+   ('ses_028c49af4ffewDMOaxmNxQJne8','ses_028c49467ffeGiffUbTxE1F7YX','ses_028c19207ffeMNXeRUMK2fxCJS')"
+  0        <- none of my 3 sandbox sessions (2 bounded + control child) exist in the real DB
+$ ... WHERE title LIKE '%wallclock%'
+  0        <- no session carries my probe title
+$ ... WHERE directory LIKE '%omo-qa-sandbox%'
+  0        <- no session points at a sandbox dir
+
+$ sqlite3 REAL_DB "SELECT id, directory, substr(title,1,40), datetime(time_created/1000,'unixepoch')
+                   FROM session WHERE time_created BETWEEN 1786022340000 AND 1786022880000"
+  ses_028c10263ffew7cltseorNOg1Q | /Users/tim/git/oh-my-openagent |
+    Finish union test adaptation (@Sisyphus- | 2026-08-06 13:24:17
+
+JUDGEMENT: the +1 is NOT mine. It is a named host session ("Finish union test
+adaptation") in the real repo directory - the SIBLING LANE that was concurrently
+editing this checkout (independently visible in git status going 4 -> 22 dirty
+files). My sandbox rows are provably absent by id, by title, and by directory.
+
+On the prior lane's +2 and its "unrelated concurrent host activity" explanation:
+I judge it PLAUSIBLE AND CONSISTENT with what I observed - this host demonstrably
+creates real sessions from other work while QA runs (I caught one in the act,
+by name and directory). I did not merely accept the explanation: I re-ran the
+same class of leak queries and they returned 0 for my runs, and my bounded run
+independently achieved a clean delta of 0. Isolation holds.
+
+================================================================================
+8. WATCHDOG (macOS has no `timeout`)
+================================================================================
+A shell watchdog bounded each `opencode run` at 420s.
+$ cat /tmp/omo-f3/out/bounded/watchdog.txt
+  watchdog_bound_s=420 fired=no
+$ cat /tmp/omo-f3/out/control/watchdog.txt
+  watchdog_bound_s=420 fired=no
+Neither fired. Both runs exited 0 on their own (run-exit.txt = 0 for both).
+Exit code 0 was NOT used as evidence for any assertion above - every assertion
+is backed by literal jq/sqlite3/grep output.
+
+================================================================================
+9. CLEANUP RECEIPTS
+================================================================================
+Per-run receipts:
+$ cat /tmp/omo-f3/out/bounded/cleanup-receipts.txt
+  fake_llm_pid 56607 alive_after_kill=no
+  fake_llm_port 51656 listeners=0
+  opencode_run_pid 56628 alive=no
+  leftover_beat_procs=0
+$ cat /tmp/omo-f3/out/control/cleanup-receipts.txt
+  fake_llm_pid 63248 alive_after_kill=no
+  fake_llm_port 51994 listeners=0
+  opencode_run_pid 63269 alive=no
+  leftover_beat_procs=0
+
+Final sweep:
+  $ pgrep -f "fake-llm-f3" | wc -l                       -> 0
+  $ pgrep -f "F3_CHILD_BEAT|F3_PARENT_HOLD" | wc -l      -> 0
+  $ lsof -nP -iTCP:51656 -sTCP:LISTEN | grep -c LISTEN   -> 0
+  $ lsof -nP -iTCP:51994 -sTCP:LISTEN | grep -c LISTEN   -> 0
+  $ pgrep -f "opencode run Run the wallclock" | wc -l    -> 0
+  sandbox dirs removed (artifacts copied to /tmp/omo-f3/out-archive first):
+  $ ls -d /var/folders/.../T/omo-qa-sandbox.XXXXXX.* | wc -l  -> 0
+  host ~/.omo/omo.jsonc mtime unchanged (29 Juli 21:54)
+  7 opencode processes remain on the host - all pre-existing (IntelliJ ACP,
+  language servers, the user's own sessions), none spawned by me: my probe
+  pattern matches 0.
+
+================================================================================
+10. WHY THIS IS ENOUGH / WHAT WAS OMITTED
+================================================================================
+ENOUGH: the yield is proven at the level the claim is made - real opencode, real
+session lifecycle, from source. The handle is traced to crypto.randomUUID in
+product code and observed differing across runs. Child survival is proven three
+ways with at least one producer (the child's own shell) outside both the plugin
+and the harness. The control isolates the config key as the single cause: same
+child workload, 2x parent block, no handle.
+
+OMITTED / LIMITS:
+- The model is a hermetic fake provider (by design; no real API call, no
+  credentials). This exercises real opencode session and tool machinery, not
+  real model behavior.
+- No secrets are reproduced here. The sandbox provider key is the literal
+  string "fake-key"; host credentials were never in scope since HOME was
+  sandboxed.
+- I did not re-run the option A (todo 6) half of F3. This artifact covers the
+  option C half only, which is what this lane was assigned.
+- A sibling lane was concurrently editing the checkout. I bounded that risk by
+  diffing the two files under test against HEAD (section 2) rather than by
+  freezing the tree, which I could not do without disrupting the other lane.
+
+================================================================================
+F3 (option C half) VERDICT: APPROVE
+The recorded result REPRODUCED on every assertion: bounded run yields a real
+bg_ handle at 60276 ms against a 60000 ms bound; the child provably keeps
+running for +61s afterwards and completes naturally with zero aborts; the
+negative control produces no handle and blocks the full 121357 ms. Provenance
+is source, not the stale Aug-5 dist. Isolation holds. No harness rigging found.
+================================================================================

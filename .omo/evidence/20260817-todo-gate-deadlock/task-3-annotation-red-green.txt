@@ -1,0 +1,38 @@
+WHAT WAS TESTED
+- RED: bun test packages/omo-opencode/src/features/background-agent/background-task-notification-template.test.ts
+- GREEN: bun test packages/omo-opencode/src/features/background-agent/background-task-notification-template.test.ts
+- Typecheck: bun run typecheck
+- Manual render surface: temporary Bun script imported buildBackgroundTaskNotificationText from worktree and rendered completed+3, completed+undefined, completed+0, completed-negative, and error+3.
+
+WHAT WAS OBSERVED
+RED output:
+Expected to contain: "- `task-todos`: Finish task - completed with 3 unfinished todos"
+Received: "<system-reminder>\\n[BACKGROUND TASK COMPLETED]\\n[ALL BACKGROUND TASKS COMPLETE]\\n\\n**Completed:**\\n- `task-todos`: Finish task\\n\\nAll sibling background tasks are complete. Your next action should be to call `background_output(task_id=\"<id>\")` for each task ID above.\\n</system-reminder>"
+24 pass, 1 fail. Ran 25 tests across 1 file.
+
+GREEN output:
+25 pass, 0 fail, 58 expect() calls. Ran 25 tests across 1 file.
+Before change pass count: 24 pass. After change pass count: 25 pass.
+Typecheck output ended successfully after tsgo --noEmit and workspace package checks.
+
+Manual rendered summary lines:
+completed+3: - `manual-completed-3`: Render task - completed with 3 unfinished todos
+completed+undefined: - `manual-completed-undefined`: Render task
+completed+0: - `manual-completed-0`: Render task
+completed-negative: - `manual-completed-negative`: Render task
+error+3: - `manual-error-3`: Render task [ERROR] - Timed out
+
+Adversarial classes:
+- misleading_success_output: error+3 retained [ERROR] - Timed out and received no completion annotation.
+- malformed_input: 0 and -1 rendered with no annotation.
+- dirty_worktree: after implementation, status included only scoped template/test changes plus concurrent-lane files and known pre-existing packages/omo-senpi/plugin/extensions/omo-task.js. Commit stages only scoped template/test files.
+- remaining ultraqa classes: not applicable. Rendering change has no network, persistence, auth, concurrency, or external-process boundary.
+
+WHY IT IS ENOUGH
+- RED proves new completed-task annotation did not exist before implementation.
+- GREEN proves all 25 co-located rendering tests pass, including unchanged undefined and zero behavior plus non-completed error behavior.
+- Manual output proves user-visible final-summary line includes annotation only for completed positive count; malformed and failed inputs preserve existing shapes.
+- Full workspace typecheck passed.
+
+WHAT WAS OMITTED
+- Raw environment dumps and unrelated concurrent-lane diffs omitted. No secrets, tokens, or auth headers captured.

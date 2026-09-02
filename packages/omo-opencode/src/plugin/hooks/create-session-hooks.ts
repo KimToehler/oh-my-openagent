@@ -10,7 +10,6 @@ import {
   createModelFallbackHook,
   createAnthropicContextWindowLimitRecoveryHook,
   createAutoUpdateCheckerHook,
-  createCodegraphBootstrapHook,
   createAstGrepSgProvisionHook,
   createAgentUsageReminderHook,
   createNonInteractiveEnvHook,
@@ -18,7 +17,7 @@ import {
   createEditErrorRecoveryHook,
   createDelegateTaskRetryHook,
   createTaskResumeInfoHook,
-  createStartWorkHook,
+  createUlwExecuteHook,
   createPrometheusMdOnlyHook,
   createSisyphusJuniorNotepadHook,
   createNoSisyphusGptHook,
@@ -49,7 +48,6 @@ export type SessionHooks = {
   modelFallback: ReturnType<typeof createModelFallbackHook> | null
   anthropicContextWindowLimitRecovery: ReturnType<typeof createAnthropicContextWindowLimitRecoveryHook> | null
   autoUpdateChecker: ReturnType<typeof createAutoUpdateCheckerHook> | null
-  codegraphBootstrap: ReturnType<typeof createCodegraphBootstrapHook> | null
   astGrepSgProvision: ReturnType<typeof createAstGrepSgProvisionHook> | null
   agentUsageReminder: ReturnType<typeof createAgentUsageReminderHook> | null
   nonInteractiveEnv: ReturnType<typeof createNonInteractiveEnvHook> | null
@@ -59,7 +57,7 @@ export type SessionHooks = {
   unpolledShellJob: ReturnType<typeof createUnpolledShellJobHook> | null
   editErrorRecovery: ReturnType<typeof createEditErrorRecoveryHook> | null
   delegateTaskRetry: ReturnType<typeof createDelegateTaskRetryHook> | null
-  startWork: ReturnType<typeof createStartWorkHook> | null
+  ulwExecute: ReturnType<typeof createUlwExecuteHook> | null
   prometheusMdOnly: ReturnType<typeof createPrometheusMdOnlyHook> | null
   sisyphusJuniorNotepad: ReturnType<typeof createSisyphusJuniorNotepadHook> | null
   noSisyphusGpt: ReturnType<typeof createNoSisyphusGptHook> | null
@@ -147,10 +145,6 @@ export function createSessionHooks(args: {
         }))
     : null
 
-  const codegraphBootstrap = isHookEnabled("codegraph-bootstrap")
-    ? safeHook("codegraph-bootstrap", () => createCodegraphBootstrapHook(ctx, pluginConfig.codegraph))
-    : null
-
   const astGrepSgProvision = isHookEnabled("ast-grep-sg-provision")
     ? safeHook("ast-grep-sg-provision", () => createAstGrepSgProvisionHook())
     : null
@@ -195,8 +189,8 @@ export function createSessionHooks(args: {
     ? safeHook("delegate-task-retry", () => createDelegateTaskRetryHook(ctx))
     : null
 
-  const startWork = isHookEnabled("start-work")
-    ? safeHook("start-work", () => createStartWorkHook(ctx))
+  const ulwExecute = isHookEnabled("ulw-execute")
+    ? safeHook("ulw-execute", () => createUlwExecuteHook(ctx))
     : null
 
   const prometheusMdOnly = isHookEnabled("prometheus-md-only")
@@ -254,7 +248,6 @@ export function createSessionHooks(args: {
     modelFallback,
     anthropicContextWindowLimitRecovery,
     autoUpdateChecker,
-    codegraphBootstrap,
     astGrepSgProvision,
     agentUsageReminder,
     nonInteractiveEnv,
@@ -264,7 +257,7 @@ export function createSessionHooks(args: {
     unpolledShellJob,
     editErrorRecovery,
     delegateTaskRetry,
-    startWork,
+    ulwExecute,
     prometheusMdOnly,
     sisyphusJuniorNotepad,
     noSisyphusGpt,

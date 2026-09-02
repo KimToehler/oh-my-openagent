@@ -1,0 +1,95 @@
+BASELINE TAIL - bun test @ worktree .worktrees/lesson-nudge, branch feat/lesson-nudge, commit a39320716
+
+Command: bun test > /tmp/lesson-nudge-baseline-full.txt 2>&1
+
+--- tail of full output ---
+239 |         const matches = skills.filter(s => s.name === "ulw-plan")
+240 |
+241 |         expect(matches).toHaveLength(1)
+242 |         expect(matches[0]?.scope).toBe("project")
+                                        ^
+error: expect(received).toBe(expected)
+
+Expected: "project"
+Received: "opencode"
+
+      at <anonymous> (packages/skills-loader-core/src/features/opencode-skill-loader/loader-deduplication.test.ts:242:35)
+(fail) skill loader MCP parsing > deduplication > prioritizes project Agents ulw-plan over shared ulw-plan [7.08ms]
+346 |
+347 |         expect(literalMatches).toHaveLength(1)
+348 |         expect(literalMatches[0]?.scope).toBe("opencode-project")
+349 |         expect(literalMatches[0]?.definition.description).toContain("Literal project skill")
+350 |         expect(ulwPlanMatches).toHaveLength(1)
+351 |         expect(ulwPlanMatches[0]?.scope).toBe("shared")
+                                               ^
+error: expect(received).toBe(expected)
+
+Expected: "shared"
+Received: "opencode"
+
+      at <anonymous> (packages/skills-loader-core/src/features/opencode-skill-loader/loader-deduplication.test.ts:351:42)
+(fail) skill loader MCP parsing > deduplication > treats a project skill literally named shared/ulw-plan as a plain name, not a canonical alias [14.92ms]
+
+packages/omo-opencode/src/__tests__/perf/plugin-init.test.ts:
+empty-project: cold=49.3ms warm=[19.5, 22.3] median=22.3ms
+in-tree-fixture: cold=48.0ms warm=[19.5, 22.8] median=22.8ms
+
+ 13002 pass
+ 3 skip
+ 4 fail
+ 1 snapshots, 83284 expect() calls
+Ran 13009 tests across 1704 files. [130.38s]
+EXIT=1
+
+--- count summary ---
+PASS=13002
+FAIL=4
+SKIP=3
+TOTAL=13009 tests across 1704 files
+EXIT=1 (non-zero expected: pre-existing failures)
+
+================================================================
+ORCHESTRATOR CORRECTION - READ BEFORE ANY LATER COMPARISON
+================================================================
+The run above measured 13002 pass / 4 fail. That is NOT the committed-state
+baseline. It is an ARTIFACT-CONTAMINATED measurement.
+
+Cause, verified rather than assumed:
+  `bun install` in a fresh worktree runs a postinstall BUILD which REGENERATES
+  packages/omo-codex/scripts/install-dist/install-local.mjs. The committed copy
+  of that file embeds version: "4.19.3" while package.json says 4.19.4, so
+  script/codex-installer-version.test.ts FAILS on committed state. The
+  regenerated copy embeds 4.19.4, so the test PASSED during that run. The
+  worker then `git restore`d the artifact, which returned the tree to the
+  failing state AFTER the measurement was already taken.
+
+Direct verification by the orchestrator (both checkouts, committed state):
+  main checkout : bun test script/codex-installer-version.test.ts -> 0 pass 1 fail
+  worktree      : bun test script/codex-installer-version.test.ts -> 0 pass 1 fail
+  root package.json version : 4.19.4
+  committed artifact embeds : version: "4.19.3"
+  cmp main vs worktree artifact : IDENTICAL
+
+Arithmetic closes exactly against PR-1's recorded gate on dev
+(13001 pass / 5 fail): 13001 + 1 = 13002 pass, 5 - 1 = 4 fail. Exactly one
+test changed sides. Nothing else moved. This is NOT a flaky test and NOT a
+moved baseline; it is a build artifact toggling one assertion.
+
+BINDING BASELINE FOR THIS PR (committed state, 5 failures):
+  1. resolveSkillContentAsync > #given the shared ulw-plan skill source #when OpenCode skills are resolved #then ulw-plan is path-backed with workflow resources
+  2. skill loader MCP parsing > deduplication > prioritizes project Agents ulw-plan over shared ulw-plan
+  3. skill loader MCP parsing > deduplication > prioritizes project Claude ulw-plan over shared ulw-plan
+  4. skill loader MCP parsing > deduplication > treats a project skill literally named shared/ulw-plan as a plain name, not a canonical alias
+  5. script/codex-installer-version.test.ts #given the generated Codex installer #when release versions are synchronized #then its embedded package version matches the root release version
+
+  PASS=13001 FAIL=5   <- todo 9 compares against THIS, not the 4-name set.
+
+CONDITIONAL, and it matters for todo 9:
+  If todo 9 runs its suite WITHOUT an intervening `bun install`, expect 5 fail.
+  If a `bun install` regenerated the artifact first, expect 4 fail with
+  codex-installer-version as the ONLY difference. Either is acceptable. ANY
+  OTHER failure-set difference is a regression introduced by this PR.
+  Run `git status --porcelain packages/omo-codex/scripts/install-dist/` before
+  interpreting the count.
+
+The 4.19.3-vs-4.19.4 drift is PRE-EXISTING on dev and is NOT this PR's to fix.

@@ -1,0 +1,150 @@
+TASK: Fix three documentation gaps found by 5-agent review
+
+WHAT WAS TESTED
+===============
+
+1. packages/omo-opencode/src/hooks/AGENTS.md: Verified hook directory counts, tier composition, and line-by-line accuracy against source files.
+2. docs/reference/features.md: Verified lessons config block structure and added nudge key with explanation bullet.
+3. packages/omo-opencode/src/hooks/lesson-nudge/hook.ts: Added 2-line comment explaining why nudge cannot work under opencode run.
+
+Verification methods: hook directory enumeration, type signature grepping, bun test suite, typecheck, git commit.
+
+WHAT WAS OBSERVED
+=================
+
+HOOK DIRECTORY COUNTS
+$ ls -d packages/omo-opencode/src/hooks/*/ | wc -l
+      63
+
+$ find packages/omo-opencode/src/hooks -mindepth 2 -maxdepth 2 -name 'index.ts' | wc -l
+      55
+
+Result: 63 directories total, 55 with index.ts, 8 without (unchanged from 62/54/8).
+
+TIER HOOK COUNTS
+$ sed -n '/^export type SessionHooks/,/^}/p' packages/omo-opencode/src/plugin/hooks/create-session-hooks.ts | grep ":" | wc -l
+      25
+
+$ sed -n '/^export type ToolGuardHooks/,/^}/p' packages/omo-opencode/src/plugin/hooks/create-tool-guard-hooks.ts | grep ":" | wc -l
+      18
+
+$ sed -n '/^export type TransformHooks/,/^}/p' packages/omo-opencode/src/plugin/hooks/create-transform-hooks.ts | grep ":" | wc -l
+      7
+
+$ sed -n '/^export type ContinuationHooks/,/^}/p' packages/omo-opencode/src/plugin/hooks/create-continuation-hooks.ts | grep ":" | wc -l
+      7
+
+$ sed -n '/^export type SkillHooks/,/^}/p' packages/omo-opencode/src/plugin/hooks/create-skill-hooks.ts | grep ":" | wc -l
+      2
+
+Total composition: 25 + 18 + 7 + 7 + 2 = 59 base (was 54).
+
+DOCUMENTATION CHANGES
+
+GAP 1: packages/omo-opencode/src/hooks/AGENTS.md
+
+Before:
+- Line 1: "~54 Lifecycle Hooks Across 62 Dirs"
+- Line 7: "The 62 directories = 54 with `index.ts` + 8 without"
+- Line 15 (Tier table): Session "24 | 24"
+- Line 22: "54 base, 61 with team-mode, 62 with team-mode + monitor"
+- Line 26: "### Tier 1: Session Hooks (24)"
+- Session table: no lessonNudge row
+
+After:
+- Line 1: "~59 Lifecycle Hooks Across 63 Dirs"
+- Line 7: "The 63 directories = 55 with `index.ts` + 8 without"
+- Line 15 (Tier table): Session "25 | 25"
+- Line 22: "59 base, 63 with team-mode + monitor"
+- Line 26: "### Tier 1: Session Hooks (25)"
+- Session table: added lessonNudge row
+
+Also updated:
+- ToolGuard (17) → (18)
+- Tier table restructured to clarify team-tool-gating is already included in the 18, and Transform always includes all 7 (not conditional sub-counts).
+
+GAP 2: docs/reference/features.md
+
+Before (lines 883-891):
+{
+  "lessons": {
+    "enabled": false,
+    "storage": "user",
+    "max_files": 200,
+    "max_body_chars": 3000
+  }
+}
+
+After (lines 883-892):
+{
+  "lessons": {
+    "enabled": false,
+    "storage": "user",
+    "nudge": true,
+    "max_files": 200,
+    "max_body_chars": 3000
+  }
+}
+
+Added bullet after line 896:
+- `nudge` (default `true`) controls the idle reminder that suggests recorded lessons when a session is idle; has no effect under `oh-my-opencode run`.
+
+GAP 3: packages/omo-opencode/src/hooks/lesson-nudge/hook.ts
+
+Before (line 14):
+const registeredSessions = new Set<string>()
+
+After (lines 14-16):
+// Nudge requires persistent in-memory state across session.idle events within one process.
+// opencode run exits after each turn, losing this state, so nudge cannot work under run.
+const registeredSessions = new Set<string>()
+
+TEST RESULTS
+
+bun test packages/omo-opencode/src/hooks/lesson-nudge/
+ 8 pass, 0 fail, 14 expect() calls [79.00ms]
+
+bun run typecheck
+ exit code 0
+
+bun test (full suite)
+ 13019 pass, 3 skip, 5 fail
+
+Expected failures (verified by name):
+1. #given the generated Codex installer #when release versions are synchronized #then its embedded package version matches the root release version [1.58ms]
+2. resolveSkillContentAsync > #given the shared ulw-plan skill source #when OpenCode skills are resolved #then ulw-plan is path-backed with workflow resources [6.30ms]
+3. skill loader MCP parsing > deduplication > prioritizes project Claude ulw-plan over shared ulw-plan [9.13ms]
+4. skill loader MCP parsing > deduplication > prioritizes project Agents ulw-plan over shared ulw-plan [6.80ms]
+5. skill loader MCP parsing > deduplication > treats a project skill literally named shared/ulw-plan as a plain name, not a canonical alias [12.47ms]
+
+git status after test suite:
+$ git status --porcelain packages/omo-codex/scripts/install-dist/
+(no output — no dirty files)
+
+COMMIT
+======
+96c1f931b docs: fix three documentation gaps from lesson-nudge review
+
+Files changed:
+ M docs/reference/features.md (2 insertions, 1 deletion)
+ M packages/omo-opencode/src/hooks/AGENTS.md (8 insertions, 8 deletions)
+ M packages/omo-opencode/src/hooks/lesson-nudge/hook.ts (3 insertions, 0 deletions)
+
+WHY IT IS ENOUGH
+================
+
+- All 63 hook directories enumerated and counted from source, not from assumptions.
+- All 5 tier hook counts derived by grepping type signatures, reflecting the actual exported hooks.
+- Total composition (59 base) and adjusted max (63 with team + monitor) verified against real return types.
+- lessonNudge now present in Session hooks AGENTS.md table, matching the code.
+- features.md nudge key added and documented to match the config default (true) and its actual scope (TUI/serve only).
+- hook.ts comment captures the technical cause (process-local state + per-turn exit) so future maintainers understand the limitation.
+- Full test suite confirms no regressions; 5 expected failures match documented pattern (Codex version + ulw-plan dedup scope).
+- No dirty files in install-dist after tests, no untracked changes under .omo/.
+
+WHAT WAS OMITTED
+================
+
+- Root AGENTS.md not modified (that file was already correct per user verification).
+- No redacted files (no secrets in evidence).
+- No unnecessary generated outputs (only raw counting commands and their results).

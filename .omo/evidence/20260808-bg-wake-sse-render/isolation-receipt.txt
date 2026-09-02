@@ -1,0 +1,60 @@
+ISOLATION RECEIPT - task 9 real-harness QA (bg-wake-sse-render)
+================================================================
+
+REAL DB UNDER PROTECTION
+  path: /Users/tim/.local/share/opencode/opencode.db
+  size: 4214452224 bytes
+
+SESSION COUNT BEFORE / AFTER
+  command: sqlite3 "$HOME/.local/share/opencode/opencode.db" 'SELECT count(*) FROM session;'
+
+  BEFORE_TS=2026-08-08T15:26:37Z   BEFORE_SESSION_COUNT=1542
+  AFTER_TS =2026-08-08T15:55:03Z   AFTER_SESSION_COUNT =1542
+
+  DELTA = 0   -> UNCHANGED. PASS.
+
+LEAK CHECK (stronger than the count alone)
+  Every session id created by this QA was looked up in the REAL db by id.
+  All returned 0 rows, so no sandbox session was written to the user's db.
+
+  command: sqlite3 "$REAL_DB" "SELECT count(*) FROM session WHERE id='<ses>';"
+
+    ses_01e0290e3ffejg97jHeRm5daDq -> 0    (serve-wake-split-probe run)
+    ses_01dfe1757ffe52692MgFvQfSj0 -> 0    (noout run 1)
+    ses_01dfb55b4ffeh3Ioh4gpp4w9y9 -> 0    (noout run 2, run of record)
+    ses_01df6e620ffew1HL8QK1TfuPLz -> 0    (control run 2)
+    ses_01df17fe7ffeEA8VCRMKlcaXFG -> 0    (control run 4)
+    ses_01dee0e80ffefmNRQ9PJZ0JVAs -> 0    (fix run 4)
+
+  Probe-title check over the 20 newest real sessions:
+    sqlite3 "$REAL_DB" "SELECT count(*) FROM session WHERE id IN
+      (SELECT id FROM session ORDER BY time_created DESC LIMIT 20)
+      AND (title LIKE '%split probe%' OR title LIKE '%noout wake%');"
+    -> 0
+
+MTIME NOTE (honest disclosure, not a leak)
+  BEFORE_MTIME = 1786202723  (Aug  8 17:25:23 2026)
+  AFTER_MTIME  = 1786204501  (Aug  8 17:55:01 2026)
+
+  The file mtime advanced during the QA window. This is the user's OWN live
+  opencode instance writing to its own db while the QA ran on a separate
+  machine-local sandbox. It is NOT sandbox write-through:
+    - the session count is identical before and after (1542 -> 1542)
+    - every QA session id returns 0 rows in the real db
+    - each spawned server ran under a private XDG sandbox (see below)
+  Both independent checks agree the QA wrote nothing to the real db.
+
+SANDBOX MECHANISM
+  Every spawned opencode process ran under oqa_mk_isolated_xdg() from
+  .agents/skills/opencode-qa/scripts/lib/common.sh, which exports:
+    HOME, OPENCODE_TEST_HOME, XDG_DATA_HOME, XDG_CONFIG_HOME,
+    XDG_CACHE_HOME, XDG_STATE_HOME  -> a fresh mktemp -d per run
+    OPENCODE_DISABLE_AUTOUPDATE=1, OPENCODE_DISABLE_MODELS_FETCH=1
+
+  Example sandbox root from the run of record:
+    /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.12nUSCtGwf
+  Sandbox db for that run:
+    <sandbox>/data/opencode/opencode.db
+
+  The model provider was a LOCAL fake OpenAI server on 127.0.0.1, so no real
+  provider API call was made and no provider credential was used.

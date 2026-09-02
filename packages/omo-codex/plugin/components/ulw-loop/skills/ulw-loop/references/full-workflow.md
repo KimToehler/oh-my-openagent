@@ -121,7 +121,7 @@ only when deliberately overwriting completed evidence.
 Write state through the CLI path. Do not hand-edit state files.
 
 ### 2. Refine success criteria + a Prometheus-grade QA and parallelism plan per goal
-Shape every goal's objective and `successCriteria` by `references/define-goal.md`: its quality bar, objective anatomy, and criterion construction govern this step.
+Shape every goal's objective and `successCriteria` by `references/define-goal.md`: its quality bar, objective anatomy, and criterion construction govern this step. Where the brief is silent on a constraint the work forks on, derive the default per that reference, record it via `annotate_ledger` (`--evidence` naming the repo fact, `--rationale` the default plus reversibility), and surface the assumed list in the first user-visible report so a wrong default is a one-line veto, not a finished run.
 Gather context BEFORE planning with parallel `explorer` / `librarian` workers plus your own read-only tools.
 First survey available skills: read every loosely-relevant skill's description, deliberately choose which this work uses, and prefer applying genuinely-relevant skills over working raw.
 Then run tier triage per goal — rigor (LIGHT/HEAVY below) and shape (`delivery` default, or `research` when the deliverable is a cited answer, not an artifact) — and record both in an `annotate_ledger` steering entry. Default is LIGHT — a narrow change inside existing layers. Take HEAVY only on a fact you can point to: a new module / abstraction / domain model; auth, security, or session; an external integration; a DB schema or migration; concurrency, transaction boundaries, or cache invalidation; a cross-domain refactor; or the user signaled care or demanded review. When unsure, take HEAVY; upgrade the moment a HEAVY fact surfaces, never downgrade mid-run.
@@ -179,6 +179,24 @@ Loop per goal. Cap at 5 cycles per goal. Cap identical same-criterion failures a
 4. If blocked or failed, checkpoint with `--status blocked` or `--status failed` and include diagnosis evidence.
 5. If this is the final goal, run the final quality gate first and pass `--quality-gate-json`.
 
+## Exact final-story sequence
+For the final story, follow this exact checkpoint sequence:
+
+```sh
+omo-agent-toolkit ulw-loop status --json
+# Read nextActions and currentAttemptDir.
+omo-agent-toolkit ulw-loop record-evidence --goal-id <g> --criterion-id <c> --status pass --evidence "..."
+# Repeat record-evidence once per criterion.
+# Then use the harness update_goal tool with status complete.
+omo-agent-toolkit ulw-loop checkpoint --goal-id <g> --print-template --json
+# Fill the printed template: replace every placeholder and use real artifact paths under currentAttemptDir.
+# codex-goal-json.goal.objective must equal the plan's codexObjective verbatim.
+omo-agent-toolkit ulw-loop checkpoint --goal-id <g> --status complete --evidence "..." --codex-goal-json <path> --quality-gate-json <path>
+omo-agent-toolkit ulw-loop complete-goals
+```
+
+The lazycodex gate uses all five sections shown in the sample below, including `codeReview`.
+
 ## Final Quality Gate
 Trigger only for the final aggregate goal after every criterion in every goal is `pass`.
 1. Run targeted verification for changed behavior.
@@ -197,7 +215,7 @@ omo-agent-toolkit ulw-loop checkpoint --goal-id <id> --status complete --evidenc
 {
   "codeReview":{"by":"lazycodex-code-reviewer","recommendation":"APPROVE","codeQualityStatus":"CLEAR","reportPath":"test/fixtures/artifacts/code-review.md","evidence":"Diff review passed.","blockers":[]},
   "manualQa":{"by":"lazycodex-qa-executor","status":"passed","evidence":"CLI and data surfaces passed.","surfaceEvidence":[{"id":"surface-cli-pass","criterionRef":"C1","surface":"cli","invocation":"omo-agent-toolkit ulw-loop checkpoint --quality-gate-json sample-quality-gate.json --json","verdict":"passed","artifactRefs":["artifact-cli-pass"]},{"id":"surface-data-pass","criterionRef":"C2","surface":"data","invocation":"diff -u before-ledger.json after-ledger.json","verdict":"passed","artifactRefs":["artifact-data-diff"]}],"adversarialCases":[{"id":"adv-malformed-input","criterionRef":"C3","scenario":"malformed gate input omits manual QA evidence","expectedBehavior":"validator rejects ULW_LOOP_QUALITY_GATE_INVALID","verdict":"passed","artifactRefs":["artifact-cli-reject"]}],"artifactRefs":[{"id":"artifact-cli-pass","kind":"cli-transcript","description":"CLI pass artifact.","path":"test/fixtures/artifacts/cli-pass.txt"},{"id":"artifact-cli-reject","kind":"log","description":"Reject log artifact.","path":"test/fixtures/artifacts/rejection.txt"},{"id":"artifact-data-diff","kind":"data-diff","description":"Data diff artifact.","path":"test/fixtures/artifacts/data-diff.txt"}]},
-  "gateReview":{"by":"lazycodex-gate-reviewer","recommendation":"APPROVE","reportPath":"test/fixtures/artifacts/gate-review.md","evidence":"Gate review passed.","blockers":[]},
+  "gateReview":{"by":"lazycodex-gate-reviewer","recommendation":"APPROVE","reportPath":"test/fixtures/artifacts/gate-review.md","evidence":"Gate review passed.","blockers":[],"notes":[]},
   "iteration":{"fullRerun":true,"status":"passed","rerunCommands":["bunx vitest run packages/omo-codex/plugin/components/ulw-loop/test/quality-gate-doc.test.ts"],"evidence":"Focused rerun passed."},
   "criteriaCoverage":{"totalCriteria":3,"passCount":3,"originalIntent":"User wanted artifact-backed completion.","desiredOutcome":"Behavior ships with review and QA evidence.","userOutcomeReview":"Result matches brief and goals.","adversarialClassesCovered":["malformed_input","stale_state"]}
 }

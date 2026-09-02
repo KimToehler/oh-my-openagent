@@ -1,0 +1,54 @@
+WHAT WAS TESTED
+- RED: bun test packages/omo-opencode/src/config/schema/background-task.test.ts
+- GREEN: bun test packages/omo-opencode/src/config/schema/background-task.test.ts
+- Typecheck: bun run typecheck
+- Schema generation: bun run build:schema
+- Manual schema surface: bun run build:schema && grep -c todoGateGraceMs assets/omo.schema.json && grep -c todoGateGraceMs assets/oh-my-opencode.schema.json
+- Config-boundary probe: temporary /tmp/todo-gate-grace-probe.ts imported BackgroundTaskConfigSchema and called safeParse({todoGateGraceMs: 1800000}).
+
+WHAT WAS OBSERVED
+RED output:
+Expected: 600000
+Received: undefined
+Expected: false
+Received: true
+4 fail, proving field and both ordering checks did not yet exist.
+
+GREEN output:
+17 pass
+0 fail
+21 expect() calls
+Ran 17 tests across 1 file.
+
+Typecheck output ended successfully after tsgo root, script, and workspace checks.
+
+Schema generation output:
+Generating JSON Schemas...
+JSON Schemas generated: assets/omo.schema.json, assets/oh-my-opencode.schema.json
+
+Manual schema surface output:
+2
+1
+Both generated assets contain todoGateGraceMs.
+
+Config-boundary probe output:
+{"success":false,"issues":[{"code":"custom","path":["todoGateGraceMs"],"message":"todoGateGraceMs must be less than taskTtlMs"}]}
+
+Adversarial probes:
+- stale_state: build:schema left scoped schema artifacts dirty plus pre-existing/out-of-scope background-agent notification template source and test changes, and packages/omo-senpi/plugin/extensions/omo-task.js. Only scoped assets will be staged.
+- dirty_worktree: packages/omo-senpi/plugin/extensions/omo-task.js remains modified and unstaged; not touched by this task.
+- malformed_input: 59999 rejects at minimum; 600000 with taskTtlMs 300000 and 1800000 with TTL omitted both reject on todoGateGraceMs.
+- concurrency: not applicable, static schema validation has no concurrent state.
+- timeout: not applicable, schema parsing has no timer or wait path.
+- cancellation: not applicable, schema parsing has no cancellable operation.
+- network: not applicable, validation and schema generation are local.
+- permissions: not applicable, no permission boundary changed.
+- resource_exhaustion: not applicable, one numeric field and constant only.
+
+WHY IT IS ENOUGH
+Focused tests prove valid, optional, minimum, configured-TTL, and default-TTL behavior. Generated schemas prove public config artifacts expose field. Direct safeParse probe proves default TTL fallback at config boundary, not only test expectation.
+
+WHAT WAS OMITTED
+- Full raw typecheck logs omitted because successful and lengthy.
+- No secrets, credentials, headers, or environment dumps collected.
+- Temporary probe removed after run: cleanup: deleted /tmp/todo-gate-grace-probe.ts.

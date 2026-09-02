@@ -1,0 +1,14 @@
+rule: .omo/rules/internal-prompt-injection.md
+globs parsed: 24
+alwaysApply in frontmatter: false
+
+PASS  matched=true  expected=true  reason=[object Object] packages/omo-opencode/src/shared/prompt-async-gate.ts
+PASS  matched=true  expected=true  reason=[object Object] packages/omo-opencode/src/hooks/goal/index.ts
+PASS  matched=true  expected=true  reason=[object Object] packages/omo-opencode/src/features/background-agent/manager.ts
+PASS  matched=true  expected=true  reason=[object Object] packages/omo-opencode/src/cli/run/runner.ts
+PASS  matched=false expected=false reason=[object Object] packages/omo-opencode/src/config/schema/team-mode.ts
+PASS  matched=false expected=false reason=[object Object] packages/web/app/page.tsx
+PASS  matched=false expected=false reason=[object Object] AGENTS.md
+PASS  matched=false expected=false reason=[object Object] docs/guide/team-mode.md
+
+RESULT: PATH-GATED as intended (0 failures)

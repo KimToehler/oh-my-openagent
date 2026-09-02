@@ -1,0 +1,12 @@
+(a) log surface live: grep -ac "context-injector" $LOG = 127  -> nonzero, PASS
+
+(b) unbracketed "opencode" key must make S0 FAIL: NOT RUN - UNINFORMATIVE BY CONSTRUCTION.
+    S0 already FAILS with the correct bracketed key, so both arms of this
+    discriminator now produce FAIL and it can no longer distinguish anything.
+    Running it would produce a green-looking result with zero information.
+    It must be re-run after the dispatch defect is fixed.
+
+(c) removing the hook's log() call must make S0 FAIL: NOT RUN - SAME REASON.
+    S0 fails with the log() call present. The mutation cannot change the
+    outcome, so it proves nothing about the provenance of the counted line.
+    Also re-run after the fix. Hook source left UNMODIFIED (git status clean).

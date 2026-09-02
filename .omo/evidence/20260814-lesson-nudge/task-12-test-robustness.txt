@@ -1,0 +1,31 @@
+WHAT WAS TESTED
+- Focused baseline: `bun test packages/omo-opencode/src/plugin/event-hook-dispatcher.test.ts` passed `4 pass / 0 fail` before edits.
+- DEFECT 1 pre-fix mutation: replaced dispatcher promise with `Promise.reject(new Error("task12 D1 mutation"))` while assertion remained un-awaited. Focused test failed `3 pass / 1 fail`; Bun reported `Expected promise that resolves` at `expect(dispatched).resolves.toBeUndefined()`.
+- DEFECT 2 pre-fix mutation: commented out executable `goal` dispatch while retaining `hooks.goal` in comment. Old source-text guard passed `4 pass / 0 fail`.
+- DEFECT 3 pre-fix mutations: changed production registration to `content: ""`, then separately `priority: "low"`. Existing nudge test passed both times: `7 pass / 0 fail`.
+- Post-fix focused GREEN: dispatcher test `4 pass / 0 fail`; lesson-nudge test `7 pass / 0 fail`.
+- DEFECT 2 post-fix mutation: commented executable `goal` dispatch again. Behavioral guard failed `3 pass / 1 fail`, `Expected number of calls: 1; Received number of calls: 0`. Restored dispatch, then focused test passed `4 pass / 0 fail`.
+- DEFECT 3 post-fix content mutation: `content: ""` failed `6 pass / 1 fail`; expected `buildLessonNudgeMessage()` content, received empty content. Restored source.
+- DEFECT 3 post-fix priority mutation: `priority: "low"` failed `6 pass / 1 fail`; expected `normal`, received `low`. Restored source, then nudge test passed `7 pass / 0 fail`.
+- Full suite: confirmed `packages/omo-codex/scripts/install-dist/` clean before run, then ran `bun test`: `13019 pass / 3 skip / 5 fail`, `13027` tests across `1707` files.
+- Typecheck: `bun run typecheck`, exit `0`.
+
+WHAT WAS OBSERVED
+- Awaiting `expect(dispatched).resolves.toBeUndefined()` makes test completion depend on assertion promise.
+- Behavioral guard creates spies for every session-hook member outside existing 11-name other-tier allowlist. Shapes match dispatcher: bare `sessionNotification` and `lessonNudge`; `{ handler }` for `todoContinuationEnforcer` and `atlasHook`; `{ event }` for all other event-tier members. One dispatched event called every spy.
+- Commented `goal` dispatch now produces RED, proving guard catches defect old text search missed.
+- Full lesson-nudge registration entry now pins `id`, `source`, `content: buildLessonNudgeMessage()`, and `priority: "normal"`.
+- All mutation source files restored after experiments. Each experiment status check showed only intended uncommitted test files, never mutation production files.
+- Same pre-existing five suite failures:
+  1. `#given the generated Codex installer #when release versions are synchronized #then its embedded package version matches the root release version`
+  2. `resolveSkillContentAsync > #given the shared ulw-plan skill source #when OpenCode skills are resolved #then ulw-plan is path-backed with workflow resources`
+  3. `skill loader MCP parsing > deduplication > prioritizes project Claude ulw-plan over shared ulw-plan`
+  4. `skill loader MCP parsing > deduplication > prioritizes project Agents ulw-plan over shared ulw-plan`
+  5. `skill loader MCP parsing > deduplication > treats a project skill literally named shared/ulw-plan as a plain name, not a canonical alias`
+- Captured command outputs: `/tmp/task12-d1-red-before.log`, `/tmp/task12-d2-red-before-green-old-guard.log`, `/tmp/task12-d3-content-before-green.log`, `/tmp/task12-d3-priority-before-green.log`, `/tmp/task12-d2-after-red.log`, `/tmp/task12-d2-after-green.log`, `/tmp/task12-d3-content-after-red.log`, `/tmp/task12-d3-priority-after-red.log`, `/tmp/task12-d3-after-green.log`, `/tmp/task12-full-bun-test.log`, `/tmp/task12-typecheck.log`.
+
+WHY IT IS ENOUGH
+- Each supplied mutation was run before and after test strengthening. Old tests accepted D2 and D3 mutations; new tests reject each required mutation and pass restored source. Full suite failure count and named failure set remain unchanged. Typecheck passed.
+
+WHAT WAS OMITTED
+- No secrets, environment dumps, credentials, auth headers, or raw private logs recorded. Full raw suite output remains in local `/tmp/task12-full-bun-test.log`; evidence preserves counts, failure names, and test-relevant excerpts only.
