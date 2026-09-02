@@ -122,12 +122,22 @@ grep -F "session.error" "$EVIDENCE_DIR/12-plugin-log-after-interrupt.txt" > "$EV
 TERMINALIZED="$(grep -cF "Terminalizing child task after parent session abort" "$EVIDENCE_DIR/12-plugin-log-after-interrupt.txt" 2>/dev/null | tr -d ' ')"
 TERMINALIZED_THIS_CHILD="$(grep -F "Terminalizing child task after parent session abort" "$EVIDENCE_DIR/12-plugin-log-after-interrupt.txt" 2>/dev/null | grep -cF "$PARENT" | tr -d ' ')"
 
+# THE INTERRUPT MUST STAY INTERRUPTED. Terminalizing the children originally ran the
+# full notification path, which woke the parent and RESTARTED the turn the user had
+# just aborted - 3 wakes and 6 new sessions in the 2026-09-02 evidence, against 0 and
+# 0 in the negative control. Terminalizing correctly is only half the property; the
+# other half is that nothing resumes afterwards.
+PARENT_WAKES="$(grep -cF "background-agent-parent-wake" "$EVIDENCE_DIR/12-plugin-log-after-interrupt.txt" 2>/dev/null | tr -d ' ')"
+SESSIONS_AFTER="$(grep -c '"type":"session.created"' "$EVIDENCE_DIR/10-sse-after-interrupt.jsonl" 2>/dev/null | tr -d ' ')"
+
 { printf 'parent_session=%s\n' "$PARENT"
   printf 'child_session=%s\n' "$CHILD"
   printf 'parent_session_error_events=%s\n' "${PARENT_ERROR_EVENTS:-0}"
   printf 'parent_events_mentioning_aborted=%s\n' "${ABORT_SHAPED:-0}"
   printf 'terminalize_log_lines=%s\n' "${TERMINALIZED:-0}"
-  printf 'terminalize_lines_for_this_parent=%s\n' "${TERMINALIZED_THIS_CHILD:-0}"; } > "$EVIDENCE_DIR/14-oracle.txt"
+  printf 'terminalize_lines_for_this_parent=%s\n' "${TERMINALIZED_THIS_CHILD:-0}"
+  printf 'parent_wake_dispatches=%s\n' "${PARENT_WAKES:-0}"
+  printf 'sessions_created_after_interrupt=%s\n' "${SESSIONS_AFTER:-0}"; } > "$EVIDENCE_DIR/14-oracle.txt"
 
 if [ "$EXPECT_STUCK" -eq 1 ]; then
   VERDICT=FAIL
@@ -145,8 +155,14 @@ else
     exit 1
   fi
   VERDICT=FAIL
-  [ "${TERMINALIZED_THIS_CHILD:-0}" -gt 0 ] && VERDICT=PASS
-  printf 'MODE=fixed (expect child lane terminalized on parent interrupt)\nVERDICT=%s\n' "$VERDICT" > "$EVIDENCE_DIR/15-verdict.txt"
+  WAKE_VERDICT=FAIL
+  [ "${PARENT_WAKES:-0}" -eq 0 ] && [ "${SESSIONS_AFTER:-0}" -eq 0 ] && WAKE_VERDICT=PASS
+  if [ "${TERMINALIZED_THIS_CHILD:-0}" -gt 0 ] && [ "$WAKE_VERDICT" = PASS ]; then VERDICT=PASS; fi
+  { printf 'MODE=fixed (expect child lane terminalized AND parent left interrupted)\n'
+    printf 'terminalized=%s\n' "${TERMINALIZED_THIS_CHILD:-0}"
+    printf 'no_wake_after_interrupt=%s (wakes=%s sessions_created=%s)\n' \
+      "$WAKE_VERDICT" "${PARENT_WAKES:-0}" "${SESSIONS_AFTER:-0}"
+    printf 'VERDICT=%s\n' "$VERDICT"; } > "$EVIDENCE_DIR/15-verdict.txt"
 fi
 cat "$EVIDENCE_DIR/14-oracle.txt" "$EVIDENCE_DIR/15-verdict.txt"
 
