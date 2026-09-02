@@ -39,7 +39,10 @@ describe("pollSyncSession transcript retention", () => {
       taskId: undefined,
     }, 15)
 
-    expect(result).toContain("Poll inactivity timeout reached")
+    expect(result).toEqual({
+      kind: "error",
+      message: expect.stringContaining("Poll inactivity timeout reached"),
+    })
     expect(messagesCalls).toBeGreaterThanOrEqual(1)
     expect(messagesCalls).toBeLessThan(statusCalls)
   })

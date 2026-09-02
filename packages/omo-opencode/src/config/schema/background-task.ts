@@ -15,10 +15,10 @@ export const BackgroundTaskConfigSchema = z.object({
   modelConcurrency: z.record(z.string(), z.number().min(0)).optional(),
   maxDepth: z.number().int().min(1).optional(),
   maxLiveDescendantsPerRoot: z.number().int().min(0).optional(),
-  /** Stale timeout in milliseconds - interrupt tasks with no activity for this duration (default: 180000 = 3 minutes, minimum: 60000 = 1 minute) */
-  staleTimeoutMs: z.number().min(60000).optional(),
-  /** Timeout for tasks that never received any progress update, falling back to startedAt (default: 1800000 = 30 minutes, minimum: 60000 = 1 minute) */
-  messageStalenessTimeoutMs: z.number().min(60000).optional(),
+  /** Stale timeout in milliseconds - interrupt tasks with no activity for this duration (default: 2700000 = 45 minutes, minimum: 60000 = 1 minute) */
+  staleTimeoutMs: z.number().describe("Stale timeout in milliseconds - interrupt tasks with no activity for this duration (default: 2700000 = 45 minutes, minimum: 60000 = 1 minute)").min(60000).optional(),
+  /** Timeout for tasks that never received any progress update, falling back to startedAt (default: 3600000 = 60 minutes, minimum: 60000 = 1 minute) */
+  messageStalenessTimeoutMs: z.number().describe("Timeout for tasks that never received any progress update, falling back to startedAt (default: 3600000 = 60 minutes, minimum: 60000 = 1 minute)").min(60000).optional(),
   /** Absolute TTL for non-terminal tasks in milliseconds (default: 1800000 = 30 minutes, minimum: 300000 = 5 minutes). Tasks exceeding this age from their last activity (or startedAt if no progress) are pruned. */
   taskTtlMs: z.number().min(300000).optional(),
   /** Timeout for tasks whose session has completely disappeared from the status registry (default: 60000 = 1 minute, minimum: 10000 = 10 seconds). When a session is gone (likely crashed), this shorter timeout is used instead of the normal stale timeout. */

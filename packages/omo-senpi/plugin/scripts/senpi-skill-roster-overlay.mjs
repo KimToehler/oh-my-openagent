@@ -10,7 +10,7 @@ function dropRawSisyphusLead(content) {
 
 export function applySenpiSkillRosterOverlay(skillName, content) {
   if (skillName === "review-work" || skillName === "visual-qa") {
-    return routeNamedAgent(content, "oracle", "unspecified-high")
+    return routeNamedAgent(routeNamedAgent(content, "oracle", "unspecified-high"), "auditor", "unspecified-high")
   }
   if (skillName === "debugging") {
     return dropRawSisyphusLead(routeNamedAgent(content, "oracle", "deep"))

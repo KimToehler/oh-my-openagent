@@ -136,7 +136,6 @@ export async function executeSyncContinuation(
   let anchorMessageCount: number | undefined
   let anchorMessageID: string | undefined
   let yieldedToBackground = false
-  let handedBackToParent = false
 
   try {
     const resumeContext = await resolveResumeContext(client, continuationID)
@@ -302,7 +301,7 @@ ${buildTaskMetadataBlock({
      if (toastManager) {
        toastManager.removeTask(taskId)
      }
-     if (!yieldedToBackground && handedBackToParent) {
+     if (!yieldedToBackground) {
        handedBackSyncSessions.add(continuationID)
        if (typeof client.session.abort === "function") {
          void client.session.abort({ path: { id: continuationID } }).catch((error: unknown) => {

@@ -67,6 +67,7 @@ const NON_EVENT_TIER_SESSION_HOOKS = new Set([
   "nonInteractiveEnv",
   "editErrorRecovery",
   "delegateTaskRetry",
+  "ulwExecute",
   "startWork",
   "prometheusMdOnly",
   "sisyphusJuniorNotepad",

@@ -10,7 +10,7 @@ Generated command:
 git ls-files packages/omo-opencode/src packages/omo-codex/src | grep '\.ts$' | sort | xargs awk 'FNR==1 && /^export (\*|\{).*from ["'"'"']@oh-my-opencode\// { print FILENAME }'
 ```
 
-Snapshot date: 2026-08-31. Total shim exports found: 256.
+Snapshot date: 2026-09-02. Total shim exports found: 257.
 
 ## Aggregate By Target Package
 
@@ -26,7 +26,7 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 | `@oh-my-opencode/omo-codex` | 41 |
 | `@oh-my-opencode/omo-senpi` | 1 |
 | `@oh-my-opencode/openclaw-core` | 30 |
-| `@oh-my-opencode/rules-engine` | 4 |
+| `@oh-my-opencode/rules-engine` | 5 |
 | `@oh-my-opencode/skills-loader-core` | 65 |
 | `@oh-my-opencode/team-core` | 45 |
 | `@oh-my-opencode/tmux-core` | 3 |
@@ -203,6 +203,7 @@ Snapshot date: 2026-08-31. Total shim exports found: 256.
 | `packages/omo-opencode/src/hooks/rules-injector/parser.ts` | `@oh-my-opencode/rules-engine` |
 | `packages/omo-opencode/src/hooks/rules-injector/project-root-finder.ts` | `@oh-my-opencode/rules-engine` |
 | `packages/omo-opencode/src/hooks/rules-injector/rule-distance.ts` | `@oh-my-opencode/rules-engine` |
+| `packages/omo-opencode/src/hooks/rules-injector/rule-file-finder.ts` | `@oh-my-opencode/rules-engine` |
 | `packages/omo-opencode/src/hooks/rules-injector/rule-scan-cache.ts` | `@oh-my-opencode/rules-engine` |
 | `packages/omo-opencode/src/openclaw/config.ts` | `@oh-my-opencode/openclaw-core` |
 | `packages/omo-opencode/src/openclaw/daemon.ts` | `@oh-my-opencode/openclaw-core` |
