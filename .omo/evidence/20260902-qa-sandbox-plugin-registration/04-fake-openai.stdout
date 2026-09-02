@@ -1,0 +1,3 @@
+fake-openai listening on 55056
+[2026-09-02T21:27:25.351Z] branch=qa-read-anchor call=1
+[2026-09-02T21:27:25.412Z] branch=qa-read-anchor-result call=2

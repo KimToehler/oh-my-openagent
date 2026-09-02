@@ -1,0 +1,4 @@
+FAIL: no omo plugin log at /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/omo-qa-sandbox.XXXXXX.gvgosZKr1N/data/tmp/oh-my-opencode.log - the plugin never started.
+      A sandbox server runs happily with NO omo plugin: sessions are
+      created, tools execute, and every hook is silently absent. Any
+      'the hook did not fire' result from this run is UNPROVEN.

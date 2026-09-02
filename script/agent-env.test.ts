@@ -145,6 +145,51 @@ printf 'ISDIR=%s\\n' "$([ -d "$OMO_QA_PROJ" ] && echo yes || echo no)"
         }
       },
     )
+
+    // A sandbox that isolates perfectly but loads no omo plugin produces the
+    // worst possible QA result: a healthy-looking server where every hook is
+    // absent, so "the hook did not fire" reads as evidence about the feature
+    // rather than about the harness. Four INCONCLUSIVE verdicts on a real
+    // vulnerability came from exactly that. The sandbox must therefore ship the
+    // registration itself. It goes at the XDG user level (opencode reads
+    // $XDG_CONFIG_HOME/opencode, NOT $HOME/.config/opencode once XDG is set),
+    // and it must name the same dist/index.js the probes use: config levels
+    // MERGE rather than override, and two DIFFERENT omo entry points loading at
+    // once trips detectDuplicateOmoPlugin() into disabling the plugin outright.
+    test.skipIf(process.platform === "win32")(
+      "#given the QA isolation helper #when sourced #then it registers this repo's built plugin at the XDG user level",
+      () => {
+        const probe = `set -e
+. ${JSON.stringify(sandbox)} >/dev/null 2>&1
+printf 'CFG=%s\\n' "$XDG_CONFIG_HOME/opencode/opencode.json"
+printf 'ROOT=%s\\n' "$OMO_QA_ROOT"
+`
+        const result = Bun.spawnSync(["bash", "-c", probe])
+        const stdout = result.stdout.toString()
+        const cfgPath = /^CFG=(.*)$/m.exec(stdout)?.[1]
+        const qaRoot = /^ROOT=(.*)$/m.exec(stdout)?.[1]
+
+        expect(cfgPath, "probe must report the config path").toBeTruthy()
+        expect(
+          existsSync(cfgPath ?? ""),
+          `sandbox must register the plugin at ${cfgPath}`,
+        ).toBe(true)
+
+        const parsed = JSON.parse(readFileSync(cfgPath as string, "utf8")) as { plugin?: unknown }
+        const entries = parsed.plugin
+        expect(Array.isArray(entries), "registration must declare a plugin array").toBe(true)
+
+        const expected = `file://${join(REPO_ROOT, "dist", "index.js")}`
+        expect(entries as string[], "must register this repo's built plugin").toContain(expected)
+        // Exactly one omo entry: a second, differently-pathed entry is what
+        // silently disables the plugin via the duplicate guard.
+        expect((entries as string[]).length, "must register exactly one plugin entry").toBe(1)
+
+        if (qaRoot !== undefined && qaRoot.length > 0) {
+          Bun.spawnSync(["rm", "-rf", qaRoot])
+        }
+      },
+    )
   })
 
   describe(".env.example", () => {

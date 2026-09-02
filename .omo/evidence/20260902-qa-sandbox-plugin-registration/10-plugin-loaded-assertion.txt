@@ -1,0 +1,1 @@
+PASS: omo plugin loaded (1 ENTRY line(s))

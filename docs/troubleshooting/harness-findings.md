@@ -3733,6 +3733,39 @@ Register it project-level, inside the session directory, not user-level. Nest om
 
 **Last verified:** 2026-09-02 (f548b2d49, observed directly during the containment reproduction)
 
+**Update (verified 2026-09-02):** The registration diagnosis and workaround above
+were wrong. The sandbox exports `XDG_CONFIG_HOME="$OMO_QA_ROOT/config"`
+(`script/agent/qa-sandbox.sh:34`), so OpenCode's user config is
+`$XDG_CONFIG_HOME/opencode/opencode.json` — **not**
+`$HOME/.config/opencode/opencode.json`. That failed attempt wrote a file OpenCode
+never reads. A real server confirmed user-level XDG registration loads
+`dist/index.js`; project-level registration also works, but it is not required.
+
+The proposed `/config` assertion was also a false proof: `GET /config` echoes
+configured entries, not successfully loaded modules. With a deliberately
+nonexistent `dist/DOES-NOT-EXIST.js`, the server returned 200 and `/config` listed
+the bogus entry while no plugin log existed and every omo hook was absent. The
+reliable signal is the plugin's own `ENTRY - plugin loading` line. The new
+`oqa_assert_plugin_loaded <plugin-log> [offset]` checks that signal; its negative
+control rejects the healthy-but-unloaded server.
+
+Two further config traps surfaced. Config **levels merge** rather than override:
+user-level `dist/index.js` plus project-level `src/index.ts` loads omo twice. The
+plugin's duplicate detector then makes it return `{}` and no-op, recreating the
+silent failure; its current config reader misses project-root `opencode.json`, so
+it logs no duplicate warning. Identical paths dedupe safely. At one config
+location, `opencode.jsonc` also wins over `opencode.json`, so probes that write a
+JSONC config supersede the sandbox default cleanly.
+
+**Fixed:** `script/agent/qa-sandbox.sh` now writes one XDG user-level registration
+for this repository's `dist/index.js`, warns loudly for a missing/stale build, and
+never auto-builds while sourced. `opencode-qa` now requires an actual startup-marker
+assertion before any claim about an omo hook. Real isolated QA drove native `read`
+through fake-model tool calls and got `1#SN|QA_SANDBOX_ANCHOR`; host DB stayed
+`3642 -> 3642`. Negative control showed `/config` listing the bogus plugin while
+`oqa_assert_plugin_loaded` failed, as required. Evidence:
+`.omo/evidence/20260902-qa-sandbox-plugin-registration/`.
+
 
 ## 2026-09-02 - A self-run QA probe validates the branch the author reasoned toward, not the incident the report describes
 

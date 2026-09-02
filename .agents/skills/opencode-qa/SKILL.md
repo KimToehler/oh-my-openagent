@@ -23,6 +23,26 @@ check a flag with `opencode <cmd> --help`.
   scripts already do this; if you run opencode by hand for QA, set
   `XDG_DATA_HOME` / `XDG_CONFIG_HOME` / `XDG_STATE_HOME` / `XDG_CACHE_HOME` to
   temp dirs first.
+- **Prove the omo plugin is loaded before believing any result that depends on
+  it.** A sandbox server runs perfectly with no omo plugin at all: sessions are
+  created, prompts are answered, tools execute, `/config` returns 200 — and every
+  omo hook is silently absent. A probe then reports "the hook did not fire",
+  which reads as evidence about the feature when it is evidence about the
+  harness. That inversion produced four INCONCLUSIVE verdicts on a real
+  vulnerability. Assert first: `oqa_assert_plugin_loaded <plugin-log> [offset]`.
+- **`GET /config` is NOT proof of loading.** It echoes back *configured* plugins,
+  not loaded ones — point it at a plugin file that does not exist and it still
+  lists the path, the server still starts, and no hook runs. The plugin's own
+  `ENTRY - plugin loading` log line is the real signal. Absence of an effect is
+  only evidence when the producer of that effect is present.
+- `script/agent/qa-sandbox.sh` now registers this repo's `dist/index.js` at
+  `$XDG_CONFIG_HOME/opencode/opencode.json`, so a plain sandbox has omo loaded.
+  Three traps if you write your own config: opencode reads `$XDG_CONFIG_HOME/opencode`,
+  **not** `$HOME/.config/opencode`, once XDG is set; an `opencode.jsonc` beats an
+  `opencode.json` in the same directory; and config levels MERGE rather than
+  override, so registering a *second, differently-pathed* omo entry loads omo
+  twice and `detectDuplicateOmoPlugin()` then disables it entirely. Reuse the
+  same `dist/index.js` path and identical entries dedupe harmlessly.
 - Global text search over the `part` table is a multi-GB scan. Always scope it
   (`--session`, `--recent`, or `--since`). The text script refuses an
   unbounded scan on purpose.
