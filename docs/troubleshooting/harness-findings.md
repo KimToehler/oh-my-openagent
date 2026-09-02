@@ -2614,7 +2614,25 @@ Two claims in this entry, verified separately.
 
 **Fix status (2026-09-02):** both claims still unfixed. Claim B severity stays `blocker`; Claim A stays `costly` and is now the older, less-verified half.
 
-**Last verified:** 2026-09-02 (64d608f6d)
+**RETRACTION - Claim B (2026-09-02, second pass, verified against dev @ 4eccb91fa):** Claim B is **stale as written**, and the two verification passes above (2026-08-27, 2026-09-02 first pass) were both wrong on the decisive point. Each traced the real-path/content-hash dedupe at `injection-processor.ts:167-175` and concluded "injected once per session, never restated" without reading the ~50 lines directly above it. Those lines are the reset:
+
+- `hook.ts:119-125` handles `session.compacted` and calls `clearSessionState(sessionID)`.
+- `injection-processor.ts:114-130` independently compares the cache's `compactionEpoch` against `transcriptHydration.getCompactionEpoch(sessionID)` and, on mismatch, replaces `contentHashes` and `realPaths` with empty sets.
+- The epoch itself is derived from the compaction message ID during transcript hydration (`transcript-hydration.ts:143-170`), so the reset still fires when the `session.compacted` event is missed entirely.
+
+So the dedupe is per-compaction-epoch, not per-session. A rule that was injected before a compaction boundary is re-injected in full after it, which is the exact recall behavior Claim B asserted was absent. The claim's premise - that a rule can be injected once and then be permanently absent from context - does not hold for the case that motivated it, an incident occurring after a long-running session compacted.
+
+The real gap was coverage, not behavior: nothing pinned the redelivery, so it could regress silently and re-confirm the claim by accident. `7e1f4d45d test(rules-injector): pin full-body rule redelivery across a compaction boundary` adds that test to `hooks/rules-injector/hook.test.ts` (+46 lines); the rules-injector suite is 122 pass.
+
+**Residual, and it is real.** Two things survive this retraction and neither is fixed:
+1. The documented compaction-marker residual at `transcript-hydration.ts:54-56` - when an SDK emits only a part-level marker before the summary, the summary stays inside the scanned window, so a verbatim `[Rule: X]` banner quoted into that summary can suppress X on the next pass. That is a narrower failure than Claim B described, but it is the same class.
+2. Within a single uncompacted session the delivery model is still one-shot and still attached to a tool output. Claim B's design objection to that model stands; its factual claim about permanent absence does not.
+
+**Claim A is untouched by this retraction.** Gradle/resource capacity starvation between file-disjoint lanes was not re-probed in this pass either, and stands as originally reported.
+
+**Fix status (2026-09-02, second pass):** Claim B severity revised `blocker` -> `costly`, scoped to the residual above rather than to permanent absence. Claim A stays `costly` and is now the oldest unverified half of this entry.
+
+**Last verified:** 2026-09-02 (4eccb91fa)
 
 ## 2026-08-27 — Background-agent todo-gate tests used an unpinned historical clock
 
