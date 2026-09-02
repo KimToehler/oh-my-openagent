@@ -40,10 +40,52 @@ Build a table: entry title, current severity, current fix status, line range. Sk
 already marked `fixed in <sha>` **unless** the user asked for a full re-verification —
 those are settled.
 
-### 2. Dispatch one verifier per entry
+**Scope from `**Last verified:**`, never from the newest `**Fix status:**` date.** Each pass
+writes a `**Last verified:** YYYY-MM-DD (<sha>)` line per entry it checks (step 4). Sort by
+that field and take the oldest; an entry with no such line has never been re-verified and
+goes first.
 
-One background `explore` per entry, all in parallel. Each verifier gets the entry text and
-must answer with evidence, not opinion.
+Deriving scope from status dates instead is what made coverage *rotate*: each pass picked
+whatever "looked stale", re-verified a different subset, and left an untouched block behind.
+On 2026-09-02 a morning pass covered 15 entries, an afternoon pass found 23 others still
+sitting at their 2026-08-27 verdict, and no pass had ever covered all 61. Rotation looks
+like progress and is not.
+
+State the coverage arithmetic out loud before dispatching: total entries, how many are
+settled, how many you are checking, how many you are knowingly leaving. If you are not
+covering everything, say which block you skipped and why.
+
+### 2. Collect git history YOURSELF, before dispatching
+
+**The verifier agent cannot run git. Do not ask it to.**
+
+`explore` is restricted to `read`, `grep`, `glob` and four `lsp_*` tools
+(`packages/omo-opencode/src/agents/explore.ts:28-31`, `shared/permission-compat.ts:27`).
+It has no bash. A prompt telling it to run `git log` produces "I could not execute this"
+in the best case — and in the worst case it substitutes something that looks like history
+and is not. On the 2026-09-02 pass two verifiers read `.git/logs/refs/heads/dev` through
+`read` and reasoned from it; a reflog records *your local checkout activity*, not the
+branch's history, so "no fix commit appears" was unfounded in both.
+
+So the orchestrator owns every git query. One batched call before dispatch:
+
+```bash
+git log --oneline --since=<oldest-entry-date> -- <paths touched by the entries> | head -40
+git log -1 --format="%h %ad %s" --date=short <each SHA an entry claims>
+```
+
+Then **paste the resulting subject lines into each verifier's prompt** as given fact, and
+tell the verifier its job is source-and-test reading only. That keeps the two evidence
+directions independent: you supply history, it supplies current source, and a disagreement
+between them is signal rather than a gap.
+
+Explicitly forbid the substitute in the prompt: `Do NOT read .git/ — no reflog, no refs, no
+COMMIT_EDITMSG. If you need history, say so and stop.`
+
+### 3. Dispatch one verifier per entry
+
+One background `explore` per entry, all in parallel. Each verifier gets the entry text, the
+git subject lines you collected in step 2, and must answer with evidence, not opinion.
 
 Required in every verifier prompt:
 
@@ -54,6 +96,10 @@ Required in every verifier prompt:
 - **Explicit permission to say "I could not confirm this."** Verifiers that feel obliged to
   return a verdict will invent one.
 - `Do NOT edit any file.` Verification is read-only.
+- `Do NOT read .git/` — no reflog, no refs, no `COMMIT_EDITMSG`. History arrives in the
+  prompt from step 2 or not at all.
+- The git subject lines from step 2, pasted in, with the instruction to treat them as given
+  and to reconcile them against what the source actually shows.
 
 Ask each verifier to check both directions:
 
@@ -62,7 +108,7 @@ Ask each verifier to check both directions:
 
 Searching only for the defect finds the defect. Searching only for the fix finds the fix.
 
-### 3. Cross-check every "still open" verdict — MANDATORY
+### 4. Cross-check every "still open" verdict — MANDATORY
 
 **A single verifier's "still open" is not a verdict. Confirm it yourself before writing it
 down.**
@@ -84,17 +130,24 @@ Before accepting "still open":
   retry path.
 - Look for test files named after the defect. A test file named for the symptom usually
   means someone fixed the symptom. `ls` the directory and read the `#given` lines.
-- Run `git log --oneline -- <the file>` and read the subject lines. A fix commit naming the
-  defect outranks a source read that missed it.
+- Re-read the step 2 history for that file, and widen it if the entry named a specific
+  symbol: `git log --oneline -S "<symbol>" -- <path>`. A fix commit naming the defect
+  outranks a source read that missed it. **You run this, not the verifier** — see step 2.
 
 If any of those turn up something the verifier did not address, re-verify that point
 yourself before writing.
 
-### 4. Append, never rewrite
+### 5. Append, never rewrite
 
 Every result becomes an `**Update:** (YYYY-MM-DD, verified against <branch> source)` line
 appended to the existing entry. The original text stays exactly as written — the history of
 what we believed and when is the point.
+
+**Every entry you checked also gets a `**Last verified:** YYYY-MM-DD (<sha>)` line** — the
+short SHA of the commit you verified against, from `git rev-parse --short HEAD`. Write it
+even when nothing changed: "checked, unchanged" is the single most useful thing the next
+pass can know, and it is exactly what a `**Fix status:**` line fails to record. This field
+is what step 1 sorts on.
 
 This applies to entries that turn out to be **wrong**, not just outdated. When a diagnosis
 is retracted, say so plainly and say what the real cause was. Do not quietly soften it.
@@ -110,7 +163,7 @@ Four outcomes, each with its own shape:
 
 Then revise the `**Fix status:**` line — by appending a new one, not editing the old.
 
-### 5. Re-score severity
+### 6. Re-score severity
 
 Original severity was assigned in the heat of being blocked. Re-score against what is now
 known:
@@ -123,16 +176,17 @@ known:
 - A finding whose mechanism is confirmed fixed keeps its original severity in the heading;
   the Update carries the resolution. Do not rewrite history to look calmer than it was.
 
-### 6. Report, then route
+### 7. Report, then route
 
 Report to the user: what is now fixed, what is still open ranked by severity, and what
-changed its mind. Keep it to a screen.
+changed its mind. Keep it to a screen. State the coverage arithmetic from step 1 — how many
+entries exist, how many you checked, how many remain unverified.
 
 Then propose the top open findings as work — `ulw-plan` for anything needing design, or
 `work-with-pr` directly for a contained fix. **Propose, do not start.** The user asked for
 a review; implementation is a separate decision.
 
-### 7. Commit the log alone
+### 8. Commit the log alone
 
 Per the capture rule, by explicit path, on its own:
 
@@ -147,10 +201,11 @@ Never `git add -A` — the harness repo usually has unrelated work in progress.
 
 | Step | Output |
 |---|---|
-| Inventory | Table of entries: title, severity, status, lines |
-| Dispatch | 1 background `explore` per entry, parallel, read-only |
+| Inventory | Table of entries, scoped by `**Last verified:**` — state the coverage arithmetic |
+| Git history | Orchestrator runs every `git log` / `git show`, batched, before dispatch |
+| Dispatch | 1 background `explore` per entry, parallel, read-only, history pasted in |
 | Cross-check | Every "still open" independently confirmed |
-| Append | `**Update:**` lines, original text untouched |
+| Append | `**Update:**` + `**Last verified:**` lines, original text untouched |
 | Re-score | Severity by recurrence, not by original guess |
 | Route | Propose top findings to `ulw-plan` / `work-with-pr` |
 | Commit | One file, explicit path |
@@ -168,6 +223,14 @@ subjects describe intent, and intent misses.
 
 **Batch-verifying several entries in one agent.** Each entry needs its own search strategy;
 one agent handling five will do the first properly and skim the rest.
+
+**Asking the verifier to run git.** It cannot — `explore` has no bash. It will either report
+the gap (a wasted lane) or read `.git/logs` and reason from a reflog, which is your local
+checkout activity rather than the branch's history. Collect history yourself in step 2.
+
+**Letting coverage rotate.** Picking "whatever looks stale" re-verifies a different subset
+each pass and never converges. Sort by `**Last verified:**`, take the oldest, and say out
+loud what you are leaving behind.
 
 **Running this automatically.** See the manual-invocation section. It writes to a tracked
 file.

@@ -124,6 +124,12 @@ make it survivable.
 
 **Update:** (2026-08-28, measured) The `~110s` foreground figure used throughout this entry is **superseded** and was never the real bound. Measured: the MCP client aborts a `ctx_shell` tool call at **~59 s** (`sleep 58` returns normally; `sleep 60` returns `MCP error -32001: Request timed out`), and lean-ctx's own foreground cap default is now **45 s** (`LEAN_CTX_SHELL_FG_CAP_MS`), lowered from 110 s so the cap trips before the client abort. Read every `~110s` above as `~45 s foreground cap / ~59 s client abort`. The workaround also improves: `background_action="wait"` now blocks server-side until the job is terminal or `wait_timeout_ms` elapses (default 45 s, max 50 s, silently clamped), so a detached job can be supervised with ~6 cheap calls for a 5-minute job instead of ~30 status polls — but `wait` does **not** make the job notify, so it must be re-called on timeout and a turn must still never end with a detached job outstanding. `LEAN_CTX_SHELL_TIMEOUT_MS` still governs only a detached job's lifetime, as this entry states.
 
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) The shape has changed again, in our favour. `88d2cb9b2 fix(hooks): offer background_action="wait" as the unpolled-job warning's primary resolution` makes `wait` the FIRST resolution the warning offers, not a footnote: `packages/omo-opencode/src/hooks/unpolled-shell-job/message.ts:18-26` now leads with it and states that it blocks server-side until the job is terminal or `wait_timeout_ms` elapses. The warning still tells the truth about the external half - `ctx_shell(run_in_background=true)` "does not notify" (`message.ts:12-14`) - and the idle rescue is intact (`hook.ts:82-85` outstanding-job check, `:91-110` dispatch, `:112-124` cooldown). Tracker behaviour for all three wait outcomes is pinned at `tracker.test.ts:344-381`, with warning ordering at `:413-423`. Two same-day siblings tightened the same path: `7788a7d9a` (terminal status with an exit clause) and `b93318cd1` (id-gone deregistration).
+
+**Fix status (2026-09-02):** worked around, materially better. The external no-notification gap is unchanged and still outside our control, so this does not close. Severity stays `costly`: `wait` turns a 5-minute job from ~30 status polls into ~6 blocking calls, but a turn that ends with a detached job outstanding still strands it.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-17 — `<unpolled-background-shell-jobs>` hook fires once, then stops
 
 **Severity:** costly
@@ -206,6 +212,12 @@ Both declared-deliberate residuals confirmed unchanged. Idle-only firing still r
 
 **Fix status (2026-08-27):** unchanged, tracking gap still fixed, residuals still deliberate. Severity stays `papercut`.
 
+**Update:** (2026-09-02) Re-checked as part of the full-log pass. Three same-day commits touched this hook without changing the finding's standing: `7788a7d9a` (terminal status with an exit clause), `b93318cd1` (deregister on an id-gone status poll) and `88d2cb9b2` (wait as the primary resolution). Tracking gap remains fixed; the idle-only firing and positive-status-only late adoption remain deliberate.
+
+**Fix status (2026-09-02):** unchanged. Severity stays `papercut`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-17 — Stale-cancellation timer misread as a wall-clock budget
 
 **Severity:** docs-gap
@@ -250,6 +262,8 @@ always right, only the reading of it was wrong.
 **Fix status (2026-08-21):** fixed in tracked source — the wording now lives in
 `AGENTS.md:124` as well as the user's global config, so it no longer depends on one
 machine. Closed.
+
+**Last verified:** not re-checked 2026-09-02 - skipped as settled (fixed in tracked source); re-verify only on a full-log pass
 
 ## 2026-08-17 — Dead task reports `running`; resume requires cancel first
 
@@ -392,6 +406,12 @@ Confirmed fixed in code, both halves, and all three cited SHAs resolve and are a
 
 **Fix status (2026-08-27):** fixed, verified in source and history. Severity stays `papercut`.
 
+**Update:** (2026-09-02) Re-checked in the full-log pass; no change. Settled.
+
+**Fix status (2026-09-02):** fixed, unchanged.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-17 — Provider outage drops the in-memory task record; sessions unrecoverable by `task_id`
 
 **Severity:** costly
@@ -492,6 +512,12 @@ Split verdict confirmed. The resume-adopt half is genuinely fixed: `resume()` no
 
 **Fix status (2026-08-27):** partially fixed, unchanged from the 2026-08-24 split. Restart still destroys `task_id` control. Severity stays `costly`.
 
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Unchanged. The registry is still purely in-process: `task-registry.ts:6-13` declares `Map` stores and `:22-29` hangs `activeTasks`/`completedTasks` off `globalThis`, with all mutations staying in memory (`:99-124`). The adopt-on-miss path survives and improved - `resume()` at `manager.ts:1400-1457` verifies the session, probes liveness, and adopts - and `a307c362a` (2026-09-02) additionally made it carry the child's real agent identity rather than a fabricated one, which strengthens the recovery half without touching persistence. `manager.ts:1413-1415` still states outright that task state lives in process memory and may be lost on restart. Cross-checked for persistence introduced elsewhere - `.omo/` writes, `writeFile`/`Bun.write`, SQLite, a startup rehydrate - and found none in the feature's production source; the transcript fallback (`background-task-notification-template.ts:131`, `:174`) recovers a transcript, not a task record.
+
+**Fix status (2026-09-02):** partially fixed, unchanged. Severity stays `costly`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-17 — Completion summary replays every historical park as a current failure
 
 **Severity:** costly
@@ -589,6 +615,12 @@ Confirmed fixed. `7d41a6f23` (`fix(background-agent): stop replaying every park 
 
 **Fix status (2026-08-27):** fixed. Severity stays `papercut`.
 
+**Update:** (2026-09-02) Re-checked in the full-log pass; no change. Settled.
+
+**Fix status (2026-09-02):** fixed, unchanged.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-17 — `report_blocked` used for waiting, not for blocking
 
 **Severity:** costly
@@ -670,6 +702,12 @@ entry noted in `docs/reference/blocked-escalation-follow-up.md:19-25`.
 Confirmed fixed at both wording sites, and both are committed, not working-tree-only. The tool description at `packages/omo-opencode/src/tools/report-blocked/tools.ts:16` now says a still-running detached job is not a blocker and must be polled; the subagent prompt at `packages/omo-opencode/src/tools/delegate-task/prompt-builder.ts:21` repeats it. The `docs/reference/features.md:681` row is correct. Residual worth naming: no test asserts the wording, so a future edit could silently drop it (`report-blocked/tools.test.ts:26-60` and `prompt-builder.test.ts:122-132` assert mechanics and presence only).
 
 **Fix status (2026-08-27):** fixed, wording only, unpinned by tests. Severity stays `docs-gap`.
+
+**Update:** (2026-09-02) Re-checked in the full-log pass; no change. Still wording-only and still unpinned by tests, so it can regress silently.
+
+**Fix status (2026-09-02):** fixed, unchanged.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 
 ## 2026-08-17 — Mid-batch background completions starve a busy parent; delivery bounded, retention not
 
@@ -806,6 +844,12 @@ Split confirmed, and the retention half is now located precisely. Delivery is bo
 
 **Fix status (2026-08-27):** partially fixed, unchanged. Severity stays `costly`. The contained fix is a failing test for completed-task-with-pending-`noReply`-wake, then widening `wakeStillOwed` at `manager.ts:2623-2630`.
 
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Retention half still open, confirmed at the current location. `wakeStillOwed` now sits at `manager.ts:2647-2654` and still reads `pendingParentWake?.shouldReply === true || dispatchedParentWake?.shouldReply === true || hasInFlightParentWakeDispatch(...)`, so a completed task whose only outstanding wake is pending-with-`noReply` contributes nothing and the record is removed at `:2661-2669` rather than rescheduled at `:2655-2657`. Cross-checked for a sibling retention mechanism: the 300s ceiling at `parent-wake-flush-runner.ts:28`/`:303-308` bounds DELIVERY and deposits with `retainPendingWake: true` (`:70-80`), but it pins the wake, not the task record; the pending queue is a single in-memory map (`parent-wake-pending-queue.ts:19-23`) whose `noReply` admission metadata (`:94-96`) the manager cleanup never reads. Retention tests cover pending/dispatched/in-flight `shouldReply` only (`task-completion-retention-guard.test.ts:304-549`); no `wakeStillOwed` test exists.
+
+**Fix status (2026-09-02):** partially fixed, unchanged. Severity stays `costly`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-17 — Findings log had no review path; three entries were stale within hours
 
 **Severity:** costly
@@ -864,6 +908,8 @@ line when it has one at `:245`. The cross-check requirement is load-bearing.
 **Fix status (2026-08-21):** fixed — capture rule at `~/.omo/rules/harness-findings.md`,
 read-back skill at `.agents/skills/harness-findings-review/SKILL.md`, manual-only wiring
 confirmed. Follow-up: the capture rule does not yet mention the review skill.
+
+**Last verified:** not re-checked 2026-09-02 - skipped as settled (fixed, capture rule + this skill); re-verify only on a full-log pass
 
 ## 2026-08-18 — Subagents summarize mutation-test output instead of pasting it, making evidence unfalsifiable at review time
 
@@ -942,6 +988,12 @@ Site choice matters here, so it is recorded. `buildSystemContent` was rejected b
 The two contradictory statuses above are settled: line 896 (`fixed`) is correct and line 900 (`still unfixed`) is stale. `EVIDENCE_REPORTING` exists verbatim at `packages/omo-opencode/src/tools/delegate-task/prompt-builder.ts:16-19` and is prepended unconditionally to all three prompt shapes (non-plan `:102-105`, plan `:107-108`, background `:111-112`). Every delegation route reaches one of them: `background-task.ts:117`, `sync-session-lifecycle.ts:33`, `sync-prompt-sender.ts:88`, `sync-continuation.ts:160`, `unstable-agent-task.ts:32`. Pinned by three tests (`prompt-builder.test.ts:138`, `:153`, `:167`). Cross-checked `packages/prompts-core/`, `.omo/rules/`, and `.agents/skills/` for a duplicate requirement and found none, so the choke point is the only site, which is the right place for it.
 
 **Fix status (2026-08-27):** fixed at the choke point; the 2026-08-24 `still unfixed` line above is retracted as stale. Severity `docs-gap` retained for the record.
+
+**Update:** (2026-09-02) Re-checked in the full-log pass; no change. Settled at the `buildTaskPrompt` choke point.
+
+**Fix status (2026-09-02):** fixed, unchanged.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 
 ## 2026-08-21 — OpenDesign kills in-flight background subagents at parent turn end, then reports them `completed`
 
@@ -1155,6 +1207,12 @@ OMO-side half confirmed fixed; `9096d20da` (`fix(background-agent): stop reporti
 
 **Fix status (2026-08-27):** OMO half fixed and verified; external kill still unfixed, still a `blocker` for OpenDesign specifically.
 
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Split unchanged; OMO half re-confirmed in current source. Shutdown aborts running sessions (`manager.ts:3691-3703`) and archives still-running tasks as cloned `cancelled` records carrying an explicit FINAL-cancellation error (`:3726-3742`), leaving already-terminal tasks untouched via `TERMINAL_BACKGROUND_TASK_STATUSES` (`:3732-3735`); pinned at `manager-shutdown-global-cleanup.test.ts:159-211`. Cross-runtime recovery no longer claims success either - the task stays `running` and the output renders `Status: unknown` with a warning that a transcript does not prove completion (`tools/background-task/create-background-output.ts:111-148`), pinned by a test that explicitly rejects `Status: completed` for a recovered killed task (`create-background-output.cross-instance.test.ts:273-329`). `9096d20da` (2026-08-21) is confirmed present in history. The external one-shot kill is not observable from this repository and is neither fixed nor disproven here.
+
+**Fix status (2026-09-02):** OMO half fixed and re-verified; external kill still unfixed, still a `blocker` for OpenDesign specifically.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-21 — `session.status()` polled without a directory, but the endpoint is directory-scoped
 
 **Severity:** costly
@@ -1211,6 +1269,14 @@ Mitigating: `not-busy-is-not-gone.test.ts:6-20,41-48` pins the invariant that an
 Still open, and now enumerated exactly rather than approximately. There are 17 `session.status()` call sites under `packages/omo-opencode/src/`: 3 scoped, passing `query: { directory }` (`cli/run/completion.ts:87-89`, `cli/run/poll-for-completion.ts:230-232`, `cli/run/prompt-start.ts:38-40`) and 14 unscoped (`features/background-agent/manager.ts:3363,3476`; `features/tmux-subagent/polling-manager.ts:70,142`, `session-ready-waiter.ts:20`, `polling.ts:76,113`, `manager.ts:716`; `features/tui-sidebar/snapshot-builder.ts:60`; `tools/look-at/session-poller.ts:42`; `tools/call-omo-agent/completion-poller.ts:35`; `tools/delegate-task/sync-session-poller.ts:165`, `unstable-agent-task.ts:127`; `plugin/unstable-agent-babysitter.ts:27`). Note the five `tmux-subagent` sites pass `{ path: undefined }`, which looks scoped but is not. Cross-checked for a central injector that would make the omission harmless: `features/background-agent/opencode-client.ts:1-3` is a bare type alias and `plugin/build-team-idle-wake-hint-client.ts:16-29` binds methods without injecting query options, so no compensation exists. No test asserts a production status call carries `directory`.
 
 **Fix status (2026-08-27):** still unfixed, still deliberately. Severity stays `costly`; end-to-end harm remains unproven, so the sweep is worth scoping but not urgent.
+
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Unchanged, and the count is stable at 17 production call sites: 3 pass `query: { directory }` (`cli/run/completion.ts:87`, `cli/run/poll-for-completion.ts:230`, `cli/run/prompt-start.ts:38`), 14 do not. The background manager is still unscoped at `manager.ts:3425` and `:3538`. Six tmux-subagent sites pass `{ path: undefined }`, which is NOT the same thing as a directory and should be counted as unscoped (`tmux-subagent/polling-manager.ts:70,142`, `session-ready-waiter.ts:20`, `polling.ts:76,113`, `manager.ts:716`). Cross-checked for a central injector that would make the raw count misleading: none exists - `background-agent/opencode-client.ts:1-3` is a bare type alias, `plugin/build-team-idle-wake-hint-client.ts:16-29` only binds methods, and the directory-aware wrappers in `shared/session-route.ts:18-106` cover prompt/messages but have no status equivalent.
+
+Note on evidence quality: the verifier for this entry reported "no fix commit" after reading `.git/logs/refs/heads/dev` through `read`, which is a reflog and not history. The orchestrator-run `git log` confirms the conclusion anyway, but the reasoning was unsound - see the 2026-09-02 entry on the skill ordering its verifier to run git.
+
+**Fix status (2026-09-02):** still unfixed, still deliberately. Severity stays `costly`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 
 ## 2026-08-23 — lean-ctx triage silently eats dense output; every per-call bypass is a dead end
 
@@ -1301,6 +1367,12 @@ Delegation remained the only working route: `task(subagent_type="explore", ...)`
 The `blocker` re-score does not survive scrutiny in its stated form, and the entry title overstates the claim. Configuration confirmed: lean-ctx runs from `~/.config/opencode/opencode.json:91-97`; `compress_protect` including `"**/*.md"` is at `~/.lean-ctx/config.toml:155-159`, inside `[proxy]` at `:137-139`. No `triage_protect`, triage level, firewall, or disable switch exists anywhere in that config (`:137-166`) or in the skill (`~/.config/opencode/skills/lean-ctx/SKILL.md:1-71`), which confirms the central claim that `compress_protect` is the wrong lever and no triage-side equivalent is documented. However, `ctx_expand` IS a documented lossless retrieval path for archived output (`SKILL.md:52-54`), so "every per-call bypass is a dead end" is too broad as written: it holds for arbitrary dense text and shell stdout, not for archived slices. This was reproduced again during this very review: `ctx_shell` triage filtered 9 of 16 lines of a `sed` output (`[lean-ctx: 9 lines filtered by triage (level 2)]`), and `raw=true` recovered it, which further narrows the "no per-call bypass" claim.
 
 **Fix status (2026-08-27, revised):** still unfixed. Severity revised `blocker` -> `costly`: the silent-loss mechanism is real and has no config-side lever, but `raw=true` and `ctx_expand` are working per-call bypasses, so this is not a total dead end. The claim to carry forward is narrower: triage silently drops dense output by default, and the default is the defect.
+
+**Update:** (2026-09-02, probed against dev @ 64d608f6d) Still unfixed, and this pass produced a fresh live reproduction rather than a source read. Running `grep -n "^## 20\|^\*\*Severity:\|^\*\*Fix status" docs/troubleshooting/harness-findings.md` through `ctx_shell` returned `[Firewalled ctx_shell output - 37311 chars, 9640 tok, 271 lines stored out-of-band]` with a head/tail excerpt and `--- ... 243 lines omitted ... ---` in the middle. `ctx_expand(id=...)` recovered it, confirming the archive is lossless and that the narrowed claim is the correct one: the content is not destroyed, it is silently withheld by default. Configuration is unchanged - `~/.lean-ctx/config.toml:137-159` still exposes only `compress_protect` (which already includes `"**/*.md"` and did not prevent this), and `~/.config/opencode/opencode.json:91-97` registers the server with `command`/`enabled`/`type` and no tuning surface. `ctx_expand` remains documented as the recovery path (`~/.config/opencode/skills/lean-ctx/SKILL.md:51-54`); `raw=true`/`inline=true` remain undocumented in any agent-read file.
+
+**Fix status (2026-09-02):** still unfixed, reproduced live. Severity stays `costly`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 
 ## 2026-08-24 — `formatTaskResult` discards a lane's whole transcript when the session errors
 
@@ -1398,6 +1470,12 @@ Confirmed fixed. `36e1cf15f` (`fix(background-task): keep partial transcript whe
 
 **Fix status (2026-08-27):** fixed, verified in source, history, tests, and evidence.
 
+**Update:** (2026-09-02) Re-checked in the full-log pass; no change. Settled.
+
+**Fix status (2026-09-02):** fixed, unchanged.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-24 — A timed-out `ctx_shell` is indistinguishable from a failed one
 
 **Severity:** papercut
@@ -1453,6 +1531,8 @@ make recovery obvious rather than guesswork.
 **Fix status (2026-08-24):** effectively fixed for agents that load the user-global `AGENTS.md`; uncovered otherwise. Severity stays `papercut`.
 
 **Update:** (2026-08-28, measured) The **`~110 s` figure this entry rests on is superseded**, including the `/Users/tim/.config/opencode/AGENTS.md:126` citation in the update above — that line documented a "fixed ~110s foreground cap" and has itself been corrected, so it can no longer be read as authority for 110 s. Measured bounds: the MCP client aborts a `ctx_shell` tool call at **~59 s** (`sleep 58` returns normally; `sleep 60` returns `MCP error -32001: Request timed out`), and lean-ctx's foreground cap default is now **45 s** (`LEAN_CTX_SHELL_FG_CAP_MS`, lowered from 110 s so the cap trips before the client abort). This *sharpens* the original finding rather than retiring it: the `detekt` commit at 60–90 s in "What happened" was **never** inside the foreground budget — the note at `:1435` that "60–90s is inside the foreground budget" is wrong on the measured numbers, and that command was always going to time out. The recovery advice is unchanged and still correct: on a timeout, verify by **effect** (`git log`, output file, test-results XML) before assuming failure, and never blind-retry a non-idempotent command. New in the toolbox: `background_action="wait"` provides a cheap blocking poll — it blocks server-side until the job is terminal or `wait_timeout_ms` elapses (default 45 s, max 50 s, silently clamped), roughly 6 calls for a 5-minute job instead of ~30 — while still not making the job notify.
+
+**Last verified:** not re-checked 2026-09-02 - skipped as settled (effectively fixed); re-verify only on a full-log pass
 
 ## 2026-08-24 — `multimodal-looker` reports high confidence on image regions outside the frame
 
@@ -1516,6 +1596,12 @@ Caveat on scope: this raises the cost of fabricating, it does not make it imposs
 Confirmed fixed. `fa6feef70` (`fix(multimodal-looker): require frame-bounds check before spatial claims`) resolves and is an ancestor of `dev`. Both routes carry the identical requirement to state actual pixel dimensions, confirm the target is in bounds, answer `NOT VISIBLE` otherwise, and never infer unseen content: the agent system prompt at `packages/omo-opencode/src/agents/multimodal-looker.ts:61` and the direct-call runtime prompt at `packages/omo-opencode/src/tools/look-at/look-at-prompt.ts:27`. Pinned by `multimodal-looker.test.ts:78-99`, which asserts the wording in both prompts. Cross-checked for a third image route that bypasses the guard: the only production path is `look_at` (`look-at-session-runner.ts:24-26,65-77`), so there is none.
 
 **Fix status (2026-08-27):** fixed. The original caveat stands: this is a prompt-level guard, not an enforced one.
+
+**Update:** (2026-09-02) Re-checked in the full-log pass; no change. The prompt-level caveat still stands.
+
+**Fix status (2026-09-02):** fixed, unchanged.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 
 ## 2026-08-24 — `review-work` and `full-code-review` default to a diff range that is empty for merged work
 
@@ -1583,6 +1669,12 @@ Both halves confirmed fixed, and a third copy surfaced. The repo half is committ
 
 **Fix status (2026-08-27):** fixed, both halves, plus the generated Codex copy. Severity `docs-gap` retained for the record.
 
+**Update:** (2026-09-02) Re-checked in the full-log pass; no change. Settled.
+
+**Fix status (2026-09-02):** fixed, unchanged.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-24 — `ctx_shell` redirect guard also blocks heredoc appends
 
 **Severity:** papercut
@@ -1625,6 +1717,12 @@ The message text confirms the mechanism is syntactic: it matches on `>` / `>>` a
 A documentation search found no note anywhere - repo `AGENTS.md`, user-global `AGENTS.md`, `.omo/rules/*.md` - that the guard is syntactic, and no documented `ctx_execute(language="shell")` escalation for it. The closest is `/Users/tim/.config/opencode/AGENTS.md:78`, "File editing -> native Edit/StrReplace".
 
 **Fix status (2026-08-24):** still worked around, still undocumented. Severity stays `papercut`.
+
+**Update:** (2026-09-02, probed against dev @ 64d608f6d) The GUARD half is retracted; the DOCUMENTATION half stands. A live probe run this pass - `cat >> /tmp/omo-heredoc-probe.txt <<'MD' / probe line / MD` - returned `exit=0` and was not blocked. Either the guard was narrowed since 2026-08-24, or, more likely given the message text quoted above, the `/tmp` escape hatch this entry itself noted covers the probed form; the original observation used a non-temp path. A probe against a repo-relative path was not run, so the guard's behaviour there is unconfirmed and the original report is not contradicted for that case. Documentation is unchanged: `grep` across root `AGENTS.md`, user-global `AGENTS.md` and `.omo/rules/` still finds no note that the guard is syntactic and no documented `ctx_execute(language="shell")` escalation.
+
+**Fix status (2026-09-02, revised):** guard behaviour partially retracted - a heredoc append to a temp path works today, verified by probe. The undocumented-syntactic-guard half remains open. Severity stays `papercut`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 ## 2026-08-24 - Rules injection re-suppressed after compaction by full-transcript hydration
 
 **Severity:** costly
@@ -1658,6 +1756,8 @@ made the stale on-disk cache win regardless.
 
 **Fix status:** fixed in `08a8d55b1` - hydration now stops at the last compaction part, and
 the persisted cache carries a `compactionEpoch` stamp that invalidates it on mismatch.
+
+**Last verified:** not re-checked 2026-09-02 - skipped as settled (fixed in `08a8d55b1`); re-verify only on a full-log pass
 
 ## 2026-08-24 - MCP-prefixed tool names bypass rules injection entirely
 
@@ -1694,6 +1794,8 @@ substring or suffix check.
 **Fix status:** fixed in `8f3d2daa3` (shared `matchesTrackedTool` helper), `cea18ab27`
 (rules-injector), `00bb1d903` (directory injectors).
 
+**Last verified:** not re-checked 2026-09-02 - skipped as settled (fixed in `8f3d2daa3` + `cea18ab27`); re-verify only on a full-log pass
+
 ## 2026-08-24 - The findings log was unfindable from root AGENTS.md
 
 **Severity:** docs-gap
@@ -1725,6 +1827,8 @@ pattern-matched a plausible existing tracked directory instead of finding the re
 
 **Fix status:** fixed in `afc234a0c` (root AGENTS.md pointer) and `48f0c1345` (capture rule
 committed as `docs/templates/harness-findings-rule.md.example`).
+
+**Last verified:** not re-checked 2026-09-02 - skipped as settled (fixed in `afc234a0c` + `48f0c1345`); re-verify only on a full-log pass
 
 ## 2026-08-24 - Exact-match tool-name gating survives in other hooks
 
@@ -1799,6 +1903,12 @@ The fifth hook is `hashline-read-enhancer`: `isReadTool` and `isWriteTool` still
 
 **Fix status (2026-08-27):** partially fixed. Four of five migrated and pinned; the fifth is dormant-by-default. Severity revised `costly` -> `papercut`, since the security fail-open that led the original severity is closed and the remainder is off by default.
 
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Unchanged, and the MCP-prefix cross-check sharpens what the residual actually is. The shared helper `matchesTrackedTool` (`shared/tool-name-match.ts:3-21`) does exact-plus-separator-bounded-suffix matching and is used by seven call sites: `write-existing-file-guard/tool-execute-before-handler.ts:116-117`, `comment-checker/hook.ts:75,134`, `read-image-resizer/hook.ts:121`, `atlas/write-edit-tool-policy.ts:1-7`, plus the three injectors (`rules-injector/hook.ts:92`, `directory-agents-injector/hook.ts:50`, `directory-readme-injector/hook.ts:44`). `hashline-read-enhancer/hook.ts:19-25` is still raw exact-match, gated on `hashline_edit` (`plugin/hooks/create-tool-guard-hooks.ts:125-127`, default false at `config/schema/oh-my-opencode-config.ts:60-61`). The cross-check finding: upstream normalization strips only a leading `mcp_` (`plugin/tool-execute-before.ts:38-48`, pinned at `tool-execute-before-mcp-prefix.test.ts:21-60`), so `mcp_background_output` becomes `background_output` but `mcp_Lean-ctx_ctx_read` becomes `Lean-ctx_ctx_read` - never bare `read`. The remaining gate is therefore unreachable for server-qualified names even when enabled. Three further literal comparisons surfaced and are worth separate reachability review rather than assuming they are covered: `plan-format-validator/hook.ts:9`, `prometheus-md-only/constants.ts:12`, and the unwired `hashline-edit-diff-enhancer/hook.ts:31-33`.
+
+**Fix status (2026-09-02):** partially fixed, unchanged. Severity stays `papercut`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-24 - A negative-assertion QA probe with no positive control reported a false defect
 
 **Severity:** costly
@@ -1833,6 +1943,12 @@ todowrite:       NOT BLOCKED
 Confirmed still open, in both skills. `.agents/skills/opencode-qa/SKILL.md` has no positive-control or negative-assertion guidance in its golden rules (`:17-30`) or its hook/event case (`:88-115`), and no reference under `references/` matches `positive control`, `negative assertion`, or `false negative`. The sibling `.agents/skills/codex-qa/` has none either, so there is no guidance to copy across. Cross-checked root `AGENTS.md`, `.omo/rules/`, and `packages/shared-skills/skills/` for the requirement and found no match. The only incidental hits are unrelated: `opencode-qa/SKILL.md:190` (reminder matcher) and `scripts/serve-wake-split-probe.sh:22` (a flag-disabled control inside one script, not general guidance).
 
 **Fix status (2026-08-27):** still unfixed. Severity stays `costly`: the recorded outcome was a false defect reported as real, which is the same failure class as a summarized-evidence claim. The contained fix is a probe-construction section in `opencode-qa`, mirrored into `codex-qa`.
+
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Still unfixed, and this update records a NEAR-MISS worth keeping. This pass's verifier reported the finding FIXED, citing `.agents/skills/opencode-qa/SKILL.md:190-191` and quoting "reminder matcher rejects a no-reminder stream and accepts a reminder marker" as positive/negative-control wording. The cross-check refuted it: that line is a cell in the helper-script self-test table, describing what `scripts/blocked-escalation-probe.sh` asserts about itself. It is not guidance to a QA author about constructing a probe, and the 2026-08-27 update above had already dismissed the same line as an incidental hit. `grep -rn "positive control\|negative assertion\|positive-control" .agents/skills/opencode-qa/ .agents/skills/codex-qa/` returns nothing. A verifier finding a plausible string and stopping is the exact structural failure this skill's cross-check step was written for.
+
+**Fix status (2026-09-02):** still unfixed, confirmed by cross-check after a verifier false-positive. Severity stays `costly`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 
 ## 2026-08-24 - Gitignored .omo/plans is invisible inside task worktrees
 
@@ -1882,6 +1998,12 @@ plans/
 The mechanism is still open but the diagnosis above is wrong in two details, and the practical impact is smaller than recorded. First, the ignore line cited in the entry (`.gitignore:59:plans/`) is a **generic** `plans/` pattern, not an `.omo`-specific rule; the `.omo/*` block at `.gitignore:2-6` unignores only `rules/` and `evidence/`. `git check-ignore -v .omo/plans` exits 1 (the bare directory is not matched), while `git check-ignore -v .omo/plans/<file>.md` matches `.gitignore:59`. Second, and more importantly, **10 plans are already tracked** (`git ls-files .omo/plans/` returns 10 files, including `plan-gate-hardening.md` and `omo-agent-toolkit-rename.md`), so force-added plans ARE visible inside worktrees today. The gap is limited to plans that were never force-added. Confirmed no compensating mechanism: worktree creation is plain `git worktree add` (`.agents/skills/work-with-pr/SKILL.md:65-73`), `start-work` only records `worktree_path` (`start-work-hook.ts:153`), the plan resolver takes the supplied path with no walk-up (`session-plan-affinity.ts:34-36`), and no `OMO_PLANS_DIR` exists. `work-with-pr` touches plans only during post-work cleanup (`SKILL.md:308-314`).
 
 **Fix status (2026-08-27, revised):** still unfixed, scope corrected. Severity revised `costly` -> `papercut`: force-adding a plan already works and is in active use, so the residual is a discoverability gap, not a blocker.
+
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Unchanged. `.omo/plans` is still ignored via `.omo/*` at `.gitignore:2`, with only `.omo/rules/` and `.omo/evidence/` unignored at `:3-6`, plus a bare `plans/` pattern at `:59`. Force-add still works, and is still undocumented where an agent would find it: no `git add -f`, `force-add`, or plan-visibility note in `.opencode/skills/work-with-pr/SKILL.md` (which creates worktrees at `:65-73`), in `~/.config/opencode/skills/start-work/SKILL.md` (which tells agents to read `.omo/plans` at `:57-75`), in `.omo/rules/`, or in root `AGENTS.md`. The discoverability gap is exactly as scoped on 2026-08-27.
+
+**Fix status (2026-09-02):** still unfixed. Severity stays `papercut`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 
 ## 2026-08-25 — A stdio MCP server is reaped after exactly 30 min idle and never respawns; its tools then report as *nonexistent*
 
@@ -1975,6 +2097,12 @@ Two different stdio flavours, same `1801.0s`, same `exit_code=0`. The timer is i
 
 **Fix status (2026-08-25, revised):** root cause identified, unfixed, and split across two owners. (a) *Upstream, Open Design:* the server self-exits at 1801s idle; the exact timer was not located in the shipped bundle, so the ask is to make the idle TTL configurable or disable it for stdio. (b) *Upstream, opencode:* `onclose` drops tool registrations permanently with no respawn-on-use and no distinct error - upstream has an open PR for **remote** reconnect ([anomalyco/opencode#43558](https://github.com/anomalyco/opencode/pull/43558)) and an open idle-disconnect issue ([#43444](https://github.com/anomalyco/opencode/issues/43444)), but nothing for local stdio. Nothing is actionable inside this repository. Severity revised `costly` -> `papercut`: recovery is an in-session `/mcps` toggle rather than a restart, and the log grep identifies it in one command - but the misleading error stays expensive for whoever has not read this entry.
 
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Ownership split re-confirmed; nothing has moved on either side. Our own stdio layer has no respawn by design: `packages/mcp-stdio-core/src/server.ts:58-97` marks the server closed on idle and exits the read loop, `:68-76` and `:172-195` do the same for the parent watchdog, `:143-160` logs `output_error` and stops - there is no restart path anywhere, and the default idle timeout there is 10 minutes (`:37`, `:61-64`), unrelated to the observed 30. `packages/omo-opencode/src/mcp/` holds MCP definitions and builders, not a client lifecycle manager, so the "tools report as nonexistent" presentation remains OpenCode-side as the original diagnosis said.
+
+**Fix status (2026-09-02):** still unfixed, both halves external. Severity unchanged.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-25 - An inverted test silently deleted the only coverage of a still-reachable rollback path
 
 **Severity:** costly
@@ -2021,6 +2149,8 @@ OMO-side ownership retracted. The entry's own revised root cause already places 
 What the unit suite could not see is that two existing tests which LOOKED like they pinned the wrong behavior were in fact the only assertions that a parked task keeps blocked metadata while cancelled. The prior lesson said to enumerate what a rewritten test carried before repurposing it; the recurrence adds a second rule: **a green suite after a behavior change is not evidence when the changed function is reused by another feature under a different `source`/mode argument.** Only the live `opencode-qa` escalation probe caught it. Generalization: when a fix adds a cleanup or guard to a shared lifecycle function, enumerate every caller and what each one means by that call, before assuming the cleanup is universally correct.
 
 **Fix status (2026-09-02):** the original 2026-08-25 finding remains as previously assessed. This update records a recurrence of the failure class, not a change to that status.
+
+**Last verified:** 2026-09-02 (earlier same-day pass, commit not recorded)
 ## 2026-08-26 — A lane that yields mid-task reports as `completed`; nothing checks for a dirty tree
 
 **Severity:** costly
@@ -2133,6 +2263,12 @@ Confirmed still open, with no compensating mechanism anywhere. Terminal status i
 
 **Fix status (2026-08-27):** still unfixed. Severity revised `costly` -> `blocker`: this is the failure mode that makes every other lane-completion signal untrustworthy, an agent cannot distinguish finished work from abandoned work, and unlike the mid-batch case there is no bounded fallback at all.
 
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Still open on its own terms, with one partial mitigation that does NOT address the dirty tree. `400a4a723 fix(background-agent): record completion reasons` added a `completionReason` field (`packages/omo-opencode/src/features/background-agent/types.ts:117-120`), and the notification template now renders it (`background-task-notification-template.ts:58-69`), so a reader can at least see WHY a lane ended - terminal status, todo-gate expiry, idle status, session gone, idle event. None of those is "the worktree is dirty". Nothing inspects git state before marking a lane `completed`: the reason producer's own test file enumerates every supported reason (`completion-reason.test.ts:37-90`) and no dirty-tree case exists, and there is no test file named for dirty/yield/abandoned in either the feature or the tool directory. Cross-checked the todo gate and `unfinishedTodoCount` (`types.ts:115-118`) - those bound an unfinished-todo lane, not an uncommitted-work lane - and the `noReply` path (`parent-wake-flush-runner.ts:196-211`), which concerns parent liveness.
+
+**Fix status (2026-09-02):** still unfixed. Severity stays `blocker`. Contained fix: extend `completionReason` with a dirty-worktree determination made at completion time, and pin it with a test that completes a lane over a dirty tree.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-25 — A `report_blocked` park is invisible to a *busy* parent, which then reports the dead lane as "in flight"
 
 **Severity:** blocker
@@ -2239,6 +2375,12 @@ Confirmed, with the boundary located exactly. `report_blocked` records the park 
 
 **Fix status (2026-08-27):** partially fixed. Unbounded invisibility is closed by the 300s retained ceiling; the actionable-wake half is open at `parent-wake-flush-runner.ts:295-297`. Severity revised `blocker` -> `costly`.
 
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Unchanged, both halves re-confirmed at current line numbers. The retained ceiling is real: `PENDING_PARENT_WAKE_MAX_RETAINED_ADMIT_DEFER_MS = 300_000` at `parent-wake-flush-runner.ts:28`, applied at `:303-308` against `lastAdmitOnlyDepositAt ?? noReplyAdmittedAt ?? queuedAt`, with the busy-parent branch admitting at `:60-81`; pinned at `parent-wake-midbatch-starvation.test.ts:348-385` (asserts `body.noReply === true` at `:373-381`). The actionable half is equally unchanged: `shouldForceDispatchAfterActiveDefer` still reads `wake.shouldReply && getQueuedAgeMs(wake) >= PENDING_PARENT_WAKE_MAX_ACTIVE_DEFER_MS` at `:295-297`, so a park with `shouldReply === false` can never satisfy it and receives only a `forceNoReply: true` admission at `:70-76`. Cross-checked for a compensating manager-side path and found none: `notifyBlockedTask` queues before cancellation (`manager.ts:2675-2685`), `cancelTask` can suppress the follow-up (`:2763-2783`), and cleanup retention only tracks `shouldReply` wakes (`:2647-2656`). The six blocked-* test files cover notify, retention, resume, races and escalation, but none exercises a busy parent receiving an actionable wake after a `report_blocked` park.
+
+**Fix status (2026-09-02):** partially fixed, unchanged. Severity stays `costly`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-26 — `ctx_read` v1 request shape loops on an incompatible empty `paths` field
 
 **Severity:** costly
@@ -2272,6 +2414,12 @@ otherwise use ordinary `ctx_read` or a targeted shell read.
 Still open and confirmed external. The lean-ctx skill documents `ctx_read` modes and cache behavior (`~/.config/opencode/skills/lean-ctx/SKILL.md:36-54`) but nothing about `paths` versus `path` or `engine_interface: "v1"`; no `references/` directory exists beside it. No tracked recovery hint exists in this repo: the only `ctx_read` mention is tool-name matching at `packages/omo-opencode/src/hooks/rules-injector/AGENTS.md:21`. Ownership is external: lean-ctx appears in neither `package.json:8-38` nor `.opencode/package.json:1-5`, so there is nothing here to normalize.
 
 **Fix status (2026-08-27):** still unfixed, upstream ownership. Repo-side option is a one-line agent-facing hint; the real fix is upstream request normalization.
+
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Unchanged. The repo-side mitigation this entry proposed - a one-line agent-facing hint about `engine_interface` and the incompatible empty `paths` field - is still absent from every place an agent would read it: no match in root `AGENTS.md`, `/Users/tim/.config/opencode/AGENTS.md`, or `.omo/rules/`. Upstream ownership of the underlying request-shape defect is unchanged.
+
+**Fix status (2026-09-02):** still unfixed, upstream ownership, repo-side hint still unwritten.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 
 ## 2026-08-26 — Foreground timeout hid a failing detekt pre-commit gate
 
@@ -2311,6 +2459,12 @@ Coverage is better than recorded, but not at the strongest site. The core lesson
 
 **Fix status (2026-08-27):** partially fixed. Severity stays `costly` until the timeout-to-probe step is written down where an agent reads it at request time.
 
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Still partially fixed, and the residual is narrower than the 2026-08-27 line implies. Request-time guidance now carries the surrounding facts: the foreground cap and its relationship to the measured ~59s client abort (root `AGENTS.md:128`), the duration-routing table (`:101-124`), and the "verify by effect, not by status line" rule (`:130-132`). The user-global copy matches at `:101-134`. What is still absent everywhere is the single linking sentence - after a foreground timeout, probe the job's terminal status if an id exists, THEN verify the disk effect - so an agent has all the parts and no instruction to assemble them at the moment it is holding a timeout.
+
+**Fix status (2026-09-02):** partially fixed, unchanged in substance. Severity stays `costly`. Contained fix: one sentence in root `AGENTS.md` next to the duration table, mirrored user-global.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-26 — Detached shell completion and task completion have incompatible wake contracts
 
 **Severity:** costly
@@ -2348,6 +2502,12 @@ Partially fixed, and the coverage claim in the entry needs correcting: the disti
 
 **Fix status (2026-08-27):** partially fixed. Severity stays `costly`: hook-directory `AGENTS.md` is read on file touch, not at the moment the agent chooses the mechanism.
 
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Now fixed. The detached-shell-vs-task wake-contract distinction lives in request-time guidance, not only in the hook directory: root `AGENTS.md:109-120` states that `task(run_in_background=true)` notifies while `ctx_shell(run_in_background=true)` never does, names the collision as "the entire trap" (`:122-126`), and gives the polling rule at `:134`. The user-global copy carries the same wording independently at `/Users/tim/.config/opencode/AGENTS.md:109-126` and `:134`. The hook-directory copy at `packages/omo-opencode/src/hooks/unpolled-shell-job/AGENTS.md:8-24` still exists but is no longer the only location, which was the entire residual.
+
+**Fix status (2026-09-02):** fixed. Severity `costly` retained for the record; the wording is unpinned by tests, so it can regress silently.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-26 — Prompted sentinel-loop workaround conflicts with active shell guidance
 
 **Severity:** costly
@@ -2383,6 +2543,12 @@ wrappers.
 The prescribed pattern is gone from active prompts and skills. Exhaustive search of `packages/prompts-core/`, `packages/omo-opencode/src/agents/`, `packages/omo-opencode/src/tools/*/prompt*.ts`, `.agents/skills/`, `.opencode/skills/`, and `packages/shared-skills/` found no detached-wrapper or `for`/`sleep` sentinel guidance. The only `sentinel` hit is unrelated (`packages/prompts-core/prompts/ultrawork/codex.md:268`, a hook-grepped token). The `until [...] ; do` loops at `.agents/skills/work-with-pr/SKILL.md:299` poll GitHub PR state, and the `sleep` calls at `.opencode/skills/opencode-qa/references/tui-tmux.md:44,47` are TUI smoke timing, neither is the pattern. The opposite direction is now written down in three places: `~/.config/opencode/AGENTS.md:122` forbids foreground sleep-polling, `packages/omo-opencode/src/hooks/unpolled-shell-job/AGENTS.md:67` and `message.ts:31` distinguish blind `sleep 300` from supported polling, and `.agents/skills/publish/SKILL.md:44,155` requires polling without sleep commands. The entry does not name the template that originally prescribed it, so the source could not be confirmed.
 
 **Fix status (2026-08-27):** effectively fixed by removal; the conflicting guidance no longer exists in any active prompt path. Severity revised `costly` -> `papercut`.
+
+**Update:** (2026-09-02) Re-checked in the full-log pass; no change. Settled by removal.
+
+**Fix status (2026-09-02):** fixed, unchanged.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 
 ## 2026-08-26 — File-disjoint lanes can still starve each other through Gradle capacity
 
@@ -2444,6 +2610,12 @@ Two claims in this entry, verified separately.
 
 **Fix status (2026-08-27):** both claims still unfixed. Claim B is the more consequential: every capture rule, lesson, and path-scoped architecture rule inherits this delivery model, so a rule can be discovered, injected once, and absent from context exactly when it matters. Severity for Claim B revised `costly` -> `blocker`; Claim A stays `costly`.
 
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Claim B re-confirmed in source, unchanged. Injection fires only from `tool.execute.after` for tracked file tools (`rules-injector/hook.ts:87-97`), the processor loads a per-session cache (`injection-processor.ts:115-125`), and real-path dedupe suppresses any rule already injected once (`:167-175`). The hook's own directory doc states the intent plainly - "Per-session dedup prevents re-injection" (`rules-injector/AGENTS.md:44-51`). So the delivery model is: attached to one tool output, once per session, never restated. Cross-checked whether anything compensates - root `AGENTS.md:263-271` describes rules as auto-loaded and path-scoped but names no durable recall, `/Users/tim/.config/opencode/AGENTS.md:96-99` likewise, and `~/.omo/rules/harness-findings.md:1-5` carries no re-injection instruction. Claim A (Gradle capacity starvation between file-disjoint lanes) was not re-probed this pass and stands as originally reported.
+
+**Fix status (2026-09-02):** both claims still unfixed. Claim B severity stays `blocker`; Claim A stays `costly` and is now the older, less-verified half.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-27 — Background-agent todo-gate tests used an unpinned historical clock
 
 **Severity:** costly
@@ -2460,6 +2632,8 @@ Two claims in this entry, verified separately.
 **Update:** (verified 2026-09-02 against `dev` @ 4e68569cb) Fixed, and this entry had no fix-status line, so it is recorded now. All four todo-gate cases run through the `withFixedNow(fixedNow, fn)` helper at `packages/omo-opencode/src/features/background-agent/manager.polling.test.ts:417-424`, which assigns `Date.now = () => fixedNow` at `:419` and restores the original in `finally` at `:423`. The four call sites are `:428`, `:451`, `:473`, `:497`. The `2026-08-17T12:00:00.000Z` fixture still exists at `:396` but is no longer compared against real time. Sibling suites pin their own clocks independently at `task-poller.test.ts:1044`, `:1079`, `:1104` and `completion-reason.test.ts:50`.
 
 **Fix status (2026-09-02):** fixed. Severity `costly` retained for the record.
+
+**Last verified:** 2026-09-02 (earlier same-day pass, commit not recorded)
 ## 2026-08-27 — A fresh `git worktree` has no `node_modules`, so build, typecheck, and live QA all fail inside it
 
 **Severity:** costly
@@ -2524,6 +2698,12 @@ A lane brief that says only "run `bun install` first" still permits this failure
 
 **Fix status:** worked around
 
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Partially fixed since. `script/agent/setup.sh:55-58` now runs `bun install --ignore-scripts` unconditionally, so a fresh worktree that runs setup gets `node_modules`. The `work-with-pr` skill also instructs a dependency install inside the new worktree (`.opencode/skills/work-with-pr/SKILL.md:65-83`). Two residuals: that skill uses a plain `bun install`, which walks straight into the submodule/`prepare` failure recorded in the 2026-09-02 worktree-submodule entry below, and the LSP workspace-resolution half of this entry was not re-checked and remains as originally reported.
+
+**Fix status (2026-09-02):** partially fixed - dependency install is now unconditional in `setup.sh`; the `bun install` route used by `work-with-pr` is still the failing one, and the LSP half is unverified.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-27 — `record_lesson` rejects a well-formed `globs` array and cannot write a lesson
 
 **Severity:** costly
@@ -2560,6 +2740,8 @@ attempt 3 (compact single-line array, em dashes and backticks removed from all p
 **Update (2026-09-02, fixed):** fixed locally in `da182869d` on branch `fix/harness-findings-batch`. Five guards for the required fields now sit ahead of the first dereference at `packages/omo-opencode/src/tools/record-lesson/tool.ts:53-57`, so an absent argument returns a field-naming error in the same style as the neighbouring citations check instead of `undefined is not an object`. This covers both reported crash sites: `args.globs.map` in `tool.ts` and the `value.replaceAll` reached through `canonicalizeLessonText` in `render.ts`. Glob CONTENT validation was not touched, per the corrected diagnosis above - `validation.ts` always accepted well-formed rootless globs. 137 tests pass in that directory, failing-first confirmed.
 
 **Fix status (2026-09-02):** fixed in `da182869d`. Severity `papercut` (as revised earlier today) retained.
+
+**Last verified:** 2026-09-02 (earlier same-day pass, commit not recorded)
 ## 2026-08-27 — An interrupted parent aborts its background lanes, but they keep reporting `running` until the 45-minute stale reaper
 
 **Severity:** costly
@@ -2601,6 +2783,12 @@ Last real disk activity, consistent with in-flight work draining and then silenc
 **Update:** (verified 2026-09-02 against `dev` @ 4e68569cb) Still open, cross-checked against three candidate compensating mechanisms rather than one. `handleSessionErrorEvent` classifies a live session with a non-terminal error as transient and returns without touching child task status at `packages/omo-opencode/src/features/background-agent/manager.ts:2323-2333`. The two mechanisms that DO terminalize are both scoped elsewhere and neither covers an interrupted-but-present parent: `session.deleted` cancels direct and descendant tasks at `manager.ts:2108-2157`, and manager shutdown aborts child sessions and archives non-terminal tasks at `manager.ts:3631-3695`. The collector remains `DEFAULT_STALE_TIMEOUT_MS = 2_700_000` at `constants.ts:7`, consumed at `task-poller.ts:237-238` and fired via `interruptStaleTask()` at `:355-372`, which matches the entry's 45-minute claim exactly. `git log -15 -- manager.ts` shows recent work on adoption, blocked expiry, and completion reasons, but no commit subject naming parent abort or interrupt propagation.
 
 **Fix status (2026-09-02):** still unfixed, confirmed. Severity stays `costly`. Contained fix: on `session.error` with an abort-shaped error, look up child tasks by `parentSessionId` and terminalize them, rather than waiting for the reaper.
+
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Unchanged, and the cross-check found the neighbouring mechanisms that do NOT cover it. `session.error` resolves only the task owning the errored session and hands it to `handleSessionErrorEvent` (`manager.ts:2088-2123`); an abort-shaped error whose child session still exists takes the transient branch and returns (`:2345-2355`). Nothing in that path looks up children by `parentSessionId`. Terminalization does exist, but for a different trigger: `session.deleted` collects the task plus descendants and cancels them (`:2126-2175`), which requires the parent session to be GONE, not merely interrupted; and manager shutdown aborts running children (`:3678-3703`), which is host teardown. The reaper is unchanged at `DEFAULT_STALE_TIMEOUT_MS = 2_700_000` (`constants.ts:7`, consumed at `task-poller.ts:237-238`), and it measures CHILD inactivity (`task-poller.ts:249-252`, `:324-330`) - which is also why the separate 2026-08-28 "reaps healthy subagents when the parent idles" entry was retracted, and why that retraction does not bear on this finding.
+
+**Fix status (2026-09-02):** still unfixed. Severity stays `costly`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 ## 2026-08-27 — A green test suite hid a feature that never fires on its common path, because the plan's example test only covered the rare branch
 
 **Severity:** costly
@@ -2633,6 +2821,8 @@ The QA artifact agrees, and was the first clue:
 
 **Fix status:** unfixed
 
+**Last verified:** not re-checked 2026-09-02 - still unfixed as written; not re-verified this pass
+
 ## 2026-08-27 — Completion reasons were hidden for clean background-task completions
 
 **Severity:** costly
@@ -2649,6 +2839,8 @@ The QA artifact agrees, and was the first clue:
 **Update:** (verified 2026-09-02 against `dev` @ 4e68569cb) Fixed, and this entry had no fix-status line, so it is recorded now. `formatTaskSummaryLine()` emits the reason independently of the unfinished-todo clause: the todo condition is `task.unfinishedTodoCount && task.unfinishedTodoCount > 0` at `packages/omo-opencode/src/features/background-agent/background-task-notification-template.ts:63`, while the reason is emitted by the separate ternary ``task.completionReason ? `, reason: ${task.completionReason}` : ""`` at `:65`. The only suppression left is a genuinely absent reason. Regression coverage exists for the exact clean-completion case at `background-task-notification-template.test.ts:509-524`, asserting `reason: session-gone` at `:523`, with unfinished-todo and missing-reason cases at `:445-458` and `:460-473`. The producer stores the reason before notifying at `manager.ts:2954-2955`, and every reason variant is covered at `completion-reason.test.ts:38-89`. Closed by `400a4a723 fix(background-agent): record completion reasons` (2026-08-27).
 
 **Fix status (2026-09-02):** fixed in `400a4a723`. Severity `costly` retained for the record.
+
+**Last verified:** 2026-09-02 (earlier same-day pass, commit not recorded)
 ## 2026-08-27 — A QA project under macOS `/tmp` silently disables the rules injector, because the resolved path loses its leading slash
 
 **Severity:** costly
@@ -2685,6 +2877,8 @@ DOES NOT RESOLVE (relative, no leading slash)
 **Update:** (verified 2026-09-02 against `dev` @ 4e68569cb) Mechanism closed in source, not pinned by a test. The described failure needed a relative path to survive into containment checking; `resolveFilePath()` now absolutizes any relative extraction with `resolve(workspaceDirectory, path)` at `packages/omo-opencode/src/hooks/rules-injector/path-resolution.ts:7-10`, before `findProjectRoot()` receives it at `injection-processor.ts:107-110`. The `output.title` fallback that produced the slash-less string still exists at `output-path.ts:17-19`, so the input is unchanged; what changed is that it can no longer reach the predicate unresolved. Containment is now the shared `isSameOrChildPath`, which itself calls `resolve(childPath)` at `packages/rules-engine/src/engine/engine-paths.ts:30-33`, exported at `engine/index.ts:24-27`. The three dev commits named in the review brief are all present in that code: `29267ea11` (the shared export), `613fb82c4` (discovery through the engine finder, `finder.ts:60-65`), `129c3a894` (explicit plugin root, `finder.ts:72-94`). No test covers `/tmp` -> `/private/tmp`; the nearest are generic temp-dir cases at `project-root-finder.test.ts:12-71`.
 
 **Fix status (2026-09-02, revised):** effectively fixed in `29267ea11` + `613fb82c4` + `129c3a894`, unpinned. Severity revised `costly` -> `papercut`: double resolution now makes the slash-loss path unreachable, and the residual is missing regression coverage for a symlinked project root. The contained follow-up is one test with a symlinked `/tmp` project.
+
+**Last verified:** 2026-09-02 (earlier same-day pass, commit not recorded)
 ## 2026-08-27 — Resuming a dead background session adopts a nonexistent agent named `continue`, returning a live-looking task id that can never run
 
 **Severity:** costly
@@ -2787,6 +2981,8 @@ Also corrected: the `:2293` agent-not-found handler now names the real agent and
 **Live QA:** proven on a real `opencode serve` across a mid-turn `SIGKILL` restart. Fixed build adopted `agent: explore` (the child's real agent) and the session gained messages (`midpre=2 midpost=4`). With the fix reverted and the bundle rebuilt, the same probe observed `agent: continue` and `midpost=2` - unchanged, meaning the lane never ran, exactly the reported symptom. The probe's normal-mode assertion was confirmed RED against the unfixed build. Evidence: `.omo/evidence/20260902-adopt-agent-identity/`.
 
 **Fix status:** fixed. Agent identity is carried through adoption; unrecoverable agents refuse instead of substituting.
+
+**Last verified:** 2026-09-02 (earlier same-day pass, commit not recorded)
 ## 2026-08-27 — Blocked reply contract was unpinned and terminal parks expired without a parent-visible wake
 
 **Severity:** costly
@@ -2805,6 +3001,8 @@ Also corrected: the `:2293` agent-not-found handler now names the real agent and
 **Update:** (verified 2026-09-02 against `dev` @ 4e68569cb) Fixed, confirmed in code and history, and the SHA in the original line needs a correction. Both halves hold: the reply contract is `const shouldReply = allComplete || isTaskFailure || isBlocked` at `packages/omo-opencode/src/features/background-agent/manager.ts:3089-3091`, pinned by a test asserting `shouldReply === true` with `allComplete === false` at `blocked-notify.test.ts:126-160`; terminal expiry marks the task cancelled and enqueues a parent notification at `manager.ts:2679-2692`, dispatched through `sendParentWakePrompt` at `parent-wake-flush-runner.ts:166-184` and pinned at `blocked-expiry-notification.test.ts:72-99`. Correction to the entry: `8f7f768ab` is real but is `fix(background-agent): reset blocked notification episodes`, dated 2026-08-09 — it predates this finding and is not what closed it. The wake half was closed by `24e74bc5a fix(background-agent): notify parent when blocked task expires` (2026-08-28, 5 insertions in `manager.ts`), with coverage added in `444a44ca9 test(background-agent): pin blocked expiry notification` and `7889bd3c4 test(background-agent): cover running blocked expiry`.
 
 **Fix status (2026-09-02, revised):** fixed in `24e74bc5a` + `444a44ca9` + `7889bd3c4`. The `8f7f768ab` attribution in the line above is retracted as a misattribution. Severity `costly` retained for the record.
+
+**Last verified:** 2026-09-02 (earlier same-day pass, commit not recorded)
 ## 2026-08-28 — `bun:test` spy call history survives another file's `mock.restore()`, silently corrupting index-based assertions
 
 **Severity:** costly
@@ -2835,6 +3033,12 @@ Reproduced twice at `d59ca317a` with a clean tree, and independently by a second
 **Workaround:** never index a spy's call history positionally when the spied module could have been mocked elsewhere in the process. Filter to a value the test owns — a unique `sessionID` or other per-test discriminator carried in the payload — before indexing. Applied at `98d451ebe`, which keeps the original ordered assertions but selects only this test's own decisions, making the test immune to foreign history regardless of file order.
 
 **Fix status:** worked around in our test; runner behavior unfixed
+
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Unchanged, and the repo-side coverage is narrower than it looks. Guidance exists for the adjacent problem - root `AGENTS.md:268` claims meta-audit coverage for `mock.module()` without restore, and `.omo/rules/test-discipline.md:48-52` documents that `script/run-ci-tests.ts` auto-isolates files using `mock.module()` and names cross-test contamination as a state leak. None of it covers SPY call history surviving another file's `mock.restore()`, which is this entry's actual mechanism. The workaround remains local to the affected test.
+
+**Fix status (2026-09-02):** still unfixed upstream; repo-side guidance covers `mock.module` restore but not spy call history. Severity unchanged.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 
 ## 2026-08-28 — In a worktree, `sync-skills.mjs` silently regenerates Codex skills from the MAIN checkout instead of failing
 
@@ -2885,6 +3089,12 @@ A full `bun install` in the worktree fixes it too, at higher cost. Either way, v
 **Update:** (verified 2026-09-02 against `dev` @ 4e68569cb) Still open, with the resolution mechanism identified precisely. The script never consults git at all — no `--show-toplevel`, no `--git-common-dir`, no `process.cwd()`. It takes whatever `sharedSkillsRootPath()` returns at `packages/omo-codex/plugin/scripts/sync-skills.mjs:6-10`, and that helper probes `./skills/`, `../skills/`, `../../skills/` relative to its own resolved module URL and returns the first hit at `packages/shared-skills/index.mjs:16-23`. Module-URL resolution is exactly what escapes a worktree when the package resolves through the main checkout's `node_modules`, which ties this to the missing-`node_modules` finding above. There is no worktree-boundary check and no loud failure: the copy proceeds straight from that path at `sync-skills.mjs:257-265`, guarded only by `isCliEntry()` at `:273-275`. The two commits touching this resolution, `c6cf711ce fix(shared-skills): resolve the skills directory in the Codex marketplace layout` (2026-08-04) and merge `b06be3b50` (2026-08-08), both predate the 2026-08-28 observation and address the marketplace layout, not worktrees.
 
 **Fix status (2026-09-02):** still unfixed, confirmed. Severity stays `costly`: it writes generated output silently from the wrong tree. Contained fix: assert the resolved root is inside the same working tree as the destination, and fail loudly when it is not.
+
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Unchanged, with the resolution mechanism now pinned precisely. `packages/omo-codex/plugin/scripts/sync-skills.mjs:9` derives its DESTINATION root from `import.meta.url`, but takes its SOURCE from `sharedSkillsRootPath()` (`:7-10`), which probes `./skills/`, `../skills/`, `../../skills/` relative to the resolved `@oh-my-opencode/shared-skills` module URL (`packages/shared-skills/index.mjs:16-22`). Neither file contains `git rev-parse`, `--show-toplevel`, or `--git-common-dir`, so when Node resolves that dependency to the main checkout the source comes from there while the destination stays worktree-local. The copy then runs with no containment assertion (`sync-skills.mjs:257-269`); the only guard is `isCliEntry()` at `:273-275`. All three invocation sites are unguarded (`omo-codex/plugin/package.json:25-30`, `omo-codex/package.json:27-31`, `src/install/codex-cache-install.ts:80-86`), and existing tests cover package wiring and generated-copy drift only (`plugin/test/sync-skills.test.mjs:77-123`). The sibling `omo-senpi` sync script is path-relative and unaffected.
+
+**Fix status (2026-09-02):** still unfixed, mechanism fully localized. Severity stays `costly`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 ## 2026-08-28 — `qa-sandbox.sh` does not isolate `HOME`, so QA overwrote the operator's real `~/.omo/omo.jsonc`
 
 **Severity:** dangerous — destroys real user configuration
@@ -2922,6 +3132,8 @@ $ cat ~/.omo/omo.jsonc          # after the QA run
 **Update:** (verified 2026-09-02 against `dev` @ 4e68569cb) Fixed, both halves, same day as the incident. `export HOME="$OMO_QA_ROOT/home"` at `script/agent/qa-sandbox.sh:56`, with the `.opencode/bin` relink at `:61-64`; the four `XDG_*` vars at `:33-36`; `CODEX_HOME` at `:42`. The second half matters as much as the first: because project layers are collected by walking `cwd` upward to `$HOME` at `packages/omo-config-core/src/loader/paths.ts:84-99` and outrank the user layer at `:104-112`, HOME isolation alone would still let a cwd under the real home claim the operator's `~/.omo` as a project layer. `OMO_QA_PROJ` closes that at `qa-sandbox.sh:82-83`, with the `cd` requirement stated at `:20-25`, `:79-81`, `:104-107` and mirrored in root `AGENTS.md:229-231`. Both behaviors are pinned by tests that execute the helper: HOME differs from the real home and stays under `OMO_QA_ROOT` at `script/agent-env.test.ts:62-91`; `OMO_QA_PROJ` exists inside the sandbox at `:98-124`. Commits: `2d405002d fix(qa-sandbox): isolate HOME so QA cannot overwrite the real ~/.omo config` and `87068442f fix(qa-sandbox): also isolate cwd via OMO_QA_PROJ, closing the project-layer leak`, both 2026-08-28.
 
 **Fix status (2026-09-02):** fixed in `2d405002d` + `87068442f`, pinned by `script/agent-env.test.ts:62-91` and `:98-124`. Severity `dangerous` retained for the record — the destruction happened, and the entry should keep saying so.
+
+**Last verified:** 2026-09-02 (earlier same-day pass, commit not recorded)
 ## 2026-08-28 — A cancelled blocked subagent keeps emitting "CHILD AWAITING RESPONSE" reminders, urging the parent to resume it
 
 **Severity:** costly — the urged action can be destructive
@@ -2983,6 +3195,8 @@ The unit test added alongside it passed against the live defect because it set `
 Found by a 6-lane `review-work` gate; three lanes reached it independently, one with a reproduction against the branch tip.
 
 **Fix status (2026-09-02, revised):** fixed in `8479eaa22`. The early-return branch now disarms the escalation and clears `blockedAt`/`blockedReason`, excluding the park itself (`source === "report_blocked"`) and any cancellation already in flight; `background_cancel` routes a blocked terminal task through instead of refusing it. Proven on a real harness by `blocked-escalation-probe.sh --dismiss`: the parent dismisses the child at +10s and no reminder or expiry follows (`REMINDER_COUNT=0`, `EXPIRY_AT_S=none`). Negative control with both halves reverted goes red and reproduces this entry exactly (`DISMISSED_AT_S=none`, reminder at +62s, expiry at +123s). Evidence: `.omo/evidence/20260902-harness-findings-batch/blocked-dismiss/`.
+
+**Last verified:** 2026-09-02 (earlier same-day pass, commit not recorded)
 ## 2026-08-28 — A repo's own "no regression" gate reported all 90 pre-existing failures as regressions outside Docker
 
 **Severity:** costly
@@ -3016,6 +3230,8 @@ That produced 90 before, 90 after, 0 new, 0 fixed — a clean result the gate co
 
 **Fix status:** worked around; upstream gate unfixed (needs the `/app/` assumption replaced with a repo-relative path)
 
+**Last verified:** not re-checked 2026-09-02 - external repo (`~/git/9router`), not verifiable from here
+
 ## 2026-08-28 — Model-family cache invalidation misses OMO-owned agent and category overrides after a proxy alias resolves
 
 **Severity:** warning
@@ -3046,6 +3262,12 @@ CONTROL rebuilt? true (1 -> 2)
 **Update:** (verified 2026-09-02 against `dev` @ 4e68569cb) Still open, confirmed at the cache key itself. `createAgentConfigCacheKey()` serializes only four OpenCode config fields — `agent`, `default_agent`, `model`, `skills` — at `packages/omo-opencode/src/plugin-handlers/config-handler.ts:67-74`, and is called with only the OpenCode `config` at `:110`. Neither `pluginConfig.agents` nor `pluginConfig.categories` participates, so an OMO-side override changes nothing about the key and the stale roster is served. This compounds with the related 2026-08-28 `model_family` entry below: `model_family` exists on `AgentOverrideConfigSchema` at `packages/omo-opencode/src/config/schema/agent-overrides.ts:7-16` but is still absent from `CategoryConfigSchema` at `categories.ts:5-16`, so the category half of that change never landed either. No regression test covers a category override invalidating the roster cache; the nearest category tests at `config-handler.test.ts:936-977` exercise configuration behavior only. Note the separate `shared/model-capabilities-cache.ts:16-59` is keyed by filename and is a different cache — not this defect.
 
 **Fix status (2026-09-02):** still unfixed, confirmed. Severity revised `warning` -> `costly`: a stale roster silently serves the wrong prompt architecture, which is the same class of silent-wrong-result the log elsewhere rates `costly`. Contained fix: fold the OMO agent and category override identities into the cache key at `config-handler.ts:67-74`, and add `model_family` to `CategoryConfigSchema`.
+
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Unchanged. `createAgentConfigCacheKey()` still serializes only OpenCode's `agent`, `default_agent`, `model` and `skills` (`plugin-handlers/config-handler.ts:67-74`) and is built from the OpenCode `config` alone (`:94-110`), so `pluginConfig.agents` and `pluginConfig.categories` cannot influence it and a cached roster is reused at `:110-137`. Cross-checked the obvious compensators and none applies: the model-capabilities snapshot cache is a separate filename-keyed store (`shared/model-capabilities-cache.ts:16-59`) that does not rebuild the roster, and category resolution happens fresh per delegation (`tools/delegate-task/category-resolver.ts:124-217`) without feeding category identity back into the cache key.
+
+**Fix status (2026-09-02):** still unfixed. Severity stays `costly`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 ## 2026-08-28 — `staleTimeoutMs` reaps *healthy, working* subagents when the parent idles
 
 **Severity:** costly
@@ -3118,6 +3340,8 @@ should carry the caveat that ending the turn is what starts the child's death cl
 **Fix status (2026-09-02, revised):** diagnosis wrong as written. The parent-idle claim is retracted: inactivity is measured against child activity at `task-poller.ts:249-252` and `:324-330`. Severity revised `costly` -> `papercut`, covering only the bounded-deferral residual. Separately, root `AGENTS.md`'s claim that "every tool call resets" the timer is imprecise — what resets it is child task activity, persisted child-session metadata, or child stream events, not a parent tool call. That wording is worth correcting.
 
 **Update (2026-09-02, self-correction):** the update above closed with a proposed doc fix, claiming the user-global `AGENTS.md` line "every tool call resets it" was imprecise. That proposal is retracted before it was applied. I checked the write site rather than inferring from the reaper: `task.progress.lastUpdate` is refreshed on every message part observed on the child session at `packages/omo-opencode/src/features/background-agent/manager.ts:1964`, with the tool-call branch immediately below at `:1969-1985`. The sentence is addressed to a working agent about its own session, and for that reader every tool call it makes does reset its own timer. The wording is correct as written and needs no change. Recorded because a review that proposes an unnecessary edit is itself a finding: the near-miss came from reading the consumer (`task-poller.ts`) and not the producer (`manager.ts:1964`).
+
+**Last verified:** 2026-09-02 (earlier same-day pass, commit not recorded)
 ## 2026-08-28: `ctx_shell` client aborts at ~59 s, and blocking waits can saturate server pool
 
 **Severity:** costly
@@ -3143,6 +3367,8 @@ one wait: unrelated echo returned at 1.776 s while wait ran to 21.241 s
 **Workaround:** Use `background_action="wait"`, with `wait_timeout_ms` default 45 s, maximum 50 s, silently clamped, and the effective bound echoed in the header. Live QA supervised a 5-minute job in 7 `tools/call` messages, 1 launch plus 6 waits, versus about 30 status polls. `wait` does not make jobs notify, so call it again on timeout and never end a turn with a detached job outstanding. Restart the MCP client or session after `lean-ctx dev-install`, because an already-running stdio child keeps the old binary and old schema. A bounded semaphore or dedicated wait pool is NOT YET IMPLEMENTED.
 
 **Fix status:** fixed in `28af1aec3` for foreground cap and blocking wait; pool saturation needs follow-up.
+
+**Last verified:** not re-checked 2026-09-02 - skipped as settled (fixed in `28af1aec3`); re-verify only on a full-log pass
 
 ## 2026-08-28: `model_family` lands for agents only, so proxy-aliased categories still get the wrong prompt
 
@@ -3186,6 +3412,12 @@ ultrabrain  gpt-5.6-sol
 
 **Fix status:** partially fixed — agents in `2d1e83fa4`; categories, precedence, catalog, and doctor check all unfixed.
 
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Unchanged, all three residuals confirmed. The agent half works: `model_family` is declared in `config/schema/agent-overrides.ts:7-19` and applied via `resolveModelForConfiguredFamily(model, override?.model_family)` in `agents/builtin-agents/general-agents.ts:107-110`, with the special agents reading it too (`sisyphus-agent.ts:84-105`, `hephaestus-agent.ts:84-134`, `atlas-agent.ts:67`). The category half does not exist at the schema level - `config/schema/categories.ts:5-20` carries `model`, `models`, fallback, reasoning and prompt settings and no `model_family` - and nothing in the category path reads one (`tools/delegate-task/category-resolver.ts:109-217`, `subagent-model-resolution.ts:31-77` resolve model and variant only). No doctor check exists: `cli/doctor/checks/model-resolution.ts:61-90` inspects `model` and `variant` overrides, and the checks directory has no `model_family` match at all.
+
+**Fix status (2026-09-02):** partially fixed, unchanged. Severity stays `costly`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-08-28: `max_tokens: 1` probes make thinking models look unavailable, and a router fail over to another vendor
 
 **Severity:** costly
@@ -3220,6 +3452,12 @@ The router message names the class outright: **request-shape error, not an accou
 **Workaround:** probe with `max_tokens: 512` or more and a trivial prompt; parse SSE with `grep`, not `jq`. Better: do not infer routing intent from live traffic at all — read the combo definition. When a probe contradicts known configuration, suspect the probe first.
 
 **Fix status:** unfixed — worth a documented probe recipe in the QA skills, since "ask the router what it served" is a recurring need.
+
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Unchanged. Neither QA skill has gained a probe recipe: `grep` for `max_tokens`, `which model`, and router-probe wording across `.agents/skills/opencode-qa/` and `.agents/skills/codex-qa/` returns nothing. Both skills carry generic probe inventories (`opencode-qa/SKILL.md:62-63,96-99,188-191`; `codex-qa/SKILL.md:58-69,94`) with no guidance on constructing a capability probe that a thinking model will survive.
+
+**Fix status (2026-09-02):** still unfixed.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 
 ## 2026-08-30 — `[background:… completed, exit 0]` does not match the terminal-status regex, so the unpolled-job warning re-fires forever on finished jobs
 
@@ -3322,6 +3560,8 @@ Both correct. `recordToolCall` branches on `args.background_action !== undefined
 
 **Lesson, restated because I had already recorded a version of it:** the recorded lesson from the earlier fix in this same session was that a probe never observed red is not evidence. The same discipline applies to a claim about behavior: an assertion never executed is not a finding. I had the tracker source and a one-line test available both times I made the claim.
 
+**Last verified:** 2026-09-02 (earlier same-day pass, commit not recorded)
+
 ## 2026-08-30 — An answered blocked task can still expire, discarding an in-flight lane's uncommitted work
 
 **Severity:** costly
@@ -3358,6 +3598,12 @@ It had been answered — twice, both times acknowledged. All of its work was unc
 **Update:** (verified 2026-09-02 against `dev` @ 4e68569cb) Partially fixed, and the split is exactly where the entry predicted. The timer half is closed: `resume()` calls `this.blockedEscalation.claim(existingTask.id)` at `packages/omo-opencode/src/features/background-agent/manager.ts:1650-1651`, and `claim()` clears both the reminder and expiry timers at `blocked-escalation.ts:49-55`; the completion timer is cleared separately at `manager.ts:1664-1668`. There is also a race guard the entry did not credit — `shouldDeferExpiry: (taskId) => this.resumingBlockedTaskIds.has(taskId)` at `manager.ts:313-319`, populated during resume at `:1489-1505`, makes expiry re-arm instead of firing while an accepted answer is still in flight, at `blocked-escalation.ts:36-46`, pinned at `blocked-races.test.ts:51-79`. The reporting half is untouched: every expiry writes `task.error = "Blocked task expired unanswered"` at `manager.ts:2679-2687` and logs the same wording at `:2694-2698`, with no answered/resumed field on `BackgroundTask` to distinguish the cases at `types.ts:111-114` — `resumingBlockedTaskIds` is transient and deleted after dispatch at `:1716-1724`.
 
 **Fix status (2026-09-02):** partially fixed. Timer loss closed by `claim()` plus the expiry-deferral race guard; reporting still labels an answered-then-expired park as `expired unanswered`. Severity revised `costly` -> `papercut`, since work is no longer discarded and the residual is a misleading label. Contained fix: persist an answered flag and emit distinct expiry text.
+
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Reporting half re-confirmed open, and the fix is larger than a label change. `claim()` disarms both timers (`blocked-escalation.ts:49-55`) and resume calls it after a successful dispatch (`manager.ts:1668-1671`); the race guard consults `resumingBlockedTaskIds` (`manager.ts:317-323`, marked at `:1504-1508`) and expiry defers and rearms (`blocked-escalation.ts:36-46`), pinned at `blocked-races.test.ts:52-79`. But `expireBlockedTask()` checks only `isTaskBlocked(task)` and then unconditionally sets `task.error = "Blocked task expired unanswered"` (`manager.ts:2701-2709`, repeated in the log line at `:2716`). The cross-check that matters: `BackgroundTask` has no durable answered-state field at all - `types.ts:111-118` carries `blockedParkCount`, `blockedAt`, `blockedReason` and todo metadata, with no `answeredAt`/`claimedAt`/reply marker - and `resumingBlockedTaskIds` is transient manager state that is cleared by the time a later expiry fires. So the label cannot consult anything; a correct fix has to persist park-answer state first.
+
+**Fix status (2026-09-02):** partially fixed, unchanged. Severity stays `costly`. Contained fix is bigger than previously scoped: add a durable answered marker to `BackgroundTask`, set it on accepted resume, then branch the expiry label on it.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 ## 2026-09-01 — A file edit reported "applied successfully" landed in the MAIN checkout instead of the target worktree
 
 **Severity:** costly
@@ -3401,6 +3647,12 @@ i.e. every difference is a line present on the branch and missing from the main 
 
 **Fix status (2026-09-02):** still unfixed, mechanism unconfirmed. Classification is conditional: (a) an OMO defect if `hashline_edit` performed the write, since it has no containment check; (b) upstream otherwise. Severity stays `costly`. Next step is reproduction, not a fix — drive `hashline_edit` from a worktree context with an absolute path outside it and assert which tree changes; only then decide whether to add validation before `hashline-edit-executor.ts:98`.
 
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Still UNCONFIRMED as an incident, but the vulnerability half is now proven and should not be restated as conditional. `hashline_edit` accepts an absolute `filePath` (`tools/hashline-edit/tools.ts:14-20`), forwards it unchanged (`hashline-edit-executor.ts:79-83`), and reads and writes it directly (`:98-99`, `:124-126`), including the rename target (`:150-153`). `context.directory` is used only as the formatter's cwd (`:128-130`) and never constrains the target; there is no `resolve`/`relative`/containment assertion in either file. OMO already owns such a helper - `hooks/write-existing-file-guard/hook.ts:36-43` normalizes and tests containment - and applies it to guarded tools (`tool-execute-before-handler.ts:128-131`), though even there an outside-session path merely returns rather than rejecting (`:131-133`). Existing hashline tests use absolute temp paths only (`tools.test.ts:35-52`, `:196-216`, `:239-258`); none covers a relative path from a different cwd, a worktree, or containment. So: a wrong-tree write through this tool is demonstrably POSSIBLE, and this specific incident still cannot be attributed to it without a reproduction.
+
+**Fix status (2026-09-02):** mechanism still unattributed; the missing-containment vulnerability is now confirmed independently of the incident. Severity stays `costly`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 
 ## 2026-09-02 - A self-run QA probe validates the branch the author reasoned toward, not the incident the report describes
 
@@ -3421,6 +3673,8 @@ Three fixes were implemented, unit-tested, run against a real-harness probe, and
 **Workaround:** for a fix to a *reported* defect, derive the test from the report's observable symptom, not from the mechanism you believe causes it. Construct the failing state through the real production path (call `report_blocked`, do not hand-set `status`); if a test needs to force a field to make the new code reachable, that is the signal it is testing the wrong state. Then prove the probe red against the unfixed build - the negative control here reproduced the incident line for line, and would have failed the original fix immediately. For a widened parser, generate the adversarial direction explicitly: the fixtures that matter are the ones that put hostile input where the anchor can reach it.
 
 **Fix status:** not a code defect; a process finding. Both underlying blockers fixed in `7918492a8` and `8479eaa22`.
+
+**Last verified:** 2026-09-02 (n/a - process finding, no source claim to re-verify)
 
 ## 2026-09-02 — A fresh git worktree cannot initialize this repo's submodules, and `bun install`'s prepare script fails as a result
 
@@ -3457,6 +3711,12 @@ Repeat for all four (`open-design`, `designpowers`, `taste-skill`, `ui-ux-pro-ma
 
 **Fix status:** unfixed; workaround only. A `postinstall`/setup step that performs the fetch-then-checkout fallback when a submodule revision is unresolvable would remove the manual step.
 
+**Update:** (2026-09-02, verified against dev @ 64d608f6d) Unchanged; no fallback exists anywhere. The failure path is intact: root `package.json:130-131` runs `prepare` -> `bun run build`, whose `build:materialize-frontend` invokes `materialize-shared-upstreams.mjs --strict` (`:117-118`), and that script performs a plain `git submodule update --init --recursive` with no recovery (`packages/omo-codex/plugin/scripts/materialize-shared-upstreams.mjs:19-31`). `postinstall.mjs` never touches git at all - it verifies the platform binary, checks the OpenCode version, and invalidates the plugin cache (`:60-71`, `:108-124`, `:155-196`). `script/agent/setup.sh:65-68` runs the same plain update and merely warns on failure, which its own test pins as expected behaviour (`script/agent-setup-offline.test.ts:49-71` asserts exit 0 with `WARN: submodule init skipped`). Four submodules are declared (`.gitmodules:1-12`). `work-with-pr` still runs a bare `bun install` in the new worktree (`.opencode/skills/work-with-pr/SKILL.md:77-83`), so it walks into this every time.
+
+**Fix status (2026-09-02):** still unfixed. Severity stays `costly`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-09-02 - Zombie/stale background-job reminders fire for jobs already consumed
 
 **Severity:** papercut
@@ -3473,6 +3733,14 @@ Repeat for all four (`open-design`, `designpowers`, `taste-skill`, `ui-ux-pro-ma
 
 **Fix status:** unfixed; workaround only.
 
+**Update (2026-09-02, verified against dev @ 64d608f6d):** largely stale as written, with a narrower residual. Three fixes landed the same day this was observed: `7788a7d9a fix(hooks): parse a terminal shell status that carries an exit clause`, `b93318cd1 fix(hooks): deregister a detached shell job when a status poll reports the id is gone`, and `88d2cb9b2 fix(hooks): offer background_action="wait" as the unpolled-job warning's primary resolution`. Current tracker handles every `background_action` including `wait` (`packages/omo-opencode/src/hooks/unpolled-shell-job/tracker.ts:198-211`), clears on terminal status or an id-anchored not-found reply (`:209-210`), and accepts both `completed, exit 0` and `failed, exit 1` (`:54`). Pinned at `tracker.test.ts:344-423`. The observed wave therefore almost certainly ran a bundle built before `7788a7d9a`, which is the same stale-bundle explanation already recorded for the 2026-08-30 regex entry.
+
+The residual is a DIFFERENT bug, not this one: the tracker only observes `ctx_shell` calls (`tracker.ts:198-200`), so a job whose output is consumed by any other route stays registered and keeps being reminded about. That is "consumed elsewhere, still tracked", not "finished job still tracked", and it is documented by the test at `tracker.test.ts:388-408`.
+
+**Fix status (2026-09-02, revised):** fixed for the reported symptom in `7788a7d9a` + `b93318cd1` + `88d2cb9b2`. Residual, still open: output consumed outside `ctx_shell` never deregisters the job. Severity stays `papercut`.
+
+**Last verified:** 2026-09-02 (64d608f6d)
+
 ## 2026-09-02 - `agent: continue` orphan adoption is broken and unrecoverable
 
 **Severity:** costly
@@ -3486,6 +3754,12 @@ Repeat for all four (`open-design`, `designpowers`, `taste-skill`, `ui-ux-pro-ma
 **Workaround:** check the returned `Agent:` field on every continuation. If it says `continue`, treat the continuation as failed and dispatch a fresh task with the prior context inlined into the prompt, rather than retrying the same continuation.
 
 **Fix status:** unfixed; workaround only.
+
+**Update (2026-09-02, verified against dev @ 64d608f6d):** this entry is a STALE DUPLICATE of the 2026-08-27 `continue`-adoption entry above, which was fixed the same day this one was written. `a307c362a fix(background-agent): adopt orphaned sessions under their real agent, never a fabricated one` (2026-09-02) landed before this entry was committed at 16:28; the entry records the pre-fix behaviour of a session that started on the older bundle. Current source recovers identity before adopting (`manager.ts:1433-1437`), REFUSES adoption when no agent can be recovered (`:1438-1444`), and passes the recovered `identity.agent`/`identity.model` into `adoptRunningSession()` (`:1447-1456`, stored at `:715-735`). The second fabrication site is closed too: `sync-continuation.ts:218` now reads `resumeAgent ?? FALLBACK_AGENT`, not `?? "continue"`. Remaining `"continue"` literals at `sync-continuation.ts:124` and `:201` are toast/poll labels that never reach dispatch. The `background_cancel` refusal on an `interrupt`-status task is a separate, still-real complaint and is NOT covered by that fix.
+
+**Fix status (2026-09-02, revised):** fixed in `a307c362a`; entry retracted as a duplicate of the 2026-08-27 finding. The residual - a dead `interrupt`-status task cannot be cancelled - is not covered and remains open.
+
+**Last verified:** 2026-09-02 (64d608f6d)
 
 ## 2026-09-02 - Verification gates dispatched before every content lane merges back produce false REJECTs
 
@@ -3501,6 +3775,8 @@ Repeat for all four (`open-design`, `designpowers`, `taste-skill`, `ui-ux-pro-ma
 
 **Fix status:** not a code defect; a process/ordering finding.
 
+**Last verified:** 2026-09-02 (n/a - process finding, no source claim to re-verify)
+
 ## 2026-09-02 - Testing lesson: a test that constructs the object under test is structurally blind to a derivation bug
 
 **Severity:** n/a (process/testing lesson, not a harness defect)
@@ -3514,3 +3790,43 @@ Repeat for all four (`open-design`, `designpowers`, `taste-skill`, `ui-ux-pro-ma
 **Fix:** the durable fix was a round-trip invariant at the derivation layer — `validate(derive(req), req) == emptyList()` — which is branch-agnostic and cannot be satisfied by a fixture that hand-sets the field under test.
 
 **Fix status:** not a code defect; a process/testing finding.
+
+**Last verified:** 2026-09-02 (n/a - process finding, no source claim to re-verify)
+
+## 2026-09-02 - The findings review re-derives its scope each pass, so coverage rotates instead of accumulating
+
+**Severity:** costly
+**Area:** harness tooling / findings log
+**Observed in:** `~/git/oh-my-openagent`, the `harness-findings-review` skill itself
+
+**What happened:** two review passes ran on the same day. The morning pass committed as `3766a4806 docs(findings): verify the 15 unreviewed entries against dev and re-score them`. The afternoon pass, invoked with the same command and expecting a mostly-verified log, found 23 entries still carrying their 2026-08-27 verdict and 15 that had never been re-verified since capture. Of 61 total entries, no pass had ever covered all of them, and the two same-day passes covered disjoint subsets.
+
+**Root cause:** the skill's inventory step scoped work by reading `**Fix status:**` dates and picking what "looked stale". That is a re-derivation, not a ledger. Each pass computes a fresh subset from whatever the previous pass happened to leave alone, so coverage rotates: entries move in and out of scope, and an untouched block can persist across many passes while every pass truthfully reports having verified everything it selected. Distribution at the time of observation, by each entry's newest status-line date: 16 at 2026-09-02, 3 at 2026-08-28, 23 at 2026-08-27, 4 older, 15 with no re-verification line at all.
+
+**Why the signal is misleading:** a `**Fix status:**` line is only written when a verdict *changes*. An entry checked and found unchanged gets no new line, so it is indistinguishable from an entry nobody has looked at since it was captured. The field the scoping logic reads cannot express "verified, unchanged" - which is the most common outcome of a review pass.
+
+**Fix:** the skill now requires a `**Last verified:** YYYY-MM-DD (<sha>)` line on every entry a pass checks, written even when nothing changed, and scopes the next pass by sorting on that field rather than on status dates. It also requires stating the coverage arithmetic out loud - total, checked, knowingly skipped - before dispatching.
+
+**Fix status:** fixed in the skill (`.agents/skills/harness-findings-review/SKILL.md`, steps 1 and 5). The `**Last verified:**` field is introduced by this pass and is not yet present on entries older than it; coverage accounting is only reliable from 2026-09-02 forward.
+
+**Last verified:** 2026-09-02 (earlier same-day pass, commit not recorded)
+
+## 2026-09-02 - The findings-review skill ordered its verifier agent to run git, which that agent cannot do
+
+**Severity:** costly
+**Area:** subagents / harness tooling
+**Observed in:** `~/git/oh-my-openagent`, an 18-verifier review pass
+
+**What happened:** the `harness-findings-review` skill dispatches one background `explore` per entry and requires, in its mandatory cross-check step, that the verifier "run `git log --oneline -- <the file>` and read the subject lines", noting that "a fix commit naming the defect outranks a source read that missed it". `explore` has no shell. 15 of 18 verifiers returned some form of "no git-capable tool is available in this session" and declined to answer the history half.
+
+**Root cause:** `createExploreAgent` allows exactly `READ_ONLY_FILE_TOOLS` plus four LSP tools - `packages/omo-opencode/src/agents/explore.ts:28-31` with `["read", "grep", "glob"]` at `packages/omo-opencode/src/shared/permission-compat.ts:27`. There is no bash, by design: `explore` is a contextual grep, not a shell. The skill asked its cheapest agent for the one piece of evidence that agent is structurally incapable of producing.
+
+**The dangerous half is not the refusal.** Two verifiers did not refuse. They substituted `read` on `.git/logs/refs/heads/dev` and reasoned from it, reporting "no fix commit appears in the reflog after the observation" as though it were history. A reflog records the local checkout's own ref movements, not the branch's commit history; the conclusion was unfounded in both cases, and it arrived formatted identically to a cited, correct one. This is the same failure class the skill's own cross-check section was written to catch: a citation proves the agent read something, not that it read the right thing.
+
+**Evidence:** in the same pass, orchestrator-run `git log --oneline --since=2026-08-27 -- packages/omo-opencode/src/features/background-agent/` returned 12 commits including `a307c362a`, `8479eaa22` and `400a4a723`, none of which any verifier could see.
+
+**Fix:** the skill now assigns every git query to the orchestrator, batched before dispatch, with the resulting subject lines pasted into each verifier prompt as given fact. Verifier prompts are required to carry `Do NOT read .git/`. The verifier's job is narrowed to source-and-test reading, which keeps the two evidence directions independent - supplied history versus observed source - so a disagreement is signal rather than a silent gap.
+
+**Fix status:** fixed in the skill (`.agents/skills/harness-findings-review/SKILL.md`, step 2 and the verifier-prompt contract). The underlying agent restriction is correct and unchanged; the defect was the instruction, not the permission.
+
+**Last verified:** 2026-09-02 (64d608f6d)
