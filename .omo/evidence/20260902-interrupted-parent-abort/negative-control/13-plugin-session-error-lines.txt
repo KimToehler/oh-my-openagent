@@ -1,0 +1,4 @@
+[2026-09-02T15:24:17.001Z] [rt:88222:4d83] [todo-continuation-enforcer] Abort detected via session.error {"sessionID":"ses_f9d477a40ffe5LnpA18IWKSIo2","errorName":"MessageAbortedError"}
+[2026-09-02T15:24:17.001Z] [rt:88222:4d83] [todo-continuation-enforcer] session.error {"sessionID":"ses_f9d477a40ffe5LnpA18IWKSIo2"}
+[2026-09-02T15:24:17.001Z] [rt:88222:4d83] [auto-compact] session.error received {"sessionID":"ses_f9d477a40ffe5LnpA18IWKSIo2","error":{"name":"MessageAbortedError","data":{"message":"Aborted"}}}
+[2026-09-02T15:24:17.001Z] [rt:88222:4d83] [atlas] session.error {"sessionID":"ses_f9d477a40ffe5LnpA18IWKSIo2","isAbort":true}

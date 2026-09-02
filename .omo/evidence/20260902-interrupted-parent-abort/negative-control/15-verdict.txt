@@ -1,0 +1,2 @@
+MODE=negative-control (expect NO terminalization)
+VERDICT=PASS

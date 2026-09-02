@@ -1,0 +1,9 @@
+[2026-09-02T15:23:38.546Z] [rt:83971:b4dc] [todo-continuation-enforcer] Abort detected via session.error {"sessionID":"ses_f9d4818a4ffe5hzYDcELnnBKuB","errorName":"MessageAbortedError"}
+[2026-09-02T15:23:38.546Z] [rt:83971:b4dc] [todo-continuation-enforcer] session.error {"sessionID":"ses_f9d4818a4ffe5hzYDcELnnBKuB"}
+[2026-09-02T15:23:38.546Z] [rt:83971:b4dc] [auto-compact] session.error received {"sessionID":"ses_f9d4818a4ffe5hzYDcELnnBKuB","error":{"name":"MessageAbortedError","data":{"message":"Aborted"}}}
+[2026-09-02T15:23:38.547Z] [rt:83971:b4dc] [atlas] session.error {"sessionID":"ses_f9d4818a4ffe5hzYDcELnnBKuB","isAbort":true}
+[2026-09-02T15:23:38.550Z] [rt:83971:b4dc] [todo-continuation-enforcer] Abort detected via session.error {"sessionID":"ses_f9d4809f8ffemIU28CL4iLWmss","errorName":"MessageAbortedError"}
+[2026-09-02T15:23:38.550Z] [rt:83971:b4dc] [todo-continuation-enforcer] session.error {"sessionID":"ses_f9d4809f8ffemIU28CL4iLWmss"}
+[2026-09-02T15:23:38.550Z] [rt:83971:b4dc] [auto-compact] session.error received {"sessionID":"ses_f9d4809f8ffemIU28CL4iLWmss","error":{"name":"MessageAbortedError","data":{"message":"Aborted"}}}
+[2026-09-02T15:23:38.550Z] [rt:83971:b4dc] [atlas] session.error {"sessionID":"ses_f9d4809f8ffemIU28CL4iLWmss","isAbort":true}
+[2026-09-02T15:23:38.578Z] [rt:83971:b4dc] [background-agent] session.error received but session still alive, treating as transient: {"taskId":"bg_23c13e4c","sessionId":"ses_f9d4809f8ffemIU28CL4iLWmss","errorMessage":"Aborted"}

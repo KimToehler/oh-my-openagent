@@ -1,0 +1,17 @@
+fake-openai listening on 49473
+[2026-09-02T15:23:38.322Z] branch=restart-parent-midturn call=1
+[2026-09-02T15:23:38.403Z] branch=child-midturn call=2
+[2026-09-02T15:23:38.501Z] branch=restart-parent-midturn call=3
+[2026-09-02T15:23:38.613Z] branch=child-midturn call=4
+[2026-09-02T15:23:44.745Z] branch=restart-parent-midturn call=5
+[2026-09-02T15:23:44.789Z] branch=child-midturn call=6
+[2026-09-02T15:23:44.899Z] branch=restart-parent-midturn call=7
+[2026-09-02T15:23:44.941Z] branch=child-midturn call=8
+[2026-09-02T15:23:45.042Z] branch=restart-parent-midturn call=9
+[2026-09-02T15:23:45.088Z] branch=child-midturn call=10
+[2026-09-02T15:23:45.186Z] branch=restart-parent-midturn call=11
+[2026-09-02T15:23:45.222Z] branch=child-midturn call=12
+[2026-09-02T15:23:45.326Z] branch=restart-parent-midturn call=13
+[2026-09-02T15:23:45.363Z] branch=child-midturn call=14
+[2026-09-02T15:23:45.468Z] branch=restart-parent-midturn call=15
+[2026-09-02T15:23:46.694Z] FINAL_COUNTS title=0 parent-tool-call=0 parent-hold=0 restart-parent=0 restart-parent-midturn=8 child-midturn=7 midturn-resume=0 restart-resume=0 active-control=0 absent-control=0 child=0 wake=0 default=0

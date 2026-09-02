@@ -2089,6 +2089,8 @@ Task ${existingTask.id} resumed with parent answer.
       const sessionID = resolveSessionEventID(props)
       if (!sessionID) return
 
+      this.terminalizeChildTasksOnParentAbort(sessionID, props?.error)
+
       const resolved = this.resolveTaskAttemptBySession(sessionID)
       if (this.parentWakeNotifier.getDispatchedParentWakes().has(sessionID) || !resolved?.isCurrent) {
         void this.requeueDispatchedParentWake(sessionID, "session.error")
@@ -2291,6 +2293,42 @@ Task ${existingTask.id} resumed with parent answer.
     this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
       log("[background-agent] Failed to notify on async prompt failure:", { taskId: task.id, error: err })
     }).finally(releaseNotificationPreparation)
+  }
+
+  /**
+   * A parent session that the user interrupts emits an abort-shaped `session.error`
+   * while its session row stays alive. Its in-flight children are not implicated by
+   * that event, so without this they keep reporting `running` until the stale reaper
+   * fires 45 minutes later. `session.deleted` does not cover it: the parent session
+   * still exists, it was only interrupted.
+   */
+  private terminalizeChildTasksOnParentAbort(sessionID: string, error: unknown): void {
+    if (!isAbortedSessionError(error)) return
+
+    const ownTask = this.resolveTaskAttemptBySession(sessionID)
+    if (ownTask?.isCurrent) return
+
+    const children = this.getAllDescendantTasks(sessionID)
+    if (children.length === 0) return
+
+    for (const child of children) {
+      if (child.status !== "running" && child.status !== "pending") continue
+
+      this.logger("[background-agent] Terminalizing child task after parent session abort:", {
+        childTaskId: child.id,
+        parentSessionId: sessionID,
+      })
+
+      void this.cancelTask(child.id, {
+        source: "parent-session-abort",
+        reason: "Parent session was interrupted",
+      }).catch((err) => {
+        log("[background-agent] Failed to cancel child task on parent abort:", {
+          taskId: child.id,
+          error: err,
+        })
+      })
+    }
   }
 
   private async handleSessionErrorEvent(args: {
