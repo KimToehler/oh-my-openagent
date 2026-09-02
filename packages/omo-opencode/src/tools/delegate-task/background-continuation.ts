@@ -40,7 +40,7 @@ export async function executeBackgroundContinuation(
     const backgroundTaskId = task.id
     const resolvedModel = resolveMetadataModel(task.model, parentContext.model)
     const adoptionDisclosure = wasUnownedAtResumeStart
-      ? "\n\nThis continuation adopted an orphaned server session using agent: continue.\nIt has no original model, no fallback chain, no category, and no loaded skill content.\nIt will not auto-fall-back on a model error.\n"
+      ? `\n\nThis continuation adopted an orphaned server session, recovering agent: ${task.agent} from its transcript.\nIt has no fallback chain, no category, and no loaded skill content.\nIt will not auto-fall-back on a model error.\n`
       : ""
 
     const bgContMeta = {

@@ -15,16 +15,32 @@ import type { AdoptRunningSessionInput, BackgroundTask, BackgroundTaskCompletion
 
 const managers: BackgroundManager[] = []
 const managerDirectories: string[] = []
+// A real session always ran under some agent, so the shared fixtures carry one:
+// adoption now refuses when the transcript cannot identify the owning agent.
+const ADOPTED_AGENT = "momus"
+const ADOPTED_MODEL = { providerID: "anthropic", modelID: "claude-opus-4" }
 const completedTranscript = [
   {
-    info: { role: "assistant", time: { completed: 1 }, finish: "stop" },
+    info: {
+      role: "assistant",
+      time: { completed: 1 },
+      finish: "stop",
+      agent: ADOPTED_AGENT,
+      model: ADOPTED_MODEL,
+    },
     parts: [{ type: "text", text: "work completed" }],
   },
 ]
 const unterminatedTranscript = [
   {
-    info: { role: "assistant", time: {} },
+    info: { role: "assistant", time: {}, agent: ADOPTED_AGENT, model: ADOPTED_MODEL },
     parts: [{ type: "text", text: "work interrupted" }],
+  },
+]
+const agentlessTranscript = [
+  {
+    info: { role: "assistant", time: { completed: 1 }, finish: "stop" },
+    parts: [{ type: "text", text: "work completed" }],
   },
 ]
 
@@ -132,9 +148,9 @@ afterEach(() => {
 })
 
 describe("BackgroundManager resume adopt-on-miss", () => {
-  test("#given a terminal child session missing from memory #when resume adopts it #then exact continuation metadata and task identity are preserved", async () => {
+  test("#given a terminal child session missing from memory #when resume adopts it #then the agent recovered from the transcript is carried through, never a fabricated name", async () => {
     // given
-    const { manager } = createManager()
+    const { manager } = createManager(completedTranscript)
     stubMissChecks(manager, true, "terminal")
     const adopt = spyOn(manager, "adoptRunningSession")
     const reconcile = spyOn(manager as never, "reconcileStaleRunningTask" as never)
@@ -148,14 +164,30 @@ describe("BackgroundManager resume adopt-on-miss", () => {
       parentSessionId: "current-parent",
       parentMessageId: "current-message",
       description: "Resumed orphaned background session child-session",
-      agent: "continue",
-      model: undefined,
+      agent: "momus",
+      model: { providerID: "anthropic", modelID: "claude-opus-4" },
       rootSessionId: "current-parent",
       rootDescendantAlreadyReserved: false,
     }
     expect(adopt).toHaveBeenCalledWith(expectedInput)
     expect(reconcile).not.toHaveBeenCalled()
     expect(getTasks(manager).get(resumed.id)).toBe(resumed)
+    expect(resumed.agent).not.toBe("continue")
+  })
+
+  test("#given an orphan whose transcript yields no agent #when resume is requested #then it refuses to adopt rather than substituting a placeholder agent", async () => {
+    // given
+    const { manager, promptAsync } = createManager(agentlessTranscript)
+    stubMissChecks(manager, true, "terminal")
+    const adopt = spyOn(manager, "adoptRunningSession")
+
+    // when
+    const result = resume(manager)
+
+    // then
+    await expect(result).rejects.toThrow(/original agent could not be recovered/i)
+    expect(adopt).not.toHaveBeenCalled()
+    expect(promptAsync).not.toHaveBeenCalled()
   })
 
   test("#given an active child session missing from memory #when resume is requested #then it refuses without dispatching a prompt", async () => {
@@ -319,7 +351,7 @@ describe("BackgroundManager resume adopt-on-miss", () => {
 
   test("#given nested-parent terminal adoption #when resumed task completes #then root descendant registers and unregisters exactly once", async () => {
     // given
-    const { manager } = createManager()
+    const { manager } = createManager(completedTranscript)
     stubMissChecks(manager, true, "terminal")
     const register = spyOn(manager as never, "registerRootDescendant" as never)
     const unregister = spyOn(manager as never, "unregisterRootDescendant" as never)

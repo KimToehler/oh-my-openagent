@@ -604,6 +604,97 @@ describe("executeSyncContinuation - toast cleanup error paths", () => {
     }
   })
 
+  test("#given a compacted transcript whose newest message is the compaction agent #when adopted on wall-clock yield #then the pre-compaction agent is recovered", async () => {
+    // given
+    const { handedBackSyncSessions } = require("../../features/claude-code-session-state")
+    handedBackSyncSessions.clear()
+    const adoptionCalls: Array<{ agent?: string }> = []
+    const mockClient = {
+      session: {
+        messages: async () => ({
+          data: [
+            { info: { role: "assistant", agent: "momus" } },
+            { info: { role: "assistant", agent: "compaction" } },
+          ],
+        }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const deps = {
+      pollSyncSession: async () => ({ kind: "wall_clock_yield" as const }),
+      fetchSyncResult: async () => ({ ok: false as const, error: "unexpected" }),
+    }
+    const manager = {
+      adoptRunningSession: (input: { agent?: string }) => {
+        adoptionCalls.push(input)
+        return { id: "bg_resumed", description: "resumed task", agent: input.agent }
+      },
+    }
+
+    try {
+      // when
+      const { executeSyncContinuation } = require("./sync-continuation")
+      await executeSyncContinuation(
+        { task_id: "ses_test_12345678", prompt: "continue", description: "resumed task", load_skills: [], run_in_background: false },
+        { sessionID: "parent-session", callID: "call-123", metadata: () => {} },
+        { client: mockClient, manager, syncWallClockTimeoutMs: 30 },
+        { sessionID: "parent-session", messageID: "parent-message" },
+        deps,
+      )
+
+      // then
+      expect(adoptionCalls[0]?.agent).toBe("momus")
+      expect(adoptionCalls[0]?.agent).not.toBe("compaction")
+    } finally {
+      handedBackSyncSessions.clear()
+    }
+  })
+
+  test("#given a transcript with no recoverable agent #when adopted on wall-clock yield #then a registered fallback agent is used instead of a fabricated name", async () => {
+    // given
+    const { handedBackSyncSessions } = require("../../features/claude-code-session-state")
+    handedBackSyncSessions.clear()
+    const adoptionCalls: Array<{ agent?: string }> = []
+    const mockClient = {
+      session: {
+        messages: async () => ({ data: [{ info: { role: "assistant" } }] }),
+        prompt: async () => ({}),
+        promptAsync: async () => ({}),
+        abort: async () => ({}),
+      },
+    }
+    const deps = {
+      pollSyncSession: async () => ({ kind: "wall_clock_yield" as const }),
+      fetchSyncResult: async () => ({ ok: false as const, error: "unexpected" }),
+    }
+    const manager = {
+      adoptRunningSession: (input: { agent?: string }) => {
+        adoptionCalls.push(input)
+        return { id: "bg_resumed", description: "resumed task", agent: input.agent }
+      },
+    }
+
+    try {
+      // when
+      const { executeSyncContinuation } = require("./sync-continuation")
+      await executeSyncContinuation(
+        { task_id: "ses_test_12345678", prompt: "continue", description: "resumed task", load_skills: [], run_in_background: false },
+        { sessionID: "parent-session", callID: "call-123", metadata: () => {} },
+        { client: mockClient, manager, syncWallClockTimeoutMs: 30 },
+        { sessionID: "parent-session", messageID: "parent-message" },
+        deps,
+      )
+
+      // then
+      expect(adoptionCalls[0]?.agent).toBe("general")
+      expect(adoptionCalls[0]?.agent).not.toBe("continue")
+    } finally {
+      handedBackSyncSessions.clear()
+    }
+  })
+
   test("marks and aborts resumed sync session when handback fails", async () => {
     //#given - a resumed sync continuation returns a poll error instead of a handback result
     const { handedBackSyncSessions } = require("../../features/claude-code-session-state")

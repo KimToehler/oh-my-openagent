@@ -6,6 +6,8 @@ import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { getTaskToastManager } from "../../features/task-toast-manager"
 import { getAgentToolRestrictions } from "../../shared/agent-tool-restrictions"
 import { getMessageDir, normalizeSDKResponse } from "../../shared"
+import { FALLBACK_AGENT } from "../../features/background-agent/spawner/fallback-agent"
+import { isCompactionAgent } from "../../features/background-agent/compaction-aware-message-resolver"
 import { promptWithModelSuggestionRetry } from "../../shared/model-suggestion-retry"
 import { resolveMessageContext } from "../../features/hook-message-injector"
 import { formatDuration } from "./time-formatter"
@@ -62,6 +64,11 @@ async function resolveResumeContext(
 
     for (let index = messages.length - 1; index >= 0; index--) {
       const info = messages[index].info
+      // A compacted session's newest message carries the compaction agent, which is
+      // not a resumable persona. Skip it so the real owning agent is recovered.
+      if (isCompactionAgent(info?.agent)) {
+        continue
+      }
       if (info?.agent || info?.model || (info?.modelID && info?.providerID)) {
         return {
           resumeAgent: info.agent,
@@ -204,7 +211,11 @@ export async function executeSyncContinuation(
             parentSessionId: parentContext.sessionID,
             parentMessageId: parentContext.messageID,
             description: args.description,
-            agent: resumeAgent ?? "continue",
+            // The session is already running under its real agent, so this record is
+            // bookkeeping and must not invent a name: a fictitious agent here would
+            // poison any later resume of the adopted task. Fall back to a REGISTERED
+            // agent when the transcript yields nothing.
+            agent: resumeAgent ?? FALLBACK_AGENT,
             model: resumeModel,
             rootSessionId: parentContext.sessionID,
             rootDescendantAlreadyReserved: false,

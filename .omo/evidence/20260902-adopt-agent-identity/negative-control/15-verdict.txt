@@ -1,0 +1,3 @@
+MODE=negative-control-agent-identity (expect fabricated agent)
+adopted_agent=continue
+VERDICT=PASS
