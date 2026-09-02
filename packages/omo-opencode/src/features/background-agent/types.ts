@@ -1,3 +1,4 @@
+import type { DirtyWorktreeStatus } from "./dirty-worktree"
 import type { FallbackEntry } from "../../shared/model-requirements"
 import type { DelegatedModelConfig } from "../../shared/model-resolution-types"
 import type { SessionPermissionRule } from "../../shared/question-denied-session-permission"
@@ -116,6 +117,12 @@ export interface BackgroundTask {
   todoGateFirstObservedAt?: Date
   /** Todos left non-terminal when the gate grace expired; surfaced in the completion notification. */
   unfinishedTodoCount?: number
+  /** Dirty paths that appeared after this task launched; surfaced in the completion notification. */
+  uncommittedFileCount?: number
+  /** In-flight baseline dirty-worktree read started at the child session launch boundary. */
+  dirtyWorktreeBaselinePromise?: Promise<DirtyWorktreeStatus>
+  /** Child session directory used for baseline and completion status reads. */
+  dirtyWorktreeDirectory?: string
   /** Path that completed the task, surfaced in the completion notification. */
   completionReason?: BackgroundTaskCompletionReason
 }

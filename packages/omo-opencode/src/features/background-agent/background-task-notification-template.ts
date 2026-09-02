@@ -14,6 +14,7 @@ export interface BackgroundTaskNotificationTask {
   blockedAt?: Date
   blockedReason?: string
   unfinishedTodoCount?: number
+  uncommittedFileCount?: number
   completionReason?: BackgroundTaskCompletionReason
 }
 
@@ -59,10 +60,16 @@ function formatTaskSummaryLine(task: BackgroundTaskNotificationTask): string {
   const sessionSuffix = task.sessionId ? ` | session: \`${task.sessionId}\`` : ""
   const safeDescription = sanitizeUntrustedText(task.description || task.id, 200).replace(/\n+/g, " ")
   const baseLine = `- \`${task.id}\`: ${safeDescription}${sessionSuffix}`
+  const completionDetails = [
+    task.unfinishedTodoCount && task.unfinishedTodoCount > 0
+      ? `${task.unfinishedTodoCount} unfinished todo${task.unfinishedTodoCount === 1 ? "" : "s"}`
+      : undefined,
+    task.uncommittedFileCount && task.uncommittedFileCount > 0
+      ? `${task.uncommittedFileCount} uncommitted file${task.uncommittedFileCount === 1 ? "" : "s"}`
+      : undefined,
+  ].filter((detail): detail is string => detail !== undefined)
   const statusSuffix = task.status === "completed"
-    ? `${task.unfinishedTodoCount && task.unfinishedTodoCount > 0
-      ? ` - completed with ${task.unfinishedTodoCount} unfinished todo${task.unfinishedTodoCount === 1 ? "" : "s"}`
-      : ""}${task.completionReason ? `, reason: ${task.completionReason}` : ""}`
+    ? `${completionDetails.length > 0 ? ` - completed with ${completionDetails.join(" and ")}` : ""}${task.completionReason ? `, reason: ${task.completionReason}` : ""}`
     : ` [${task.status.toUpperCase()}]${task.error ? ` - ${sanitizeUntrustedText(task.error, 2000)}` : ""}`
   const timeline = formatAttemptTimeline(task)
 

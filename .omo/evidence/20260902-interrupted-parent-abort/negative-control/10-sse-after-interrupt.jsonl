@@ -1,0 +1,96 @@
+data: {"id":"evt_062b88ce8001BKSPQx6gSkuzo1","type":"session.error","properties":{"sessionID":"ses_f9d477a40ffe5LnpA18IWKSIo2","error":{"name":"MessageAbortedError","data":{"message":"Aborted"}}}}
+
+data: {"id":"evt_062b88ce8002F0u47Af0NwZDGT","type":"session.status","properties":{"sessionID":"ses_f9d477a40ffe5LnpA18IWKSIo2","status":{"type":"idle"}}}
+
+data: {"id":"evt_062b88ce8003pbRbvW6Aol3iNu","type":"session.idle","properties":{"sessionID":"ses_f9d477a40ffe5LnpA18IWKSIo2"}}
+
+data: {"id":"evt_062b88cf0001NnVwCgsiiXG6L6","type":"message.part.updated","properties":{"sessionID":"ses_f9d477a40ffe5LnpA18IWKSIo2","part":{"type":"tool","tool":"task","callID":"call_midturn_child_3","state":{"status":"completed","input":{"description":"midturn adoption child","prompt":"SPLIT_CHILD_TASK: hang-midturn","subagent_type":"explore","run_in_background":true,"load_skills":[]},"output":"Background task launched.\n\nBackground Task ID: bg_aac15d1b\nDescription: midturn adoption child\nAgent: explore\nStatus: pending\n\nDo NOT call background_output now. Wait for <system-reminder> notification first. The system will deliver the result when the task completes; you do not need to poll for it.\n\n<task_metadata>\nsession_id: ses_f9d477377ffeVgstD0XHmVvBL8\nbackground_task_id: bg_aac15d1b\nsubagent: explore\n</task_metadata>\n\nto continue: task(task_id=\"ses_f9d477377ffeVgstD0XHmVvBL8\", load_skills=[], run_in_background=false, prompt=\"...\")","metadata":{"truncated":false,"prompt":"SPLIT_CHILD_TASK: hang-midturn","agent":"explore","requested_subagent_type":"explore","load_skills":[],"description":"midturn adoption child","run_in_background":true,"taskId":"ses_f9d477377ffeVgstD0XHmVvBL8","sessionId":"ses_f9d477377ffeVgstD0XHmVvBL8","backgroundTaskId":"bg_aac15d1b","model":{"providerID":"openai","modelID":"gpt-fake"}},"title":"midturn adoption child","time":{"start":1788362656877,"end":1788362657008}},"metadata":{"openai":{"itemId":"fc_3"}},"id":"prt_062b88c6b001AWZCNN1iAlglPG","sessionID":"ses_f9d477a40ffe5LnpA18IWKSIo2","messageID":"msg_062b88c570012YjKyRTyodhzlX"},"time":1788362657008}}
+
+data: {"id":"evt_062b88cf0002Asu6TIi6OmA52F","type":"message.updated","properties":{"sessionID":"ses_f9d477a40ffe5LnpA18IWKSIo2","info":{"id":"msg_062b88c570012YjKyRTyodhzlX","parentID":"msg_062b885ff001t89kJdKvyYioCY","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.pkb7VPYP4d/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"gpt-fake","providerID":"openai","time":{"created":1788362656855,"completed":1788362657008},"sessionID":"ses_f9d477a40ffe5LnpA18IWKSIo2","error":{"name":"MessageAbortedError","data":{"message":"Aborted"}}}}}
+
+data: {"id":"evt_062b88cf2001oRpVnuD3pYs6pp","type":"session.status","properties":{"sessionID":"ses_f9d477a40ffe5LnpA18IWKSIo2","status":{"type":"idle"}}}
+
+data: {"id":"evt_062b88cf3001i0HmHBwsnJMFGA","type":"session.idle","properties":{"sessionID":"ses_f9d477a40ffe5LnpA18IWKSIo2"}}
+
+data: {"id":"evt_062b89b94001LIqNSw4KNGbRH6","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b89bff00115efgd933DfQeC","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b89c6a0016D0ypck36Vbn6v","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b89cd0001KL7FoXV72SgdY3","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b89d3a001cHwYZmjADbFiaq","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b89da60016w2U4c8txzx4bC","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b89e0f001wYVsS2xv7k1Pnj","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b89e7a001dMnQD16z6Hh5cE","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b89ee1001wX1SB545vn3N1L","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b89f4f001wE5YCb1Roq9hms","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b89fba001WQWtAtRrs1tugA","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a023001IJRmU1nfwQPkbU","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a08e001jt8tCIwqJBZbd3","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a0f8001tOQtfTXZMEdOMs","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a163001tOMPG7SFv8juXl","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a1cc001DAfzRXAJKx3Ypt","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a236001el2aDJSmLdS8cx","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a2a0001bNoyk01SAsY71R","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a3090011RRoiVr2alm5sH","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a370001NQVUCybe1DMack","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a3db001f51VRmGwcqhIQS","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a445001wm5xL4jGe7vK9r","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a4ad001TqcAZSzExxCL0G","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a515001WAHq37EbB0PGos","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a580001qFmL7Mc5SPuJDE","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a5ea001dfKpZWuzD0s9E8","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a655001vV7wm4qY3u1kie","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a6c0001R5CmZYzJHYzwoT","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a72a001RgEQurRju8h58Y","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a7940011K9llAWy1u43wG","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a7ff001ibjIUS29KvCy5z","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a869001WjhaGAy7MfkarC","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a8d4001Z1AJPABYCcSrD7","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a93f0013CjlaqOePsT7HO","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8a9a9001C4Sdwdvf1aMQ8z","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8aa140014z7jBC12LYrO9d","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8aa80001RQfXQFrap7piIF","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8aaea001AaDVh2CmhISowc","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8ab55001dtL1bXOHaWe3un","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8abc1001k6OcZ4ybs6boQn","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062b8ac2b001rP04O4PnU7L3q1","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+

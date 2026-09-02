@@ -71,6 +71,11 @@ import {
 } from "./constants"
 import { formatDuration } from "./duration-formatter"
 import {
+  countNewDirtyPaths,
+  readDirtyWorktreeStatus,
+  type DirtyWorktreeStatusReader,
+} from "./dirty-worktree"
+import {
   extractErrorMessage,
   extractErrorName,
   extractErrorStatusCode,
@@ -250,6 +255,7 @@ export interface BackgroundManagerConfig {
   onSubagentSessionDeleted?: OnSubagentSessionDeleted
   onShutdown?: () => void | Promise<void>
   enableParentSessionNotifications?: boolean
+  dirtyWorktreeStatusReader?: DirtyWorktreeStatusReader
   modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   log?: typeof log
 }
@@ -291,6 +297,7 @@ export class BackgroundManager {
   private rootDescendantCounts: Map<string, number>
   private preStartDescendantReservations: Set<string>
   private enableParentSessionNotifications: boolean
+  private readonly dirtyWorktreeStatusReader: DirtyWorktreeStatusReader
   private modelFallbackControllerAccessor?: ModelFallbackControllerAccessor
   private logger: typeof log
   private loggedSessionStatusUnavailable = false
@@ -328,6 +335,7 @@ export class BackgroundManager {
     this.rootDescendantCounts = new Map()
     this.preStartDescendantReservations = new Set()
     this.enableParentSessionNotifications = options?.enableParentSessionNotifications ?? true
+    this.dirtyWorktreeStatusReader = options?.dirtyWorktreeStatusReader ?? readDirtyWorktreeStatus
     this.modelFallbackControllerAccessor = options?.modelFallbackControllerAccessor
     this.logger = options?.log ?? log
     this.parentWakeNotifier = new ParentWakeNotifier(
@@ -868,6 +876,11 @@ export class BackgroundManager {
     })
     const parentDirectory = parentSession?.data?.directory ?? this.directory
     log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
+    // Kicked off without awaiting: the baseline read spawns `git`, and launch is on the
+    // critical path to `running`. Awaiting it here delayed dispatch and left tasks
+    // observably `pending`. Completion awaits this promise instead.
+    task.dirtyWorktreeDirectory = parentDirectory
+    task.dirtyWorktreeBaselinePromise = this.dirtyWorktreeStatusReader(parentDirectory)
 
     const createResult = await this.client.session.create({
       body: {
@@ -2089,6 +2102,8 @@ Task ${existingTask.id} resumed with parent answer.
       const sessionID = resolveSessionEventID(props)
       if (!sessionID) return
 
+      this.terminalizeChildTasksOnParentAbort(sessionID, props?.error)
+
       const resolved = this.resolveTaskAttemptBySession(sessionID)
       if (this.parentWakeNotifier.getDispatchedParentWakes().has(sessionID) || !resolved?.isCurrent) {
         void this.requeueDispatchedParentWake(sessionID, "session.error")
@@ -2291,6 +2306,42 @@ Task ${existingTask.id} resumed with parent answer.
     this.enqueueNotificationForParent(task.parentSessionId, () => this.notifyParentSession(task)).catch(err => {
       log("[background-agent] Failed to notify on async prompt failure:", { taskId: task.id, error: err })
     }).finally(releaseNotificationPreparation)
+  }
+
+  /**
+   * A parent session that the user interrupts emits an abort-shaped `session.error`
+   * while its session row stays alive. Its in-flight children are not implicated by
+   * that event, so without this they keep reporting `running` until the stale reaper
+   * fires 45 minutes later. `session.deleted` does not cover it: the parent session
+   * still exists, it was only interrupted.
+   */
+  private terminalizeChildTasksOnParentAbort(sessionID: string, error: unknown): void {
+    if (!isAbortedSessionError(error)) return
+
+    const ownTask = this.resolveTaskAttemptBySession(sessionID)
+    if (ownTask?.isCurrent) return
+
+    const children = this.getAllDescendantTasks(sessionID)
+    if (children.length === 0) return
+
+    for (const child of children) {
+      if (child.status !== "running" && child.status !== "pending") continue
+
+      this.logger("[background-agent] Terminalizing child task after parent session abort:", {
+        childTaskId: child.id,
+        parentSessionId: sessionID,
+      })
+
+      void this.cancelTask(child.id, {
+        source: "parent-session-abort",
+        reason: "Parent session was interrupted",
+      }).catch((err) => {
+        log("[background-agent] Failed to cancel child task on parent abort:", {
+          taskId: child.id,
+          error: err,
+        })
+      })
+    }
   }
 
   private async handleSessionErrorEvent(args: {
@@ -2949,6 +3000,18 @@ The task was re-queued on a fallback model after a retryable failure.
     return Array.from(this.tasks.values()).filter(t => t.status !== "running")
   }
 
+  private async annotateNewDirtyWorktreePaths(task: BackgroundTask): Promise<void> {
+    if (!task.dirtyWorktreeBaselinePromise || !task.dirtyWorktreeDirectory) return
+
+    const baselineStatus = await task.dirtyWorktreeBaselinePromise
+    if (baselineStatus.kind !== "available") return
+
+    const completionStatus = await this.dirtyWorktreeStatusReader(task.dirtyWorktreeDirectory)
+    if (completionStatus.kind === "available") {
+      task.uncommittedFileCount = countNewDirtyPaths(baselineStatus.paths, completionStatus.paths)
+    }
+  }
+
   /**
    * Safely complete a task with race condition protection.
    * Returns true if task was successfully completed, false if already completed by another path.
@@ -3000,6 +3063,7 @@ The task was re-queued on a fallback model after a retryable failure.
       }
 
       task.completionReason = reason
+      await this.annotateNewDirtyWorktreePaths(task)
       this.markForNotification(task)
 
       const idleTimer = this.idleDeferralTimers.get(task.id)
@@ -3078,6 +3142,7 @@ The task was re-queued on a fallback model after a retryable failure.
       attempts: cloneAttempts(task),
       sessionId: task.sessionId,
       unfinishedTodoCount: task.unfinishedTodoCount,
+      uncommittedFileCount: task.uncommittedFileCount,
       completionReason: task.completionReason,
     })
 

@@ -145,6 +145,52 @@ describe("createRulesInjectorHook", () => {
 		expect(reminder?.length).toBeLessThanOrEqual(600);
 	});
 
+	it("#given rule injected and deduped in one epoch #when session.compacted fires #then next matching read reinjects full body exactly once", async () => {
+		// given
+		const hook = createRulesInjectorHook(makeContext(projectRoot));
+		const output = () => ({
+			title: "",
+			output: "file content",
+			metadata: { filePath: targetFile },
+		});
+
+		// when
+		const initial = output();
+		await hook["tool.execute.after"](
+			{ tool: "read", sessionID: SESSION_ID, callID: "initial" },
+			initial,
+		);
+		const duplicate = output();
+		await hook["tool.execute.after"](
+			{ tool: "read", sessionID: SESSION_ID, callID: "duplicate" },
+			duplicate,
+		);
+		await hook.event({
+			event: { type: "session.compacted", properties: { sessionID: SESSION_ID } },
+		});
+		const postCompaction = output();
+		await hook["tool.execute.after"](
+			{ tool: "read", sessionID: SESSION_ID, callID: "post-compaction" },
+			postCompaction,
+		);
+		const postCompactionDuplicate = output();
+		await hook["tool.execute.after"](
+			{ tool: "read", sessionID: SESSION_ID, callID: "post-compaction-duplicate" },
+			postCompactionDuplicate,
+		);
+
+		// then
+		expect(initial.output).toContain("[Rule: .omo/rules/typescript.md]");
+		expect(initial.output).toContain("Must use strict TypeScript.");
+		expect(duplicate.output).not.toContain("[Rule: .omo/rules/typescript.md]");
+		expect(duplicate.output).not.toContain("Must use strict TypeScript.");
+		expect(postCompaction.output).toContain("[Rule: .omo/rules/typescript.md]");
+		expect(postCompaction.output).toContain("Must use strict TypeScript.");
+		expect(postCompaction.output).not.toContain("[Rule reminder:");
+		expect(postCompactionDuplicate.output).not.toContain("[Rule: .omo/rules/typescript.md]");
+		expect(postCompactionDuplicate.output).not.toContain("Must use strict TypeScript.");
+	});
+
 	it("#given pending rule-reminder context #when session is deleted #then collector clears that session", async () => {
 		// given
 		const collector = new ContextCollector();

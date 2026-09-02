@@ -1,0 +1,6 @@
+parent_session=ses_f9d4818a4ffe5hzYDcELnnBKuB
+child_session=ses_f9d4809f8ffemIU28CL4iLWmss
+parent_session_error_events=1
+parent_events_mentioning_aborted=2
+terminalize_log_lines=2
+terminalize_lines_for_this_parent=2

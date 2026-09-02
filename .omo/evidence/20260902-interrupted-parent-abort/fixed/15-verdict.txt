@@ -1,0 +1,2 @@
+MODE=fixed (expect child lane terminalized on parent interrupt)
+VERDICT=PASS
