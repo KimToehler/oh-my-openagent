@@ -1,0 +1,476 @@
+data: {"id":"evt_062352c76001hjfKSoPtH7yHp0","type":"server.connected","properties":{}}
+
+data: {"id":"evt_062352c780020W8oN7mHJSqoQX","type":"session.created","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","version":"1.18.20","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"New session - 2026-09-02T13:00:47.096Z","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354047096}}}}
+
+data: {"id":"evt_062352dfb001YDdcYae67muV44","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"New session - 2026-09-02T13:00:47.096Z","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354047482}}}}
+
+data: {"id":"evt_062352e9d001Yj8ibn8KK78qKZ","type":"tui.toast.show","properties":{"title":"⚠️ Provider Cache Missing","message":"Model filtering disabled. RESTART OpenCode to enable full functionality.","variant":"warning","duration":6000}}
+
+data: {"id":"evt_062352e09001r4qFUnFjV1xNCU","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062352dfa001PcLUHrLnwkBkRp","role":"user","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","time":{"created":1788354047482},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"}}}}
+
+data: {"id":"evt_062352eb0001J3CNkoMzPVAB58","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"type":"text","text":"START_FIRST","messageID":"msg_062352dfa001PcLUHrLnwkBkRp","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","id":"prt_062352dfe001XAXTXoysUMM48I"},"time":1788354047664}}
+
+data: {"id":"evt_062352eb2001fYzLsaMFPkwxxi","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"New session - 2026-09-02T13:00:47.096Z","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354047665}}}}
+
+data: {"id":"evt_062352eb5001NMod2MRkhK6s5m","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_062352eb6001DUQz0C0TohR89k","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062352eb6001Y5Wop5GS9lLopw","parentID":"msg_062352dfa001PcLUHrLnwkBkRp","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354047670},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}}
+
+data: {"id":"evt_062352eea001zDypHw04QNM75u","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"first detached job created","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354047665}}}}
+
+data: {"id":"evt_06235320a001j8i24wOkDYxDPJ","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"first detached job created","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354048521}}}}
+
+data: {"id":"evt_06235320b001Sel5ry6Q9dbT51","type":"session.diff","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","diff":[]}}
+
+data: {"id":"evt_06235320c0016aAaTskC113JBf","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"role":"user","time":{"created":1788354047482},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"},"id":"msg_062352dfa001PcLUHrLnwkBkRp","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","summary":{"diffs":[]}}}}
+
+data: {"id":"evt_0623532e0001rLdK1YmFMdAdiM","type":"plugin.added","properties":{"id":"core/config-reference"}}
+
+data: {"id":"evt_0623532e0002sKCohXH9jPb660","type":"plugin.added","properties":{"id":"agent"}}
+
+data: {"id":"evt_0623532e0003TSuLhTM1XcFpi8","type":"plugin.added","properties":{"id":"command"}}
+
+data: {"id":"evt_0623532e00049Vubr4QOqXpX2y","type":"plugin.added","properties":{"id":"skill"}}
+
+data: {"id":"evt_0623532e1001BE6xTAWQuspA73","type":"plugin.added","properties":{"id":"models-dev"}}
+
+data: {"id":"evt_0623532e1002D6O84XUD5iBhHS","type":"plugin.added","properties":{"id":"config-agent"}}
+
+data: {"id":"evt_0623532e1003GPJUwrlqRCjsVX","type":"plugin.added","properties":{"id":"config-command"}}
+
+data: {"id":"evt_0623532e1004ps4V8M624503uH","type":"plugin.added","properties":{"id":"config-skill"}}
+
+data: {"id":"evt_0623532e2001wIUQZat2dTWpRx","type":"plugin.added","properties":{"id":"alibaba"}}
+
+data: {"id":"evt_0623532e2002dNByCcKSUY5KQp","type":"plugin.added","properties":{"id":"amazon-bedrock"}}
+
+data: {"id":"evt_0623532e2003JWIXm2ROS79vTg","type":"plugin.added","properties":{"id":"anthropic"}}
+
+data: {"id":"evt_0623532e2004uFr94JMySvkUP5","type":"plugin.added","properties":{"id":"azure-cognitive-services"}}
+
+data: {"id":"evt_062353363001jgmSLQ5Q1np35n","type":"plugin.added","properties":{"id":"azure"}}
+
+data: {"id":"evt_062353364001FHuvBHQXJxr3Z3","type":"plugin.added","properties":{"id":"cerebras"}}
+
+data: {"id":"evt_062353364002f4ltjnpqEYSkB9","type":"plugin.added","properties":{"id":"cloudflare-ai-gateway"}}
+
+data: {"id":"evt_0623533640034r1Dy0JRYIayLz","type":"plugin.added","properties":{"id":"cloudflare-workers-ai"}}
+
+data: {"id":"evt_062353364004ZfMDO6hymlR6Zd","type":"plugin.added","properties":{"id":"cohere"}}
+
+data: {"id":"evt_062353364005V25TT0LBPVNEYx","type":"plugin.added","properties":{"id":"deepinfra"}}
+
+data: {"id":"evt_062353364006jZhSZ3fN1SKdsL","type":"plugin.added","properties":{"id":"gateway"}}
+
+data: {"id":"evt_062353365001uTgsp1e6ZkbOKa","type":"plugin.added","properties":{"id":"github-copilot"}}
+
+data: {"id":"evt_0623533650023X7ENSuoc4dGw5","type":"plugin.added","properties":{"id":"gitlab"}}
+
+data: {"id":"evt_062353365003RRcLdNei0o6yGE","type":"plugin.added","properties":{"id":"google"}}
+
+data: {"id":"evt_0623533650041zdXI9KrF0vwP0","type":"plugin.added","properties":{"id":"google-vertex-anthropic"}}
+
+data: {"id":"evt_0623533650050hwUY7zNl05UxA","type":"plugin.added","properties":{"id":"google-vertex"}}
+
+data: {"id":"evt_062353370001aIBPjW3raa7yNB","type":"plugin.added","properties":{"id":"groq"}}
+
+data: {"id":"evt_062353370002MYRl8EoWTKUOWa","type":"plugin.added","properties":{"id":"kilo"}}
+
+data: {"id":"evt_062353371001xb4073IVbHWo4P","type":"plugin.added","properties":{"id":"llmgateway"}}
+
+data: {"id":"evt_062353371002JosR7B5eUUuLt6","type":"plugin.added","properties":{"id":"mistral"}}
+
+data: {"id":"evt_0623533710037Ds2pdToaZN7Pi","type":"plugin.added","properties":{"id":"nvidia"}}
+
+data: {"id":"evt_062353372001xGwqrNlmLBBDX7","type":"plugin.added","properties":{"id":"opencode"}}
+
+data: {"id":"evt_0623533720024r5hKcySny4SHN","type":"plugin.added","properties":{"id":"snowflake-cortex"}}
+
+data: {"id":"evt_062353372003Z7lgN4J2XdUkNW","type":"plugin.added","properties":{"id":"openai-compatible"}}
+
+data: {"id":"evt_062353372004fY1UNgLqXAceB2","type":"plugin.added","properties":{"id":"openai"}}
+
+data: {"id":"evt_062353372005oD9gXo5uJflRz3","type":"plugin.added","properties":{"id":"openrouter"}}
+
+data: {"id":"evt_062353372006C1uMWslQjBmyDv","type":"plugin.added","properties":{"id":"perplexity"}}
+
+data: {"id":"evt_062353372007wxkSAeqHPghig5","type":"plugin.added","properties":{"id":"sap-ai-core"}}
+
+data: {"id":"evt_0623533ad0016JMIJvLypUz6ZH","type":"catalog.updated","properties":{}}
+
+data: {"id":"evt_062353372008ClCHIRu3hCztFd","type":"plugin.added","properties":{"id":"togetherai"}}
+
+data: {"id":"evt_0623533ad002Nz5rARPEHdFSD8","type":"plugin.added","properties":{"id":"vercel"}}
+
+data: {"id":"evt_0623533ad0031Wv03yGQj200D2","type":"plugin.added","properties":{"id":"venice"}}
+
+data: {"id":"evt_0623533ae001tcYgfKDv1xe4Ao","type":"plugin.added","properties":{"id":"xai"}}
+
+data: {"id":"evt_0623533ae002wVNsJgeZKPOvtH","type":"plugin.added","properties":{"id":"zenmux"}}
+
+data: {"id":"evt_0623533ae003Y03CYgR1qxk4ak","type":"plugin.added","properties":{"id":"dynamic-provider"}}
+
+data: {"id":"evt_0623533af001EHDvwaJS87Ikcu","type":"plugin.added","properties":{"id":"config-plugin"}}
+
+data: {"id":"evt_0623533b00017bNDFgIg1fkPMh","type":"plugin.added","properties":{"id":"config-provider"}}
+
+data: {"id":"evt_0623533b0002opwXRfT6q4OcID","type":"plugin.added","properties":{"id":"variant"}}
+
+data: {"id":"evt_0623533b0003Lqb9Zkmkk1FRTB","type":"reference.updated","properties":{}}
+
+data: {"id":"evt_0623533bf001h8QmVcvlx5U2An","type":"integration.updated","properties":{}}
+
+data: {"id":"evt_0623533e3001Lg4G7epmls42vE","type":"catalog.updated","properties":{}}
+
+data: {"id":"evt_0623533ec0019l2T06zZEGs21J","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_0623533f3001toVKLYSXm4s0W0","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_0623533f3001s9MiZRCp9vI4nn","messageID":"msg_062352eb6001Y5Wop5GS9lLopw","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"step-start"},"time":1788354049011}}
+
+data: {"id":"evt_0623533f4001s3tLL72GgyD9Na","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_0623533f4001nkNA4T3Ewfw8Z6","messageID":"msg_062352eb6001Y5Wop5GS9lLopw","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"tool","tool":"probe_ctx_shell","callID":"call_probe_ctx_shell","state":{"status":"pending","input":{},"raw":""}},"time":1788354049012}}
+
+data: {"id":"evt_0623533f9001XVNvnfu9fuz5V4","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"type":"tool","tool":"probe_ctx_shell","callID":"call_probe_ctx_shell","state":{"status":"running","input":{"run_in_background":true,"command":"first"},"time":{"start":1788354049017}},"id":"prt_0623533f4001nkNA4T3Ewfw8Z6","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","messageID":"msg_062352eb6001Y5Wop5GS9lLopw"},"time":1788354049017}}
+
+data: {"id":"evt_06235340a001hC7763GQRe0lEB","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"type":"tool","tool":"probe_ctx_shell","callID":"call_probe_ctx_shell","state":{"status":"completed","input":{"run_in_background":true,"command":"first"},"output":"[background:shell_a1b2c3d4e5f6 started]","metadata":{"truncated":false},"title":"","time":{"start":1788354049017,"end":1788354049034}},"id":"prt_0623533f4001nkNA4T3Ewfw8Z6","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","messageID":"msg_062352eb6001Y5Wop5GS9lLopw"},"time":1788354049034}}
+
+data: {"id":"evt_06235340c001tRYCFXgS7AMEIW","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_06235340c001XWPODDfZ4by74S","reason":"tool-calls","messageID":"msg_062352eb6001Y5Wop5GS9lLopw","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"step-finish","tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1788354049036}}
+
+data: {"id":"evt_06235340d001eAJ15w5bKX87hi","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062352eb6001Y5Wop5GS9lLopw","parentID":"msg_062352dfa001PcLUHrLnwkBkRp","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354047670,"completed":1788354049039},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","finish":"tool-calls"}}}
+
+data: {"id":"evt_06235340f001RHHw163ZrnqKiN","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062352eb6001Y5Wop5GS9lLopw","parentID":"msg_062352dfa001PcLUHrLnwkBkRp","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354047670,"completed":1788354049039},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","finish":"tool-calls"}}}
+
+data: {"id":"evt_06235340f002xOCc12I1OQAjfc","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_062353410001hlGLof97qJYRxF","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062353410001BNMWSvcKK45o3h","parentID":"msg_062352dfa001PcLUHrLnwkBkRp","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354049040},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}}
+
+data: {"id":"evt_062353414001Ukf8rQFVP6WYTA","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"first detached job created","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354049044}}}}
+
+data: {"id":"evt_062353415001ZGKtd55080QCaa","type":"session.diff","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","diff":[]}}
+
+data: {"id":"evt_062353415002KjBnx4gClywEjK","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"role":"user","time":{"created":1788354047482},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"},"summary":{"diffs":[]},"id":"msg_062352dfa001PcLUHrLnwkBkRp","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}}
+
+data: {"id":"evt_06235341e001vWx7Ts0bVlGRhG","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_062353423001x6ZMeUa97CpNXk","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_062353423001r6ECIWO8toVlZ1","messageID":"msg_062353410001BNMWSvcKK45o3h","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"step-start"},"time":1788354049059}}
+
+data: {"id":"evt_062353424001HMUqNwfc2g1NHz","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_062353424001RjcSVg5fRojjlh","messageID":"msg_062353410001BNMWSvcKK45o3h","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"text","text":"","time":{"start":1788354049060}},"time":1788354049060}}
+
+data: {"id":"evt_062353425001834diBlBotlbUM","type":"message.part.delta","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","messageID":"msg_062353410001BNMWSvcKK45o3h","partID":"prt_062353424001RjcSVg5fRojjlh","field":"text","delta":"first reaped job polled"}}
+
+data: {"id":"evt_062353426001LvaX3WoL7Kr8uc","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_062353424001RjcSVg5fRojjlh","messageID":"msg_062353410001BNMWSvcKK45o3h","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"text","text":"first reaped job polled","time":{"start":1788354049060,"end":1788354049062}},"time":1788354049062}}
+
+data: {"id":"evt_062353427001lhu8P3j1ndEJzF","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_062353427001tFH4aG5H5RQeN1","reason":"stop","messageID":"msg_062353410001BNMWSvcKK45o3h","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"step-finish","tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1788354049063}}
+
+data: {"id":"evt_062353428001ReikVkGCI8CPBL","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062353410001BNMWSvcKK45o3h","parentID":"msg_062352dfa001PcLUHrLnwkBkRp","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354049040,"completed":1788354049065},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","finish":"stop"}}}
+
+data: {"id":"evt_062353429001KTOITu43rfo9qE","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062353410001BNMWSvcKK45o3h","parentID":"msg_062352dfa001PcLUHrLnwkBkRp","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354049040,"completed":1788354049065},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","finish":"stop"}}}
+
+data: {"id":"evt_062353429002Uud5h63jh2Zx2G","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_06235342a001nIaxxm8BeSn4pe","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"idle"}}}
+
+data: {"id":"evt_06235342a0023PyTvZ25Fc6khQ","type":"session.idle","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}
+
+data: {"id":"evt_06235342c001kb71OwjixvZ8tb","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"first detached job created","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354049068}}}}
+
+data: {"id":"evt_06235342d001smFh37GEhQkZcm","type":"session.diff","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","diff":[]}}
+
+data: {"id":"evt_06235342d002q1gLYsd6AGUe7K","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"role":"user","time":{"created":1788354047482},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"},"summary":{"diffs":[]},"id":"msg_062352dfa001PcLUHrLnwkBkRp","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}}
+
+data: {"id":"evt_0623535730015qduL6obkJox8K","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062353570001rae3cdYpvU7oJA","role":"user","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","time":{"created":1788354049392},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"}}}}
+
+data: {"id":"evt_0623535740010B89giGt6mxujo","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"type":"text","text":"<unpolled-background-shell-jobs>\nYou are ending your turn with 1 detached `ctx_shell` job is still outstanding:\n- `shell_a1b2c3d4e5f6` — `first`\n\n`ctx_shell(run_in_background=true)` **does not notify** on completion — unlike\n`task(run_in_background=true)`, no `<system-reminder>` will ever arrive for it. If you\nend the turn expecting one, the work stalls until a human intervenes.\n\nResolve every job listed above before yielding. Pick ONE of:\n\n**A. Wait for it — bounded loop, then ONE terminal `status` call.**\nWait in a single shell call that exits as soon as the job lands:\n\n```bash\nfor i in $(seq 1 50); do\n  grep -qE \"BUILD (SUCCESSFUL|FAILED)|<your done marker>\" /tmp/job.log 2>/dev/null && break\n  sleep 2\ndone\n```\n\nThat is one call and it returns the moment the work finishes. Firing\n`background_action=\"status\"` over and over is the failure mode this replaces: it burns a\ndozen turns, floods the context, and reports nothing the loop would not have caught.\n(The \"never sleep-poll\" guidance is about a single blind `sleep 300`, which wastes the\nfull wait even when the job finished in 5s. A loop that breaks on completion is correct.)\n\n**The loop alone does NOT clear the job.** Only a `ctx_shell` call naming the job id\nderegisters it — reading a marker file, a log, or a verdict file is invisible here, so\nthis warning will fire again on work you already finished. Close every waited-on job\nwith one terminal call:\n`ctx_shell(background_action=\"status\", job_id=\"shell_a1b2c3d4e5f6\")`\n\n**B. You no longer need it — cancel explicitly:**\n`ctx_shell(background_action=\"cancel\", job_id=\"shell_a1b2c3d4e5f6\")`\n\n**C. You already consumed its result by other means.** A job whose output you read from\na file is still registered — that is the most common reason a job you know finished is\nlisted above. Same fix: one `background_action=\"status\"` call (A) clears it, whether it\nreports a terminal status or that the id is already gone; `cancel` (B) always clears it.\n\nNext time, prefer not to detach at all: `ctx_shell` runs in the FOREGROUND up to ~110s,\nwhich covers most builds and test runs. Detaching is for work that genuinely exceeds\nthat — and if the work is delegable, `task(run_in_background=true)` notifies, so it can\nbe awaited by simply ending the turn.\n</unpolled-background-shell-jobs>","messageID":"msg_062353570001rae3cdYpvU7oJA","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","id":"prt_062353570002XlquqESDIEZFKi"},"time":1788354049396}}
+
+data: {"id":"evt_062353574002Be2cfdawmVCE1I","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"first detached job created","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354049396}}}}
+
+data: {"id":"evt_062353576001XZDOOhRavjutfw","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_062353576002S6giAq2pBnjP2f","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062353576001AZmryvTzCL7zem","parentID":"msg_062353570001rae3cdYpvU7oJA","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354049398},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}}
+
+data: {"id":"evt_062353579001TDS28zEMfYILh2","type":"tui.toast.show","properties":{"title":"⚠️ Provider Cache Missing","message":"Model filtering disabled. RESTART OpenCode to enable full functionality.","variant":"warning","duration":6000}}
+
+data: {"id":"evt_062353579002ApEyxDH4zFOdBC","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"first detached job created","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354049401}}}}
+
+data: {"id":"evt_06235357a0019tQ5kEgOE5qHla","type":"session.diff","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","diff":[]}}
+
+data: {"id":"evt_06235357b001FBsba1XXW54iNC","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"role":"user","time":{"created":1788354049392},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"},"id":"msg_062353570001rae3cdYpvU7oJA","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","summary":{"diffs":[]}}}}
+
+data: {"id":"evt_062353586001CzRNyjqjN9VzFt","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_06235358b001z2qvM3oPuWoOZs","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_06235358b001No3xTR549EUOfo","messageID":"msg_062353576001AZmryvTzCL7zem","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"step-start"},"time":1788354049419}}
+
+data: {"id":"evt_06235358c001R9QnyGh7yQVDmJ","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_06235358c0015y4FY9JdI7whzl","messageID":"msg_062353576001AZmryvTzCL7zem","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"tool","tool":"probe_ctx_shell","callID":"call_probe_ctx_shell","state":{"status":"pending","input":{},"raw":""}},"time":1788354049420}}
+
+data: {"id":"evt_06235358e001VYJ7wkNBCKqRDE","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"type":"tool","tool":"probe_ctx_shell","callID":"call_probe_ctx_shell","state":{"status":"running","input":{"background_action":"status","job_id":"shell_a1b2c3d4e5f6"},"time":{"start":1788354049422}},"id":"prt_06235358c0015y4FY9JdI7whzl","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","messageID":"msg_062353576001AZmryvTzCL7zem"},"time":1788354049422}}
+
+data: {"id":"evt_062353594001NlOAtpH7XBXaMu","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"type":"tool","tool":"probe_ctx_shell","callID":"call_probe_ctx_shell","state":{"status":"completed","input":{"background_action":"status","job_id":"shell_a1b2c3d4e5f6"},"output":"[background:shell_a1b2c3d4e5f6 not found or expired]","metadata":{"truncated":false},"title":"","time":{"start":1788354049422,"end":1788354049428}},"id":"prt_06235358c0015y4FY9JdI7whzl","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","messageID":"msg_062353576001AZmryvTzCL7zem"},"time":1788354049428}}
+
+data: {"id":"evt_062353595001BUUiXSP3rHqDGM","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_062353595001O2cD9Vjl7is2D1","reason":"tool-calls","messageID":"msg_062353576001AZmryvTzCL7zem","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"step-finish","tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1788354049429}}
+
+data: {"id":"evt_062353596001ozCh1VudxX1z3V","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062353576001AZmryvTzCL7zem","parentID":"msg_062353570001rae3cdYpvU7oJA","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354049398,"completed":1788354049431},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","finish":"tool-calls"}}}
+
+data: {"id":"evt_062353597001oYSK3RJRv3ut6e","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062353576001AZmryvTzCL7zem","parentID":"msg_062353570001rae3cdYpvU7oJA","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354049398,"completed":1788354049431},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","finish":"tool-calls"}}}
+
+data: {"id":"evt_062353597002t4S55d4lmv6PD7","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_062353597003z3Zj8q1oyTGlq1","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062353597001xSHeGVVfGDQPmO","parentID":"msg_062353570001rae3cdYpvU7oJA","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354049431},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}}
+
+data: {"id":"evt_0623535990013IfniXwF7mMKnU","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"first detached job created","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354049433}}}}
+
+data: {"id":"evt_06235359a001jEV8GHSWasc8R3","type":"session.diff","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","diff":[]}}
+
+data: {"id":"evt_06235359a002ZtPZZHXZC2qi8s","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"role":"user","time":{"created":1788354049392},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"},"summary":{"diffs":[]},"id":"msg_062353570001rae3cdYpvU7oJA","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}}
+
+data: {"id":"evt_0623535a40013Hu2MHvfMuRNPi","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_0623535a90016ZHUqHZuc44gQZ","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_0623535a9001WWZTNyPXw5M1Fq","messageID":"msg_062353597001xSHeGVVfGDQPmO","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"step-start"},"time":1788354049449}}
+
+data: {"id":"evt_0623535aa0017h02rwwXw0siI9","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_0623535aa001N3j5LVz8mRQtUP","messageID":"msg_062353597001xSHeGVVfGDQPmO","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"text","text":"","time":{"start":1788354049450}},"time":1788354049450}}
+
+data: {"id":"evt_0623535ab001beYJCCYvHFrO1r","type":"message.part.delta","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","messageID":"msg_062353597001xSHeGVVfGDQPmO","partID":"prt_0623535aa001N3j5LVz8mRQtUP","field":"text","delta":"second detached job created"}}
+
+data: {"id":"evt_0623535ab002KtB0IyDSvBW6MD","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_0623535aa001N3j5LVz8mRQtUP","messageID":"msg_062353597001xSHeGVVfGDQPmO","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"text","text":"second detached job created","time":{"start":1788354049450,"end":1788354049451}},"time":1788354049451}}
+
+data: {"id":"evt_0623535ac001B1A0zAxvvJ87a1","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_0623535ac001KuSNEPgR4JwZC0","reason":"stop","messageID":"msg_062353597001xSHeGVVfGDQPmO","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"step-finish","tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1788354049452}}
+
+data: {"id":"evt_0623535ad001plAuUsBvxGnfv7","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062353597001xSHeGVVfGDQPmO","parentID":"msg_062353570001rae3cdYpvU7oJA","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354049431,"completed":1788354049454},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","finish":"stop"}}}
+
+data: {"id":"evt_0623535ae001D4YcnmsWkJuTSp","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062353597001xSHeGVVfGDQPmO","parentID":"msg_062353570001rae3cdYpvU7oJA","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354049431,"completed":1788354049454},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","finish":"stop"}}}
+
+data: {"id":"evt_0623535af001uCFN4EydtYTuoo","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_0623535b0001cH8onJ28R6RDe7","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"idle"}}}
+
+data: {"id":"evt_0623535b0002546cnjesxpUzii","type":"session.idle","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}
+
+data: {"id":"evt_0623535b1001sTHUcAJ1kMa96K","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"first detached job created","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354049456}}}}
+
+data: {"id":"evt_0623535b1002kHnu51g7S7QdpB","type":"session.diff","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","diff":[]}}
+
+data: {"id":"evt_0623535b2001NFYwRYAccV1yR3","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"role":"user","time":{"created":1788354049392},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"},"summary":{"diffs":[]},"id":"msg_062353570001rae3cdYpvU7oJA","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}}
+
+data: {"id":"evt_0623541d0001b7atDIE4OClVMG","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_06235423e0017Splp09xUwbYfn","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0623542a8001oCnBfi2ul0atsR","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354312001TWx8GVNf9m82w4","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_06235437c001VtCieU35A67y2S","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0623543e5001gHbY2X1Ny575nF","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_06235444f001j2Oeogl0IBrONy","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0623544b8001U1Xe7d1wWamATa","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354521001axZxxr1X8PY630","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_06235458b001W03knQJ3DqXldq","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0623545f5001zEPo0E7DesMjfu","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_06235465f001JVKbf2vVnyjBlw","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0623546c9001iE7IRDC6ZCpQiq","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354733001eRY6SLRjl78Aix","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354798001Wsiy11sK6IxLN1","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354803001OSSX1z2On8Ugnq","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_06235486c001u9AK0CJ7cLcQwo","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0623548d6001sVSdIic0SZukXG","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354940001yDzCijWmEDrgxF","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0623549aa001kdyAX9pzuGhzJt","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354a14001UuS6CyyHC6o7eq","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354a7e001VGVnj8nbf0smE1","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354ae8001vR3yj1LFNHwW0S","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354b53001LksnQmNSGNhIuj","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354bbd001RwcgrWMxsPgbcy","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354c27001m7kW1Y4YNcItkb","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354c91001LHOYK022j4GyjL","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354cfa001qnZUlHSjWCryRI","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354d64001h7vTZcwUOA0Ecp","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354dce001yLqf0eWLGraMU7","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354e370015T95HQrfVlHAMn","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354ea1001aPvNJVYiPzhidP","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354f0a001meX2lAPictxbgQ","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354f70001oxPZsZbMVcOFhw","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062354fd8001WadVE1qknJyYqj","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062355042001nzS5JrOa56FCJy","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0623550ab001rwsvyiOCKRub4K","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062355115001m0daYdN0Z0tyOZ","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_06235517e001pOWM41LvJt5T2x","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0623551e8001bOvwZqg6Q2teXK","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062355251001e4Le6V4zH9JE0j","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0623552bb001mzKQsgEcLCHxNr","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062355325001eavRhx2Stjq2QZ","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_06235538f001YYelvw71sGPsE7","type":"tui.toast.show","properties":{"title":"• OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062355393001iOFZqltYAcGsH7","type":"server.heartbeat","properties":{}}
+
+data: {"id":"evt_0623553f9001RumuQ972gPXEt6","type":"tui.toast.show","properties":{"title":"● OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062355463001c0cxnwvPg7oife","type":"tui.toast.show","properties":{"title":"○ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0623554cc001DyZAxKyb6sjlBm","type":"tui.toast.show","properties":{"title":"◌ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062355536001B78kuMLdwT2RpO","type":"tui.toast.show","properties":{"title":"◦ OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_0623555a00010NDYbln7NvuHrg","type":"tui.toast.show","properties":{"title":"  OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_06235560a00175qak0Nze0OWgW","type":"tui.toast.show","properties":{"title":"· OhMyOpenCode 5.0.0-beta.7 (dev)","message":"Sisyphus running in local development mode.","variant":"info","duration":150}}
+
+data: {"id":"evt_062357aa4001tgtMnnJrvPPOR8","type":"server.heartbeat","properties":{}}
+
+data: {"id":"evt_06235a1b5001AtR7GfH7yLj1N1","type":"server.heartbeat","properties":{}}
+
+data: {"id":"evt_06235c8c50018xtm1Fqx94raGj","type":"server.heartbeat","properties":{}}
+
+data: {"id":"evt_06235efd7001Lgpu3dC1MD4vCS","type":"server.heartbeat","properties":{}}
+
+data: {"id":"evt_0623616e7001D0pVr3ZMlmdnGs","type":"server.heartbeat","properties":{}}
+
+data: {"id":"evt_062363408001WhA07jX4k2ZHot","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_0623634060011ySg8RIS3n59Ui","role":"user","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","time":{"created":1788354114566},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"}}}}
+
+data: {"id":"evt_06236340900113th8t8LUiqsSW","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"type":"text","text":"START_SECOND","messageID":"msg_0623634060011ySg8RIS3n59Ui","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","id":"prt_062363406002UZj04LDcPXq69n"},"time":1788354114569}}
+
+data: {"id":"evt_06236340a001FG11XqWRkzWskD","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"first detached job created","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354114570}}}}
+
+data: {"id":"evt_06236340c001a3gqCjJRNzT0qP","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_06236340d001LXdB3ANEY3iaYS","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_06236340c001XdaCe3K5fE61ic","parentID":"msg_0623634060011ySg8RIS3n59Ui","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354114573},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}}
+
+data: {"id":"evt_06236340f001SZ36xqMmEx62p5","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"first detached job created","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354114575}}}}
+
+data: {"id":"evt_062363410001XuiS0alwtQeEul","type":"session.diff","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","diff":[]}}
+
+data: {"id":"evt_062363411001WXdv0ipUwSN2hI","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"role":"user","time":{"created":1788354114566},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"},"id":"msg_0623634060011ySg8RIS3n59Ui","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","summary":{"diffs":[]}}}}
+
+data: {"id":"evt_0623634130012DC0E4MgXnn63e","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_0623634190019go0NTOtxDfHO9","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_062363419001TFSwJy2eftm2i5","messageID":"msg_06236340c001XdaCe3K5fE61ic","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"step-start"},"time":1788354114585}}
+
+data: {"id":"evt_06236341a001T5dWBDPpJ5ss72","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_06236341a00188tFtkZxCZyDNV","messageID":"msg_06236340c001XdaCe3K5fE61ic","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"tool","tool":"probe_ctx_shell","callID":"call_probe_ctx_shell","state":{"status":"pending","input":{},"raw":""}},"time":1788354114586}}
+
+data: {"id":"evt_06236341b001iOfLMbJy1HZFg0","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"type":"tool","tool":"probe_ctx_shell","callID":"call_probe_ctx_shell","state":{"status":"running","input":{"run_in_background":true,"command":"second"},"time":{"start":1788354114587}},"id":"prt_06236341a00188tFtkZxCZyDNV","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","messageID":"msg_06236340c001XdaCe3K5fE61ic"},"time":1788354114587}}
+
+data: {"id":"evt_062363429001Uiiqpv4gm694X8","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"type":"tool","tool":"probe_ctx_shell","callID":"call_probe_ctx_shell","state":{"status":"completed","input":{"run_in_background":true,"command":"second"},"output":"[background:shell_b1c2d3e4f5a6 started]","metadata":{"truncated":false},"title":"","time":{"start":1788354114587,"end":1788354114601}},"id":"prt_06236341a00188tFtkZxCZyDNV","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","messageID":"msg_06236340c001XdaCe3K5fE61ic"},"time":1788354114601}}
+
+data: {"id":"evt_06236342a001BLe6OuOsA8RBzC","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_06236342a001t4rczcXyhpeI69","reason":"tool-calls","messageID":"msg_06236340c001XdaCe3K5fE61ic","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"step-finish","tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1788354114602}}
+
+data: {"id":"evt_06236342b001hL2xeu3jyoR1aD","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_06236340c001XdaCe3K5fE61ic","parentID":"msg_0623634060011ySg8RIS3n59Ui","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354114573,"completed":1788354114604},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","finish":"tool-calls"}}}
+
+data: {"id":"evt_06236342c001d9qism5paRasAK","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_06236340c001XdaCe3K5fE61ic","parentID":"msg_0623634060011ySg8RIS3n59Ui","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354114573,"completed":1788354114604},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","finish":"tool-calls"}}}
+
+data: {"id":"evt_06236342d0012ROwgINXL1bNP0","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_06236342d002K42mSOrpfuSrMi","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_06236342d001TlZlXc5QxLsT7E","parentID":"msg_0623634060011ySg8RIS3n59Ui","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354114605},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}}
+
+data: {"id":"evt_06236342f001dUzS7y6iV1QGgz","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"first detached job created","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354114607}}}}
+
+data: {"id":"evt_062363430001NxdRjuRYuL7JyZ","type":"session.diff","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","diff":[]}}
+
+data: {"id":"evt_062363430002E4G7LVCgUep5K9","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"role":"user","time":{"created":1788354114566},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"},"summary":{"diffs":[]},"id":"msg_0623634060011ySg8RIS3n59Ui","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}}
+
+data: {"id":"evt_06236343800107gYqOpEnvGGeF","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_06236343d001YzVUDzusuf8fYi","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_06236343d001c76uPY9DPSu7Po","messageID":"msg_06236342d001TlZlXc5QxLsT7E","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"step-start"},"time":1788354114621}}
+
+data: {"id":"evt_06236343e0017h9MWA9SHzA9Vn","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_06236343e001H2LiMNvMSAGUPY","messageID":"msg_06236342d001TlZlXc5QxLsT7E","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"text","text":"","time":{"start":1788354114622}},"time":1788354114622}}
+
+data: {"id":"evt_06236343e002QdHkyUE9FQWGkt","type":"message.part.delta","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","messageID":"msg_06236342d001TlZlXc5QxLsT7E","partID":"prt_06236343e001H2LiMNvMSAGUPY","field":"text","delta":"done"}}
+
+data: {"id":"evt_06236343e0035DF9nw37nA2YlJ","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_06236343e001H2LiMNvMSAGUPY","messageID":"msg_06236342d001TlZlXc5QxLsT7E","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"text","text":"done","time":{"start":1788354114622,"end":1788354114622}},"time":1788354114622}}
+
+data: {"id":"evt_06236343f001dQRtEfYlfh9apj","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_06236343f0016ZjB411PHhXfQb","reason":"stop","messageID":"msg_06236342d001TlZlXc5QxLsT7E","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"step-finish","tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1788354114623}}
+
+data: {"id":"evt_062363440001xskYopOJvlYdW2","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_06236342d001TlZlXc5QxLsT7E","parentID":"msg_0623634060011ySg8RIS3n59Ui","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354114605,"completed":1788354114625},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","finish":"stop"}}}
+
+data: {"id":"evt_062363441001Zondw0TAjYq6sR","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_06236342d001TlZlXc5QxLsT7E","parentID":"msg_0623634060011ySg8RIS3n59Ui","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354114605,"completed":1788354114625},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","finish":"stop"}}}
+
+data: {"id":"evt_0623634410023PzGPk1ed0PC8B","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_0623634420017yhzysyKRAi0FY","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"idle"}}}
+
+data: {"id":"evt_062363442002W4x8mYpGpaHSVo","type":"session.idle","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}
+
+data: {"id":"evt_062363443001Q960mHzFtgSUHa","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"first detached job created","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354114627}}}}
+
+data: {"id":"evt_062363444001NuCDab9EtF1ttr","type":"session.diff","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","diff":[]}}
+
+data: {"id":"evt_062363444002aQKXxUNKCqLGn6","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"role":"user","time":{"created":1788354114566},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"},"summary":{"diffs":[]},"id":"msg_0623634060011ySg8RIS3n59Ui","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}}
+
+data: {"id":"evt_062363583001dwBGwKo4jJCp15","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_0623635810013Wfa3SdSqPXnA3","role":"user","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","time":{"created":1788354114945},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"}}}}
+
+data: {"id":"evt_062363584001faAtG6U7tsEgKA","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"type":"text","text":"<unpolled-background-shell-jobs>\nYou are ending your turn with 2 detached `ctx_shell` jobs are still outstanding:\n- `shell_a1b2c3d4e5f6` — `first`\n- `shell_b1c2d3e4f5a6` — `second`\n\n`ctx_shell(run_in_background=true)` **does not notify** on completion — unlike\n`task(run_in_background=true)`, no `<system-reminder>` will ever arrive for it. If you\nend the turn expecting one, the work stalls until a human intervenes.\n\nResolve every job listed above before yielding. Pick ONE of:\n\n**A. Wait for it — bounded loop, then ONE terminal `status` call.**\nWait in a single shell call that exits as soon as the job lands:\n\n```bash\nfor i in $(seq 1 50); do\n  grep -qE \"BUILD (SUCCESSFUL|FAILED)|<your done marker>\" /tmp/job.log 2>/dev/null && break\n  sleep 2\ndone\n```\n\nThat is one call and it returns the moment the work finishes. Firing\n`background_action=\"status\"` over and over is the failure mode this replaces: it burns a\ndozen turns, floods the context, and reports nothing the loop would not have caught.\n(The \"never sleep-poll\" guidance is about a single blind `sleep 300`, which wastes the\nfull wait even when the job finished in 5s. A loop that breaks on completion is correct.)\n\n**The loop alone does NOT clear the job.** Only a `ctx_shell` call naming the job id\nderegisters it — reading a marker file, a log, or a verdict file is invisible here, so\nthis warning will fire again on work you already finished. Close every waited-on job\nwith one terminal call:\n`ctx_shell(background_action=\"status\", job_id=\"shell_a1b2c3d4e5f6\")`\n`ctx_shell(background_action=\"status\", job_id=\"shell_b1c2d3e4f5a6\")`\n\n**B. You no longer need it — cancel explicitly:**\n`ctx_shell(background_action=\"cancel\", job_id=\"shell_a1b2c3d4e5f6\")`\n`ctx_shell(background_action=\"cancel\", job_id=\"shell_b1c2d3e4f5a6\")`\n\n**C. You already consumed its result by other means.** A job whose output you read from\na file is still registered — that is the most common reason a job you know finished is\nlisted above. Same fix: one `background_action=\"status\"` call (A) clears it, whether it\nreports a terminal status or that the id is already gone; `cancel` (B) always clears it.\n\nNext time, prefer not to detach at all: `ctx_shell` runs in the FOREGROUND up to ~110s,\nwhich covers most builds and test runs. Detaching is for work that genuinely exceeds\nthat — and if the work is delegable, `task(run_in_background=true)` notifies, so it can\nbe awaited by simply ending the turn.\n</unpolled-background-shell-jobs>","messageID":"msg_0623635810013Wfa3SdSqPXnA3","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","id":"prt_0623635810025OVqzOOajfMYv6"},"time":1788354114948}}
+
+data: {"id":"evt_062363584002oYA6UeP4d19s4U","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"first detached job created","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354114948}}}}
+
+data: {"id":"evt_062363586001kD5KwPfmBNj45h","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_0623635860029emQgKm8Uz7iza","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062363586001q4JKYfwdc7fvLa","parentID":"msg_0623635810013Wfa3SdSqPXnA3","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354114950},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}}
+
+data: {"id":"evt_0623635880019xNBhfoUHs8m2S","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"first detached job created","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354114952}}}}
+
+data: {"id":"evt_062363589001QiS4TdXCdNZDJb","type":"session.diff","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","diff":[]}}
+
+data: {"id":"evt_06236358a001XEUe1ONfEM24it","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"role":"user","time":{"created":1788354114945},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"},"id":"msg_0623635810013Wfa3SdSqPXnA3","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","summary":{"diffs":[]}}}}
+
+data: {"id":"evt_06236358b001AhTi3l96Ob0Z1x","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_062363590001w9RvgzwNrs5LT7","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_062363590001Wggn8Vr11naCa6","messageID":"msg_062363586001q4JKYfwdc7fvLa","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"step-start"},"time":1788354114960}}
+
+data: {"id":"evt_062363591001o0l0iwYep1DA3S","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_0623635910014b4ANKC6dp0p3c","messageID":"msg_062363586001q4JKYfwdc7fvLa","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"text","text":"","time":{"start":1788354114961}},"time":1788354114961}}
+
+data: {"id":"evt_062363592001jCIAyCg154U4Xb","type":"message.part.delta","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","messageID":"msg_062363586001q4JKYfwdc7fvLa","partID":"prt_0623635910014b4ANKC6dp0p3c","field":"text","delta":"done"}}
+
+data: {"id":"evt_062363592002LYxH3UjSyohgZl","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_0623635910014b4ANKC6dp0p3c","messageID":"msg_062363586001q4JKYfwdc7fvLa","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"text","text":"done","time":{"start":1788354114961,"end":1788354114962}},"time":1788354114962}}
+
+data: {"id":"evt_062363593001VhOVGwwmm2UrAR","type":"message.part.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","part":{"id":"prt_062363593001t47gGuq9TGQFFs","reason":"stop","messageID":"msg_062363586001q4JKYfwdc7fvLa","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","type":"step-finish","tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"cost":0},"time":1788354114963}}
+
+data: {"id":"evt_062363593002tExAKtcKDPcgNC","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062363586001q4JKYfwdc7fvLa","parentID":"msg_0623635810013Wfa3SdSqPXnA3","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354114950,"completed":1788354114964},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","finish":"stop"}}}
+
+data: {"id":"evt_062363594001ZR2nx5R69pHA7A","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"msg_062363586001q4JKYfwdc7fvLa","parentID":"msg_0623635810013Wfa3SdSqPXnA3","role":"assistant","mode":"Sisyphus - ultraworker","agent":"Sisyphus - ultraworker","path":{"cwd":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","root":"/"},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"write":0,"read":0}},"modelID":"mock-model","providerID":"mockprov","time":{"created":1788354114950,"completed":1788354114964},"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","finish":"stop"}}}
+
+data: {"id":"evt_062363594002X7fDQDmSrk9IZi","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"busy"}}}
+
+data: {"id":"evt_062363595001zdBtiSGlDbP6HL","type":"session.status","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","status":{"type":"idle"}}}
+
+data: {"id":"evt_0623635950020d9lE2GPO9AG24","type":"session.idle","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}
+
+data: {"id":"evt_062363596001goYuA2ZuxlqsCb","type":"session.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"id":"ses_f9dcad387ffeNLdAo7Je7iBlaj","slug":"happy-star","projectID":"global","directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","path":"private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/oqa-xdg.XXXXXX.9S5LWgrKpH/proj","title":"first detached job created","agent":"Sisyphus - ultraworker","model":{"id":"mock-model","providerID":"mockprov","variant":"default"},"version":"1.18.20","summary":{"additions":0,"deletions":0,"files":0},"cost":0,"tokens":{"input":0,"output":0,"reasoning":0,"cache":{"read":0,"write":0}},"time":{"created":1788354047096,"updated":1788354114965}}}}
+
+data: {"id":"evt_062363596002tkjit9ccL99nfX","type":"session.diff","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","diff":[]}}
+
+data: {"id":"evt_062363596003DQTdRq3AVSKTgg","type":"message.updated","properties":{"sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj","info":{"role":"user","time":{"created":1788354114945},"agent":"Sisyphus - ultraworker","model":{"providerID":"mockprov","modelID":"mock-model"},"summary":{"diffs":[]},"id":"msg_0623635810013Wfa3SdSqPXnA3","sessionID":"ses_f9dcad387ffeNLdAo7Je7iBlaj"}}}
+
