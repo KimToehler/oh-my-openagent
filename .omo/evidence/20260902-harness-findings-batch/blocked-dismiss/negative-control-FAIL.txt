@@ -1,0 +1,28 @@
+REAL_DB_BEFORE=3527
+PARENT_SESSION=ses_f9e0cee55ffeugXeT33P6vazNP
+observed: blocked wake at +9s
+observed: reminder at +62s
+observed: expiry at +123s
+FAIL: parent never dismissed the child
+FAIL: a dismissed task still reminded the parent (1 times)
+FAIL: reminder wake at +62s after the task was dismissed
+FAIL: dismissed task still ran to expiry at +123s
+REWAKE_MS=60000
+EXPIRY_MS=120000
+PARENT_SESSION=ses_f9e0cee55ffeugXeT33P6vazNP
+CHILD_SESSION=ses_f9e0ce806ffeTRhJhaVP656jGU
+MODE=dismiss
+BLOCKED_AT_S=9
+DISMISSED_AT_S=none
+REMINDER_AT_S=62
+EXPIRY_AT_S=123
+REMINDER_COUNT=1
+REAL_DB_BEFORE=3527
+REAL_DB_AFTER=3527
+REAL_DB_COUNT_NOTE=count may move if the operator uses opencode during the run; identity check below is authoritative
+PARENT_IN_REAL_DB=0
+CHILD_IN_REAL_DB=0
+OPENCODE_VERSION=1.18.20
+
+ESCALATION PROBE FAIL (4)
+/Users/tim/git/oh-my-openagent/.agents/skills/opencode-qa/scripts/lib/common.sh: line 151: 87392 Terminated: 15          MOCK_PORT="$MOCK_PORT_N" MOCK_SCRIPT_FILE="$SCRIPT_FILE" MOCK_LOG="$MOCK_LOG_FILE" node "$SCRIPT_DIR/lib/mock-model.mjs" > "$SANDBOX/mock.out" 2>&1  (wd: /Users/tim/git/oh-my-openagent)
