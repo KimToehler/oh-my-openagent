@@ -3439,3 +3439,61 @@ Repeat for all four (`open-design`, `designpowers`, `taste-skill`, `ui-ux-pro-ma
 **Why it is costly:** it blocks the very first step of the repo's own mandated worktree workflow, and the error text points at `build:materialize-frontend` rather than at worktree submodule state. A previous session misattributed the resulting three phantom `omo-senpi` TS2307 errors (`typebox`, `@earendil-works/pi-tui`) to a missing package-local `node_modules`; the real cause was this aborted install. Note `typebox` is absent from the main checkout too, so its absence alone is not the signal - the entry count of root `node_modules` is.
 
 **Fix status:** unfixed; workaround only. A `postinstall`/setup step that performs the fetch-then-checkout fallback when a submodule revision is unresolvable would remove the manual step.
+
+## 2026-09-02 - Zombie/stale background-job reminders fire for jobs already consumed
+
+**Severity:** papercut
+**Area:** background tasks
+**Observed in:** `~/git/onara`, a 10-todo parallel orchestration wave
+
+**What happened:** the `<unpolled-background-shell-jobs>` reminder repeatedly fired for `ctx_shell` jobs that had already completed and whose output had already been consumed via `background_action="wait"`. Calling `status` or `cancel` on them returned `not found - already finished or cancelled`, i.e. the registry was already empty by the time the reminder landed. The reminder text itself names this as case C, but it fired often enough in this wave (5+ occurrences) to be a real cost, not a rare edge.
+
+**Evidence:** reminder text names the stale-registry case ("case C") as expected behaviour; every `status`/`cancel` call issued against a reminded job in this wave returned the same `not found — already finished or cancelled` line.
+
+**Why it matters:** a prior wave in this same project acted on such a reminder and cancelled a lane that had already succeeded, destroying its work outright. That is the failure mode this pattern makes tempting.
+
+**Workaround:** always verify against disk/git before acting on any block, completion, or job reminder. In this wave every job was independently confirmed by effect — build artifact present, commit SHA present, worktree present — rather than trusted from the status line alone.
+
+**Fix status:** unfixed; workaround only.
+
+## 2026-09-02 - `agent: continue` orphan adoption is broken and unrecoverable
+
+**Severity:** costly
+**Area:** subagents
+**Observed in:** `~/git/onara`, same 10-todo orchestration wave
+
+**What happened:** calling `task(task_id="ses_...")` to continue a previous subagent session sometimes adopts it as `Agent: continue` instead of the original agent. The response itself warns "no original model, no fallback chain, no category, and no loaded skill content." It then fails outright with `Agent "continue" not found. Make sure the agent is registered in your opencode.json or provided by a plugin.` It cannot be cancelled either — `background_cancel` refuses with `Cannot cancel task: current status is "interrupt". Only running or pending tasks can be cancelled.` — so it lingers as a dead entry.
+
+**Evidence:** occurred 6 times across this wave. It is intermittent, not deterministic — several continuations in the same wave adopted correctly as `Sisyphus-Junior`.
+
+**Workaround:** check the returned `Agent:` field on every continuation. If it says `continue`, treat the continuation as failed and dispatch a fresh task with the prior context inlined into the prompt, rather than retrying the same continuation.
+
+**Fix status:** unfixed; workaround only.
+
+## 2026-09-02 - Verification gates dispatched before every content lane merges back produce false REJECTs
+
+**Severity:** costly
+**Area:** subagents / verification
+**Observed in:** `~/git/onara`, same 10-todo orchestration wave
+
+**What happened:** a final verification wave (gates F1-F5) was dispatched in parallel with a still-unmerged content lane. The lane had finished and committed to its own branch but had not yet been merged into the task branch. Two of the gates audit the task branch by contract, so an unmerged lane was indistinguishable from a lane that never ran — both returned a REJECT citing "Todo 7 never shipped." Both revised to APPROVE after the merge, costing a full gate cycle (~18 min each).
+
+**Root cause:** ordering, not a gate defect. A gate that read the task branch had no way to see work still parked on a sibling branch, and should not guess at sibling branches — doing so would mean auditing something other than what actually merges to main. The failure mode is safe in the sense that it over-reports rather than under-reports.
+
+**Workaround / rule:** merge every content lane back to the task branch before dispatching any verification gate. Parallelism between a content lane and a gate is only safe when the gate does not read the task branch.
+
+**Fix status:** not a code defect; a process/ordering finding.
+
+## 2026-09-02 - Testing lesson: a test that constructs the object under test is structurally blind to a derivation bug
+
+**Severity:** n/a (process/testing lesson, not a harness defect)
+**Area:** testing discipline
+**Observed in:** `~/git/onara`, same 10-todo orchestration wave
+
+**What happened:** a fix deleted a hardcoded `trainingGoal = ENDURANCE` and pinned the fix with a test asserting `BUILD_MUSCLE`. That test passed, and always would have, because it consumed a hand-built skeleton fixture — the goal was an *input* to the test, never a derivation *output*. The identical defect survived one layer up in a sibling code path (`ProgramSkeletonService` inheriting the same hardcoded goal via a `copy()`), and three static review gates all returned APPROVE without seeing it. Only live-stack manual QA caught it — an HTTP 400 on the feature's own headline case.
+
+**Root cause:** the test's inputs and the code's outputs shared the same fixture, so the assertion could not distinguish "the value is right" from "the value is whatever I put in." A round-trip check against fixed input data cannot expose a bug in the derivation step that produces that data in production.
+
+**Fix:** the durable fix was a round-trip invariant at the derivation layer — `validate(derive(req), req) == emptyList()` — which is branch-agnostic and cannot be satisfied by a fixture that hand-sets the field under test.
+
+**Fix status:** not a code defect; a process/testing finding.
