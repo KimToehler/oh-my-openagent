@@ -1,0 +1,11 @@
+=== RUN 3 2026-07-30T11:24:36Z ===
+{
+  "timestamp": "2026-07-30T11:24:36.915Z",
+  "ttlMs": 90000,
+  "busyPruned": [],
+  "idlePruned": [
+    "stalled-1"
+  ],
+  "promptAsyncCallCount": 1,
+  "injectedParts": true
+}

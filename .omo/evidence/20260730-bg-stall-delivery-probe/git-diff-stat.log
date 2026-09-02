@@ -1,0 +1,9 @@
+
+=== WORKTREE DIFF ===
+ .../plugin/components/codegraph/dist/cli.js        |  48 +++-
+ .../scripts/install-dist/install-local.mjs         |   3 +-
+ packages/omo-senpi/plugin/extensions/omo-member.js |  82 +++---
+ packages/omo-senpi/plugin/extensions/omo.js        | 316 ++++++++++-----------
+ 4 files changed, 241 insertions(+), 208 deletions(-)
+
+=== production source changes ===
