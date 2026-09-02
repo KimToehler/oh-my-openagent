@@ -18,15 +18,21 @@
 # checkToolState:false adopt-path fix. The probe then requires the gate to SKIP the
 # dispatch ("skipped because latest assistant is still active"). A probe that has
 # never been observed red is not evidence.
+#
+# AGENT IDENTITY: the probe also asserts the adopted task carries the agent the child
+# actually ran under ("explore"), not the fabricated "continue" that made adopted tasks
+# die with `Agent "continue" not found`. Its negative control is
+# --expect-fabricated-agent, run against a build that still fabricates the name.
 set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SCRIPT_DIR/lib/common.sh"
-SELF_TEST=0; EVIDENCE_DIR=""; EXPECT_BLOCKED=0
+SELF_TEST=0; EVIDENCE_DIR=""; EXPECT_BLOCKED=0; EXPECT_FABRICATED_AGENT=0
 while [ $# -gt 0 ]; do case "$1" in
   --self-test) SELF_TEST=1;;
   --expect-blocked) EXPECT_BLOCKED=1;;
+  --expect-fabricated-agent) EXPECT_FABRICATED_AGENT=1;;
   --evidence-dir) EVIDENCE_DIR="${2:?--evidence-dir needs DIR}"; shift;;
-  -h|--help) echo "Usage: $0 [--self-test] [--expect-blocked] --evidence-dir DIR"; exit 0;;
+  -h|--help) echo "Usage: $0 [--self-test] [--expect-blocked] [--expect-fabricated-agent] --evidence-dir DIR"; exit 0;;
   *) echo "unknown option: $1" >&2; exit 2;; esac; shift; done
 [ -n "$EVIDENCE_DIR" ] || EVIDENCE_DIR="${TMPDIR:-/tmp}/resume-adopt-midturn-$(date +%s)"; mkdir -p "$EVIDENCE_DIR"
 
@@ -122,9 +128,23 @@ grep -F "$MIDCHILD" "$EVIDENCE_DIR/12-plugin-log-after-resume.txt" > "$EVIDENCE_
 RESUME_DISPATCHED="$(grep -c "promptAsync dispatched.*\"sessionID\":\"$MIDCHILD\".*background-agent-resume" "$EVIDENCE_DIR/12-plugin-log-after-resume.txt" 2>/dev/null | tr -d ' ')"
 RESUME_SKIPPED="$(grep -c "skipped because latest assistant is still active.*\"sessionID\":\"$MIDCHILD\"" "$EVIDENCE_DIR/12-plugin-log-after-resume.txt" 2>/dev/null | tr -d ' ')"
 RESUME_REACHED="$(grep -cE "\"sessionID\":\"$MIDCHILD\",\"source\":\"background-agent-resume\"|resume prompt skipped by promptAsync gate.*$MIDCHILD" "$EVIDENCE_DIR/12-plugin-log-after-resume.txt" 2>/dev/null | tr -d ' ')"
+
+# ---- AGENT IDENTITY ORACLE ----
+# The adopted task must carry the agent the child ACTUALLY ran under (the probe spawns
+# it as subagent_type "explore"), never the fabricated "continue" that made adopted
+# tasks die with `Agent "continue" not found`. Read the agent off the resume dispatch
+# log line for this child, which is what gets sent as the prompt body's `agent` field.
+grep -F "Resuming task - calling prompt" "$EVIDENCE_DIR/12-plugin-log-after-resume.txt" > "$EVIDENCE_DIR/17-resume-dispatch-lines.txt" 2>/dev/null
+ADOPTED_AGENT="$(grep -F "$MIDCHILD" "$EVIDENCE_DIR/17-resume-dispatch-lines.txt" 2>/dev/null | grep -oE '"agent":"[^"]*"' | head -1 | cut -d'"' -f4)"
+FABRICATED_AGENT="$(grep -cE "\"agent\":\"continue\"" "$EVIDENCE_DIR/13-child-log-lines.txt" 2>/dev/null | tr -d ' ')"
+AGENT_NOT_FOUND="$(grep -cE 'Agent "continue" not found' "$EVIDENCE_DIR/12-plugin-log-after-resume.txt" 2>/dev/null | tr -d ' ')"
+
 { printf 'resume_path_reached=%s\n' "${RESUME_REACHED:-0}"
   printf 'resume_dispatched=%s\n' "${RESUME_DISPATCHED:-0}"
   printf 'resume_skipped_tool_state=%s\n' "${RESUME_SKIPPED:-0}"
+  printf 'adopted_agent=%s\n' "${ADOPTED_AGENT:-<none>}"
+  printf 'fabricated_continue_agent_lines=%s\n' "${FABRICATED_AGENT:-0}"
+  printf 'agent_continue_not_found_errors=%s\n' "${AGENT_NOT_FOUND:-0}"
   printf 'midpre=%s midpost=%s unterminated=%s\n' "$MIDPRE" "$MIDPOST" "$UNTERM"; } > "$EVIDENCE_DIR/14-oracle.txt"
 
 # The resume code path MUST have run, in both polarities. If it did not, the probe is
@@ -135,10 +155,25 @@ if [ "$EXPECT_BLOCKED" -eq 1 ]; then
   VERDICT=FAIL
   [ "${RESUME_SKIPPED:-0}" -gt 0 ] && [ "${RESUME_DISPATCHED:-0}" -eq 0 ] && VERDICT=PASS
   printf 'MODE=negative-control (expect gate to BLOCK)\nVERDICT=%s\n' "$VERDICT" > "$EVIDENCE_DIR/15-verdict.txt"
+elif [ "$EXPECT_FABRICATED_AGENT" -eq 1 ]; then
+  # Negative control for the agent-identity fix: against a build that still fabricates
+  # the agent, the adopted task MUST show agent "continue". If it does not, this probe
+  # is not measuring the identity defect and its PASS proves nothing.
+  VERDICT=FAIL
+  [ "$ADOPTED_AGENT" = "continue" ] && VERDICT=PASS
+  printf 'MODE=negative-control-agent-identity (expect fabricated agent)\nadopted_agent=%s\nVERDICT=%s\n' "${ADOPTED_AGENT:-<none>}" "$VERDICT" > "$EVIDENCE_DIR/15-verdict.txt"
 else
   VERDICT=FAIL
-  [ "${RESUME_DISPATCHED:-0}" -gt 0 ] && [ "${RESUME_SKIPPED:-0}" -eq 0 ] && VERDICT=PASS
-  printf 'MODE=fixed (expect gate to DISPATCH)\nVERDICT=%s\n' "$VERDICT" > "$EVIDENCE_DIR/15-verdict.txt"
+  # The adopted task must dispatch AND carry a real recovered agent. The probe spawns
+  # its child as subagent_type "explore", so that is the only correct value here.
+  if [ "${RESUME_DISPATCHED:-0}" -gt 0 ] && [ "${RESUME_SKIPPED:-0}" -eq 0 ]; then
+    if [ "$ADOPTED_AGENT" = "explore" ]; then
+      VERDICT=PASS
+    else
+      printf 'AGENT IDENTITY FAILURE: adopted agent was "%s", expected "explore"\n' "${ADOPTED_AGENT:-<none>}" >&2
+    fi
+  fi
+  printf 'MODE=fixed (expect gate to DISPATCH under the recovered agent)\nadopted_agent=%s\nVERDICT=%s\n' "${ADOPTED_AGENT:-<none>}" "$VERDICT" > "$EVIDENCE_DIR/15-verdict.txt"
 fi
 cat "$EVIDENCE_DIR/14-oracle.txt" "$EVIDENCE_DIR/15-verdict.txt"
 

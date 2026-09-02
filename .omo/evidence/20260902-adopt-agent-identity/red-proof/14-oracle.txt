@@ -1,0 +1,7 @@
+resume_path_reached=3
+resume_dispatched=1
+resume_skipped_tool_state=0
+adopted_agent=continue
+fabricated_continue_agent_lines=1
+agent_continue_not_found_errors=0
+midpre=2 midpost=2 unterminated=1

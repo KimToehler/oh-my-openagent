@@ -1,0 +1,14 @@
+(fail) agent command string audit > #given tracked source files #when legacy agent and human commands are scanned #then every hit is categorized
+(fail) dependencies check > findCommentCheckerPackageBinary > #given a zero-dependency install where require.resolve throws Bun's non-Error ResolveMessage #when resolving package binary #then returns null instead of crashing
+(fail) isModuleResolutionFailure > #given a real Bun dynamic-import failure #when classifying #then it is a resolution failure even though it is not an Error instance
+(fail) Opus 5 model recommendation migration > does not publish legacy Opus 4.6 or 4.8 recommendations
+(fail) package registration audit > #given exact re-export shim scan #when inventory docs are checked #then total targets and every path are present
+(fail) reflection completion flow > #given a pending offline completion #when its source session starts #then appendEntry notify and consumed state happen without a model message
+(fail) reflection completion flow > #given a throwing reflection UI > #when a pending completion is delivered > #then the entry is consumed and the UI failure is logged
+(fail) resolveSkillContentAsync > #given the shared ulw-plan skill source #when OpenCode skills are resolved #then ulw-plan is path-backed with workflow resources
+(fail) scan tool: pinned real-binary fixtures > #given the provisioned runtime #when inspected #then it is the 0.43.0 OMO pin
+(fail) shared builtin skill extraction > #given extracted builtin skill markdown #when compared to TS sources #then bodies and metadata stay byte-equivalent
+(fail) skill loader MCP parsing > deduplication > prioritizes project Agents ulw-plan over shared ulw-plan
+(fail) skill loader MCP parsing > deduplication > prioritizes project Claude ulw-plan over shared ulw-plan
+(fail) skill loader MCP parsing > deduplication > treats a project skill literally named shared/ulw-plan as a plain name, not a canonical alias
+(fail) team-mode types > eligibility registry shape

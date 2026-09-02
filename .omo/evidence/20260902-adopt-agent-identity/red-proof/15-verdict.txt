@@ -1,0 +1,3 @@
+MODE=fixed (expect gate to DISPATCH under the recovered agent)
+adopted_agent=continue
+VERDICT=FAIL
