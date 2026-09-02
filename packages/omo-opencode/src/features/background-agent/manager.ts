@@ -2931,10 +2931,20 @@ The task was re-queued on a fallback model after a retryable failure.
       this.updateBackgroundTaskMarker(task.parentSessionId)
     }
 
+    // Record what the lane left behind before it is retired. A cancelled or
+    // interrupted lane is the likeliest to have stranded uncommitted work, and it
+    // was previously the one path that never measured it. This runs even when the
+    // notification is skipped: the count lands on the task record, so it is there
+    // when the user goes looking, without waking a session they just interrupted.
+    await this.annotateNewDirtyWorktreePaths(task)
+
     if (options?.skipNotification) {
       this.cleanupPendingByParent(task)
       this.scheduleTaskRemoval(task.id)
-      log(`[background-agent] Task cancelled via ${source} (notification skipped):`, task.id)
+      log(`[background-agent] Task cancelled via ${source} (notification skipped):`, {
+        taskId: task.id,
+        uncommittedFileCount: task.uncommittedFileCount,
+      })
       return true
     }
 

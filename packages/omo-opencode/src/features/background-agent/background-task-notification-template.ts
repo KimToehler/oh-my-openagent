@@ -68,9 +68,16 @@ function formatTaskSummaryLine(task: BackgroundTaskNotificationTask): string {
       ? `${task.uncommittedFileCount} uncommitted file${task.uncommittedFileCount === 1 ? "" : "s"}`
       : undefined,
   ].filter((detail): detail is string => detail !== undefined)
+  // A lane that was cancelled or errored is the case MOST likely to have stranded
+  // uncommitted work, so the dirty-tree count must survive on that branch too.
+  // Gating it on "completed" made the interrupted lane the one lane that said
+  // nothing about what it left behind.
+  const dirtyDetail = task.uncommittedFileCount && task.uncommittedFileCount > 0
+    ? ` - left ${task.uncommittedFileCount} uncommitted file${task.uncommittedFileCount === 1 ? "" : "s"}`
+    : ""
   const statusSuffix = task.status === "completed"
     ? `${completionDetails.length > 0 ? ` - completed with ${completionDetails.join(" and ")}` : ""}${task.completionReason ? `, reason: ${task.completionReason}` : ""}`
-    : ` [${task.status.toUpperCase()}]${task.error ? ` - ${sanitizeUntrustedText(task.error, 2000)}` : ""}`
+    : ` [${task.status.toUpperCase()}]${task.error ? ` - ${sanitizeUntrustedText(task.error, 2000)}` : ""}${dirtyDetail}`
   const timeline = formatAttemptTimeline(task)
 
   return `${baseLine}${statusSuffix}${timeline ? `\n${timeline}` : ""}`

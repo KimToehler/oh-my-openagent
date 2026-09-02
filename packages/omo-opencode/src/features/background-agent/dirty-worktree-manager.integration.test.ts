@@ -104,3 +104,55 @@ describe("BackgroundManager dirty worktree completion annotation", () => {
     await manager.shutdown()
   })
 })
+
+describe("BackgroundManager dirty worktree annotation on cancellation", () => {
+  test("#given a running lane that dirtied the tree #when it is cancelled with the notification skipped #then the task record still carries the stranded file count", async () => {
+    //#given
+    const directory = tmpdir()
+    const client = {
+      session: {
+        get: async ({ path }: { path: { id: string } }) => ({ data: { id: path.id, directory } }),
+        create: async () => ({ data: { id: "cancelled-child-session" } }),
+        promptAsync: async () => ({ data: {} }),
+        abort: async () => ({ data: {} }),
+        messages: async () => ({ data: [] }),
+        todo: async () => ({ data: [] }),
+      },
+    }
+    let readCount = 0
+    const manager = new BackgroundManager({
+      pluginContext: { client, directory } as PluginInput,
+      enableParentSessionNotifications: false,
+      dirtyWorktreeStatusReader: async (): Promise<DirtyWorktreeStatus> => {
+        readCount += 1
+        // First read is the launch baseline, second is taken at cancellation.
+        return readCount === 1
+          ? { kind: "available", paths: new Set(["pre-existing.ts"]) }
+          : { kind: "available", paths: new Set(["pre-existing.ts", "lane-wrote-this.ts"]) }
+      },
+    })
+    const task = await manager.launch({
+      description: "interrupted task",
+      prompt: "work",
+      agent: "general",
+      parentSessionId: "cancelled-parent-session",
+      parentMessageId: "parent-message",
+    })
+    await waitForRunningTask(manager, task.id)
+
+    //#when
+    // skipNotification mirrors the parent-abort path, which must not wake the
+    // session the user just interrupted.
+    await manager.cancelTask(task.id, {
+      source: "parent-session-abort",
+      reason: "Parent session was interrupted",
+      skipNotification: true,
+    })
+
+    //#then
+    // Pre-existing dirt is excluded; only what the lane itself left is counted.
+    expect(manager.getTask(task.id)?.uncommittedFileCount).toBe(1)
+
+    await manager.shutdown()
+  })
+})

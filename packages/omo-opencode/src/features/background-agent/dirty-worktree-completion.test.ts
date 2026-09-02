@@ -204,3 +204,60 @@ describe("readDirtyWorktreeStatus against a real repository", () => {
     await rm(repo, { recursive: true, force: true })
   })
 })
+
+describe("uncommitted-work reporting on non-completed lanes", () => {
+  test("#given a lane that was cancelled while holding uncommitted work #when its summary line is rendered #then the stranded file count is stated", () => {
+    //#given
+    const task: BackgroundTaskNotificationTask = {
+      id: "task-interrupted",
+      description: "migrate the parser",
+      status: "cancelled",
+      sessionId: "session-interrupted",
+      error: "Parent session was interrupted",
+      uncommittedFileCount: 3,
+    }
+
+    //#when
+    const rendered = renderCompletion(task)
+
+    //#then
+    // The interrupted lane is the likeliest to have stranded work, and was
+    // previously the only status that reported none.
+    expect(rendered).toContain("left 3 uncommitted files")
+  })
+
+  test("#given a cancelled lane that left exactly one file #when its summary line is rendered #then the count is singular", () => {
+    //#given
+    const task: BackgroundTaskNotificationTask = {
+      id: "task-one-file",
+      description: "tweak a config",
+      status: "cancelled",
+      sessionId: "session-one-file",
+      uncommittedFileCount: 1,
+    }
+
+    //#when
+    const rendered = renderCompletion(task)
+
+    //#then
+    expect(rendered).toContain("left 1 uncommitted file")
+    expect(rendered).not.toContain("uncommitted files")
+  })
+
+  test("#given a cancelled lane that left a clean tree #when its summary line is rendered #then no uncommitted annotation appears", () => {
+    //#given
+    const task: BackgroundTaskNotificationTask = {
+      id: "task-cancelled-clean",
+      description: "read some files",
+      status: "cancelled",
+      sessionId: "session-cancelled-clean",
+      uncommittedFileCount: 0,
+    }
+
+    //#when
+    const rendered = renderCompletion(task)
+
+    //#then
+    expect(rendered).not.toContain("uncommitted")
+  })
+})
