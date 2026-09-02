@@ -1,2 +1,2 @@
-data: {"id":"evt_062df10ba001n3LZZrySveS72S","type":"server.connected","properties":{}}
+data: {"id":"evt_062f713c1001N4Wp9ogGBIuGr0","type":"server.connected","properties":{}}
 

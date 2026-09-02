@@ -876,11 +876,11 @@ export class BackgroundManager {
     })
     const parentDirectory = parentSession?.data?.directory ?? this.directory
     log(`[background-agent] Parent dir: ${parentSession?.data?.directory}, using: ${parentDirectory}`)
-    const dirtyWorktreeStatus = await this.dirtyWorktreeStatusReader(parentDirectory)
-    if (dirtyWorktreeStatus.kind === "available") {
-      task.dirtyWorktreeBaseline = new Set(dirtyWorktreeStatus.paths)
-      task.dirtyWorktreeDirectory = parentDirectory
-    }
+    // Kicked off without awaiting: the baseline read spawns `git`, and launch is on the
+    // critical path to `running`. Awaiting it here delayed dispatch and left tasks
+    // observably `pending`. Completion awaits this promise instead.
+    task.dirtyWorktreeDirectory = parentDirectory
+    task.dirtyWorktreeBaselinePromise = this.dirtyWorktreeStatusReader(parentDirectory)
 
     const createResult = await this.client.session.create({
       body: {
@@ -3001,11 +3001,14 @@ The task was re-queued on a fallback model after a retryable failure.
   }
 
   private async annotateNewDirtyWorktreePaths(task: BackgroundTask): Promise<void> {
-    if (!task.dirtyWorktreeBaseline || !task.dirtyWorktreeDirectory) return
+    if (!task.dirtyWorktreeBaselinePromise || !task.dirtyWorktreeDirectory) return
+
+    const baselineStatus = await task.dirtyWorktreeBaselinePromise
+    if (baselineStatus.kind !== "available") return
 
     const completionStatus = await this.dirtyWorktreeStatusReader(task.dirtyWorktreeDirectory)
     if (completionStatus.kind === "available") {
-      task.uncommittedFileCount = countNewDirtyPaths(task.dirtyWorktreeBaseline, completionStatus.paths)
+      task.uncommittedFileCount = countNewDirtyPaths(baselineStatus.paths, completionStatus.paths)
     }
   }
 
