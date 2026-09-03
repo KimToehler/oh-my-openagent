@@ -1,10 +1,16 @@
 import type { Hooks, PluginInput } from "@opencode-ai/plugin"
 
-import { existsSync, realpathSync } from "fs"
-import { basename, dirname, isAbsolute, join, normalize, relative, resolve } from "path"
+import { resolve } from "path"
 
 import { handleWriteExistingFileGuardToolExecuteBefore } from "./tool-execute-before-handler"
 import { resolveSessionEventID } from "../../shared/event-session-id"
+import {
+  isPathInsideDirectory,
+  resolveInputPath as resolveContainedInputPath,
+  toCanonicalPath,
+} from "../../shared/path-containment"
+
+export { isPathInsideDirectory, toCanonicalPath }
 
 export type GuardArgs = {
   filePath?: string
@@ -34,34 +40,7 @@ export function getPathFromArgs(args: GuardArgs | undefined): string | undefined
 }
 
 export function resolveInputPath(ctx: PluginInput, inputPath: string): string {
-  return normalize(isAbsolute(inputPath) ? inputPath : resolve(ctx.directory, inputPath))
-}
-
-export function isPathInsideDirectory(pathToCheck: string, directory: string): boolean {
-  const relativePath = relative(directory, pathToCheck)
-  return relativePath === "" || (!relativePath.startsWith("..") && !isAbsolute(relativePath))
-}
-
-
-
-export function toCanonicalPath(absolutePath: string): string {
-  let canonicalPath = absolutePath
-
-  if (existsSync(absolutePath)) {
-    try {
-      canonicalPath = realpathSync.native(absolutePath)
-    } catch (canonicalPathError) {
-      canonicalPath = absolutePath
-    }
-  } else {
-    const absoluteDir = dirname(absolutePath)
-    const resolvedDir = existsSync(absoluteDir) ? realpathSync.native(absoluteDir) : absoluteDir
-    canonicalPath = join(resolvedDir, basename(absolutePath))
-  }
-
-  // Preserve canonical casing from the filesystem to avoid collapsing distinct
-  // files on case-sensitive volumes (supported on all major OSes).
-  return normalize(canonicalPath)
+  return resolveContainedInputPath(ctx.directory, inputPath)
 }
 
 export function isOverwriteEnabled(value: boolean | string | undefined): boolean {
