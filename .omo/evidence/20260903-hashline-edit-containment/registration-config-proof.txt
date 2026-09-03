@@ -1,0 +1,17 @@
+sandbox=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/hashline-tool-registration.XXXXXX.jko5cORFQ0
+home_config=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/hashline-tool-registration.XXXXXX.jko5cORFQ0/x/home/.omo/omo.jsonc
+{"[opencode]":{
+    "hashline_edit": true,
+    "agents": {
+      "sisyphus": {
+        "permission": {
+          "edit": "allow"
+        }
+      }
+    }
+  },
+  "_migrations": [
+    "2026-08-reasoning-unification"
+  ]
+}
+plugin_log=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/hashline-tool-registration.XXXXXX.jko5cORFQ0/oh-my-opencode.log

@@ -1,0 +1,17 @@
+WHAT WAS TESTED
+Command: bun test packages/omo-opencode/src/shared/path-containment.test.ts packages/omo-opencode/src/hooks/write-existing-file-guard/index.test.ts packages/omo-opencode/src/tools/hashline-edit/tools.test.ts
+
+WHAT WAS OBSERVED
+bun test v1.4.0 (1381054db)
+
+
+ 58 pass
+ 0 fail
+ 112 expect() calls
+Ran 58 tests across 3 files. [505.00ms]
+
+WHY IT IS ENOUGH
+Covers shared canonicalization, unchanged write-existing-file guard policy, and hashline mutating modes plus added containment matrix.
+
+WHAT WAS OMITTED
+Typecheck, final build after test-only additions, and PR lifecycle remain pending.

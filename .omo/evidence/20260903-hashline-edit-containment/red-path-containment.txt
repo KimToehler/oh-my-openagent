@@ -1,0 +1,17 @@
+WHAT WAS TESTED
+Command: bun test packages/omo-opencode/src/shared/path-containment.test.ts
+
+WHY RED BASELINE IS UNAVAILABLE
+Part B resumed after existing commit 0c6adb9e8 had already created `path-containment.ts`. No clean pre-extraction baseline exists in this task-owned worktree without rewriting approved history.
+
+WHAT WAS OBSERVED
+bun test v1.4.0 (1381054db)
+
+
+ 5 pass
+ 0 fail
+ 7 expect() calls
+Ran 5 tests across 1 file. [24.00ms]
+
+WHAT WAS OMITTED
+No red run. Existing shared primitive preceded resumed Part B.

@@ -1,0 +1,10 @@
+PRIMARY=/Users/tim/git/oh-my-openagent
+PRIMARY_STATUS_SHA256=ba0e86efbb66bf04465ce442095ce320fbaa7dba2bfaf1d165591a00f05daeb1
+SANDBOX=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/hashline-containment.XXXXXX.Cgn3I3YjBc
+REPO=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/hashline-containment.XXXXXX.Cgn3I3YjBc/repo
+WORKTREE=/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/hashline-containment.XXXXXX.Cgn3I3YjBc/worktree
+MAIN_BASELINE=6a505f5d125cd89665862ba38c3b55848a9f6b85
+REPO_PWD=/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/hashline-containment.XXXXXX.Cgn3I3YjBc/repo
+WORKTREE_PWD=/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/hashline-containment.XXXXXX.Cgn3I3YjBc/worktree
+OPENCODE_VERSION=1.18.20
+1.18.20

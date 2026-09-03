@@ -1,6 +1,7 @@
 export * from "./frontmatter"
 export * from "./command-executor"
 export * from "./contains-path"
+export * from "./path-containment"
 export * from "./file-reference-resolver"
 export * from "./model-sanitizer"
 export * from "./logger"

@@ -1,0 +1,16 @@
+[2026-09-03T07:55:44.589Z] [rt:10605:8b82] [oh-my-openagent] ENTRY - plugin loading {"directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/hashline-tool-registration.XXXXXX.jko5cORFQ0"}
+[2026-09-03T07:55:44.596Z] [rt:10605:8b82] [config-migration] startup completed {"journalResumed":false,"migratedFrom":[],"skippedConflictCount":0}
+[2026-09-03T07:55:44.598Z] [rt:10605:8b82] lsp-daemon stale-version sweep skipped: current lsp-daemon version is unknown 
+[2026-09-03T07:55:44.601Z] [rt:10605:8b82] [live-server-route] registered {"directory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/hashline-tool-registration.XXXXXX.jko5cORFQ0","hasServerUrl":true,"registrationCount":1}
+[2026-09-03T07:55:44.604Z] [rt:10605:8b82] [tmux-session-manager] initialized {"configEnabled":false,"tmuxConfig":{"enabled":false,"layout":"main-vertical","main_pane_size":60,"main_pane_min_width":120,"agent_pane_min_width":40,"isolation":"inline"},"projectDirectory":"/private/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/hashline-tool-registration.XXXXXX.jko5cORFQ0","serverUrl":"http://127.0.0.1:65270/"}
+[2026-09-03T07:55:44.695Z] [rt:10605:8b82] [tool-registry] Built tool registry {"totalTools":16,"teamModeEnabled":false,"teamToolCount":0}
+[2026-09-03T07:55:44.696Z] [rt:10605:8b82] directory-agents-injector auto-disabled due to native OpenCode support {"currentVersion":"1.18.20","nativeVersion":"1.1.37"}
+[2026-09-03T07:55:44.699Z] [rt:10605:8b82] [agent-source-loader] Agent sources loaded {"user":0,"project":0,"opencodeGlobal":0,"opencodeProject":0,"plugin":0,"agentDefinitions":0,"opencodeConfig":0,"config":0}
+[2026-09-03T07:55:44.700Z] [rt:10605:8b82] [connected-providers-cache] Cache file not found {"cacheFile":"/var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/hashline-tool-registration.XXXXXX.jko5cORFQ0/x/cache/oh-my-opencode/connected-providers.json"}
+[2026-09-03T07:55:44.700Z] [rt:10605:8b82] [fetchAvailableModels] CALLED {"connectedProvidersUnknown":true}
+[2026-09-03T07:55:44.700Z] [rt:10605:8b82] [fetchAvailableModels] connected providers unknown, returning empty set for fallback resolution 
+[2026-09-03T07:55:44.702Z] [rt:10605:8b82] [fetchAvailableModels] CALLED {"connectedProvidersUnknown":true}
+[2026-09-03T07:55:44.702Z] [rt:10605:8b82] [fetchAvailableModels] connected providers unknown, returning empty set for fallback resolution 
+[2026-09-03T07:55:44.703Z] [rt:10605:8b82] [config-handler] agents loaded {"agentKeys":["Sisyphus - ultraworker","Hephaestus - Deep Agent","Prometheus - Plan Builder","Atlas - Plan Executor","auditor","build","explore","librarian","Metis - Plan Consultant","Momus - Plan Critic","multimodal-looker","oracle","plan","Sisyphus-Junior"]}
+[2026-09-03T07:55:44.716Z] [rt:10605:8b82] [config-handler] config handler applied {"agentCount":14,"commandCount":16}
+[2026-09-03T07:55:44.698Z] [rt:10605:8b82] Loaded 0 plugins with 0 commands, 0 skills, 0 agents, 0 MCP servers 

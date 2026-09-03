@@ -8,14 +8,21 @@ import * as os from "node:os"
 import * as path from "node:path"
 import { unsafeTestValue } from "../../../../../test-support/unsafe-test-value"
 
-function createMockContext(): ToolContext {
+function createMockContext(options?: {
+  directory?: string
+  worktree?: string
+  ask?: ToolContext["ask"]
+  metadata?: ToolContext["metadata"]
+}): ToolContext {
   return unsafeTestValue<ToolContext>({
     sessionID: "test",
     messageID: "test",
     agent: "test",
+    directory: options?.directory ?? process.cwd(),
+    worktree: options?.worktree ?? options?.directory ?? process.cwd(),
     abort: new AbortController().signal,
-    metadata: mock(() => {}),
-    ask: async () => {},
+    metadata: options?.metadata ?? mock(() => {}),
+    ask: options?.ask ?? (async () => {}),
   })
 }
 
@@ -404,7 +411,7 @@ describe("createHashlineEditTool", () => {
   it("allows missing file creation with unanchored append", async () => {
     //#given
     const filePath = path.join(tempDir, "newfile.txt")
-
+    
     //#when
     const result = await tool.execute(
       {
@@ -418,5 +425,192 @@ describe("createHashlineEditTool", () => {
     expect(fs.existsSync(filePath)).toBe(true)
     expect(fs.readFileSync(filePath, "utf-8")).toBe("created")
     expect(result).toBe(`Updated ${filePath}`)
+  })
+
+  it("#given relative file path #when hashline edit executes #then resolves against context directory", async () => {
+    //#given
+    const worktree = path.join(tempDir, "worktree")
+    const main = path.join(tempDir, "main")
+    const relativePath = "nested/file.txt"
+    const worktreePath = path.join(worktree, relativePath)
+    const mainPath = path.join(main, relativePath)
+    fs.mkdirSync(path.dirname(worktreePath), { recursive: true })
+    fs.mkdirSync(path.dirname(mainPath), { recursive: true })
+    fs.writeFileSync(worktreePath, "worktree")
+    fs.writeFileSync(mainPath, "main")
+    const hash = computeLineHash(1, "worktree")
+
+    //#when
+    const result = await tool.execute(
+      { filePath: relativePath, edits: [{ op: "replace", pos: `1#${hash}`, lines: "updated" }] },
+      createMockContext({ directory: worktree, worktree }),
+    )
+
+    //#then
+    expect(result).toBe(`Updated ${worktreePath}`)
+    expect(fs.readFileSync(worktreePath, "utf8")).toBe("updated")
+    expect(fs.readFileSync(mainPath, "utf8")).toBe("main")
+  })
+
+  it("#given external file #when permission is denied #then leaves target untouched", async () => {
+    //#given
+    const worktree = path.join(tempDir, "worktree")
+    const externalPath = path.join(tempDir, "external.txt")
+    fs.mkdirSync(worktree)
+    fs.writeFileSync(externalPath, "external")
+    const ask = mock(async () => { throw new Error("denied") })
+    const hash = computeLineHash(1, "external")
+
+    //#when
+    const result = await tool.execute(
+      { filePath: externalPath, edits: [{ op: "replace", pos: `1#${hash}`, lines: "updated" }] },
+      createMockContext({ directory: worktree, worktree, ask }),
+    )
+
+    //#then
+    expect(result).toBe(`Error: denied`)
+    expect(fs.readFileSync(externalPath, "utf8")).toBe("external")
+    expect(ask).toHaveBeenCalledTimes(1)
+    expect(ask).toHaveBeenCalledWith({
+      permission: "edit",
+      patterns: [externalPath],
+      always: ["*"],
+      metadata: { filepath: externalPath },
+    })
+  })
+
+  it("#given external rename destination #when permission is denied #then source remains untouched", async () => {
+    //#given
+    const worktree = path.join(tempDir, "worktree")
+    const sourcePath = path.join(worktree, "source.txt")
+    const externalPath = path.join(tempDir, "external.txt")
+    fs.mkdirSync(worktree)
+    fs.writeFileSync(sourcePath, "source")
+    const ask = mock(async () => { throw new Error("denied") })
+    const hash = computeLineHash(1, "source")
+
+    //#when
+    const result = await tool.execute(
+      { filePath: sourcePath, rename: externalPath, edits: [{ op: "replace", pos: `1#${hash}`, lines: "updated" }] },
+      createMockContext({ directory: worktree, worktree, ask }),
+    )
+
+    //#then
+    expect(result).toBe(`Error: denied`)
+    expect(fs.readFileSync(sourcePath, "utf8")).toBe("source")
+    expect(fs.existsSync(externalPath)).toBe(false)
+    expect(ask).toHaveBeenCalledTimes(1)
+  })
+
+  it("#given granted external file #when hashline edit executes #then updates exact external file", async () => {
+    //#given
+    const worktree = path.join(tempDir, "worktree")
+    const externalPath = path.join(tempDir, "external.txt")
+    const internalPath = path.join(worktree, "external.txt")
+    fs.mkdirSync(worktree)
+    fs.writeFileSync(externalPath, "external")
+    fs.writeFileSync(internalPath, "internal")
+    const ask = mock(async () => {})
+    const hash = computeLineHash(1, "external")
+
+    //#when
+    const result = await tool.execute(
+      { filePath: externalPath, edits: [{ op: "replace", pos: `1#${hash}`, lines: "updated" }] },
+      createMockContext({ directory: worktree, worktree, ask }),
+    )
+
+    //#then
+    expect(result).toBe(`Updated ${externalPath}`)
+    expect(fs.readFileSync(externalPath, "utf8")).toBe("updated")
+    expect(fs.readFileSync(internalPath, "utf8")).toBe("internal")
+    expect(ask).toHaveBeenCalledTimes(1)
+  })
+
+  it("#given symlink inside worktree targeting external file #when permission is denied #then external target remains unchanged", async () => {
+    //#given
+    const worktree = path.join(tempDir, "worktree")
+    const externalPath = path.join(tempDir, "external.txt")
+    const linkedPath = path.join(worktree, "linked.txt")
+    fs.mkdirSync(worktree)
+    fs.writeFileSync(externalPath, "external")
+    fs.symlinkSync(externalPath, linkedPath)
+    const ask = mock(async () => { throw new Error("denied") })
+    const hash = computeLineHash(1, "external")
+
+    //#when
+    const result = await tool.execute(
+      { filePath: linkedPath, edits: [{ op: "replace", pos: `1#${hash}`, lines: "updated" }] },
+      createMockContext({ directory: worktree, worktree, ask }),
+    )
+
+    //#then
+    expect(result).toBe("Error: denied")
+    expect(fs.readFileSync(externalPath, "utf8")).toBe("external")
+    expect(ask).toHaveBeenCalledTimes(1)
+  })
+
+  it("#given missing path through symlinked parent outside worktree #when permission is denied #then file is not created", async () => {
+    //#given
+    const worktree = path.join(tempDir, "worktree")
+    const externalDir = path.join(tempDir, "external")
+    const linkedParent = path.join(worktree, "linked")
+    const externalPath = path.join(externalDir, "created.txt")
+    fs.mkdirSync(worktree)
+    fs.mkdirSync(externalDir)
+    fs.symlinkSync(externalDir, linkedParent)
+    const ask = mock(async () => { throw new Error("denied") })
+
+    //#when
+    const result = await tool.execute(
+      { filePath: path.join(linkedParent, "created.txt"), edits: [{ op: "append", lines: "created" }] },
+      createMockContext({ directory: worktree, worktree, ask }),
+    )
+
+    //#then
+    expect(result).toBe("Error: denied")
+    expect(fs.existsSync(externalPath)).toBe(false)
+    expect(ask).toHaveBeenCalledTimes(1)
+  })
+
+  it("#given delete target outside accepted worktree #when permission is denied #then file remains", async () => {
+    //#given
+    const worktree = path.join(tempDir, "worktree")
+    const externalPath = path.join(tempDir, "external.txt")
+    fs.mkdirSync(worktree)
+    fs.writeFileSync(externalPath, "external")
+    const ask = mock(async () => { throw new Error("denied") })
+
+    //#when
+    const result = await tool.execute(
+      { filePath: externalPath, delete: true, edits: [] },
+      createMockContext({ directory: worktree, worktree, ask }),
+    )
+
+    //#then
+    expect(result).toBe("Error: denied")
+    expect(fs.readFileSync(externalPath, "utf8")).toBe("external")
+    expect(ask).toHaveBeenCalledTimes(1)
+  })
+
+  it("#given path inside worktree but outside nested session directory #when hashline edit executes #then treats path as internal", async () => {
+    //#given
+    const worktree = path.join(tempDir, "worktree")
+    const sessionDirectory = path.join(worktree, "nested", "session")
+    const filePath = path.join(worktree, "outside-session.txt")
+    fs.mkdirSync(sessionDirectory, { recursive: true })
+    fs.writeFileSync(filePath, "worktree")
+    const ask = mock(async () => {})
+    const hash = computeLineHash(1, "worktree")
+
+    //#when
+    const result = await tool.execute(
+      { filePath, edits: [{ op: "replace", pos: `1#${hash}`, lines: "updated" }] },
+      createMockContext({ directory: sessionDirectory, worktree, ask }),
+    )
+
+    //#then
+    expect(result).toBe(`Updated ${filePath}`)
+    expect(fs.readFileSync(filePath, "utf8")).toBe("updated")
+    expect(ask).not.toHaveBeenCalled()
   })
 })
