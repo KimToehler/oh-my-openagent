@@ -3943,3 +3943,19 @@ The residual is a DIFFERENT bug, not this one: the tracker only observes `ctx_sh
 **Fix status:** fixed in the skill (`.agents/skills/harness-findings-review/SKILL.md`, step 2 and the verifier-prompt contract). The underlying agent restriction is correct and unchanged; the defect was the instruction, not the permission.
 
 **Last verified:** 2026-09-02 (64d608f6d)
+
+## 2026-09-03 - Hashline `edit` registration can be shadowed by OpenCode runtime tool assembly
+
+**Severity:** costly
+**Area:** OpenCode plugin runtime / tool exposure
+**Observed in:** `~/git/oh-my-openagent`, isolated OpenCode 1.18.20 containment QA
+
+**What happened:** OMO loaded and built a 16-tool registry with `hashline_edit: true`, empty `disabled_tools`, `experimental.max_tools: 128`, and write-capable `Sisyphus - ultraworker`. Model request exposed native `apply_patch` and omitted `edit`; a direct call returned `Model tried to call unavailable tool 'edit'`.
+
+**Evidence:** `.omo/evidence/20260903-hashline-edit-containment/exposure-plugin.log` records `ENTRY - plugin loading` and `[tool-registry] Built tool registry {"totalTools":16,"teamModeEnabled":false,"teamToolCount":0}`. `exposure-write-capable-request.json` has zero `"name":"edit"` entries and native `apply_patch`. OMO registers hashline under runtime key `edit` at `packages/omo-opencode/src/plugin/tool-registry-gated-tools.ts:26-33`; plugin API exposes a plain string-keyed tool map at `node_modules/.bun/@opencode-ai+plugin@1.18.22+5df5880790e6b42e/node_modules/@opencode-ai/plugin/dist/index.d.ts:173-180`.
+
+**Impact:** tested OpenCode runtime cannot prove live hashline routing under that key. Containment executor QA used real ToolContext and disposable clone fixture instead; this does not prove host tool dispatch.
+
+**Fix status:** unfixed runtime integration limitation; no product behavior changed in this containment work.
+
+**Last verified:** 2026-09-03 (fix/hashline-edit-containment-part-b)

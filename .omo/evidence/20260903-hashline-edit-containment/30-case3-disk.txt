@@ -1,0 +1,9 @@
+diff --git a/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt b/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt
+index bf4e6620b..d6a27f876 100644
+--- a/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt
++++ b/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt
+@@ -1 +1 @@
+-MAIN_BASELINE
++WORKTREE_BASELINE
+f50d7d1e8d855d759cba44968b5e34cd85c7ab1f5d3b2f8b2556db5836fb8bdb  /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/hashline-containment.XXXXXX.Cgn3I3YjBc/repo/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt
+fade43748c48254f343b9f1c93cf73e839690701da1bd281c8c8e1f7989ae612  /var/folders/c6/rmmgm5s52vsc2_g434mnp_nm0000gn/T/hashline-containment.XXXXXX.Cgn3I3YjBc/worktree/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt

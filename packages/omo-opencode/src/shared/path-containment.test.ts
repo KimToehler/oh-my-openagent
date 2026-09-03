@@ -27,7 +27,7 @@ describe("path containment", () => {
     expect(result).toBe(false)
   })
 
-  it("#given missing child under symlinked parent #when canonicalized #then resolves through symlink", () => {
+  it("#given existing symlink escaping root #when canonicalized #then reports outside", () => {
     //#given
     const tempDir = mkdtempSync(join(tmpdir(), "path-containment-test-"))
     const externalDir = join(tempDir, "external")
@@ -38,10 +38,49 @@ describe("path containment", () => {
 
     try {
       //#when
-      const result = toCanonicalPath(join(root, "linked", "missing.txt"))
+      const result = isPathInsideDirectory(toCanonicalPath(join(root, "linked")), toCanonicalPath(root))
 
       //#then
-      expect(result).toBe(join(toCanonicalPath(externalDir), "missing.txt"))
+      expect(result).toBe(false)
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
+
+  it("#given missing child under symlinked parent #when canonicalized #then reports outside", () => {
+    //#given
+    const tempDir = mkdtempSync(join(tmpdir(), "path-containment-test-"))
+    const externalDir = join(tempDir, "external")
+    const root = join(tempDir, "root")
+    mkdirSync(externalDir)
+    mkdirSync(root)
+    symlinkSync(externalDir, join(root, "linked"))
+
+    try {
+      //#when
+      const target = toCanonicalPath(join(root, "linked", "missing.txt"))
+      const result = isPathInsideDirectory(target, toCanonicalPath(root))
+
+      //#then
+      expect(target).toBe(join(toCanonicalPath(externalDir), "missing.txt"))
+      expect(result).toBe(false)
+    } finally {
+      rmSync(tempDir, { recursive: true, force: true })
+    }
+  })
+
+  it("#given path inside canonical root #when checked #then reports inside", () => {
+    //#given
+    const tempDir = mkdtempSync(join(tmpdir(), "path-containment-test-"))
+    const root = join(tempDir, "root")
+    mkdirSync(root)
+
+    try {
+      //#when
+      const result = isPathInsideDirectory(toCanonicalPath(join(root, "child.txt")), toCanonicalPath(root))
+
+      //#then
+      expect(result).toBe(true)
     } finally {
       rmSync(tempDir, { recursive: true, force: true })
     }

@@ -1,0 +1,57 @@
+{
+  "scopeLimit": "OpenCode 1.18.20 did not expose registered runtime key edit under verified hashline-on config; cases run against real hashline executor with ToolContext.",
+  "mainBaseline": "2cdeeb3a284d63601dd6e9e036ec2083459efd6c",
+  "cases": {
+    "case1": {
+      "result": "Updated /tmp/hashline-executor-probe-sWlNMu/worktree/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt",
+      "repo": "MAIN_BASELINE\n",
+      "worktree": "WORKTREE_ABSOLUTE_APPLIED\n"
+    },
+    "case2": {
+      "result": "Error: DENIED {\"permission\":\"edit\",\"patterns\":[\"/tmp/hashline-executor-probe-sWlNMu/repo/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt\"],\"always\":[\"*\"],\"metadata\":{\"filepath\":\"/tmp/hashline-executor-probe-sWlNMu/repo/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt\"}}",
+      "asks": [
+        {
+          "permission": "edit",
+          "patterns": [
+            "/tmp/hashline-executor-probe-sWlNMu/repo/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt"
+          ],
+          "always": [
+            "*"
+          ],
+          "metadata": {
+            "filepath": "/tmp/hashline-executor-probe-sWlNMu/repo/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt"
+          }
+        }
+      ],
+      "repo": "MAIN_BASELINE\n",
+      "worktree": "WORKTREE_BASELINE\n"
+    },
+    "case3": {
+      "result": "Updated /tmp/hashline-executor-probe-sWlNMu/worktree/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt",
+      "asks": [],
+      "repo": "MAIN_BASELINE\n",
+      "worktree": "WORKTREE_RELATIVE_APPLIED\n"
+    },
+    "case4": {
+      "result": "Error: DENIED {\"permission\":\"edit\",\"patterns\":[\"/tmp/hashline-executor-probe-sWlNMu/repo/packages/omo-opencode/src/tools/hashline-edit/.containment-probe-renamed.txt\"],\"always\":[\"*\"],\"metadata\":{\"filepath\":\"/tmp/hashline-executor-probe-sWlNMu/repo/packages/omo-opencode/src/tools/hashline-edit/.containment-probe-renamed.txt\"}}",
+      "asks": [
+        {
+          "permission": "edit",
+          "patterns": [
+            "/tmp/hashline-executor-probe-sWlNMu/repo/packages/omo-opencode/src/tools/hashline-edit/.containment-probe-renamed.txt"
+          ],
+          "always": [
+            "*"
+          ],
+          "metadata": {
+            "filepath": "/tmp/hashline-executor-probe-sWlNMu/repo/packages/omo-opencode/src/tools/hashline-edit/.containment-probe-renamed.txt"
+          }
+        }
+      ],
+      "source": "WORKTREE_BASELINE\n",
+      "destinationExists": false
+    }
+  },
+  "repoDiff": "",
+  "worktreeDiff": "diff --git a/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt b/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt\nindex bf4e6620b..d6a27f876 100644\n--- a/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt\n+++ b/packages/omo-opencode/src/tools/hashline-edit/.containment-probe.txt\n@@ -1 +1 @@\n-MAIN_BASELINE\n+WORKTREE_BASELINE\n"
+}
