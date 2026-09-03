@@ -1,6 +1,7 @@
 import type { ToolContext } from "@opencode-ai/plugin/tool"
 import { publishToolMetadata } from "../../features/tool-metadata-store"
 import { bunFile, bunWrite } from "../../shared/bun-file-shim"
+import { isPathInsideDirectory, resolveInputPath, toCanonicalPath } from "../../shared/path-containment"
 import { applyHashlineEditsWithReport } from "./edit-operations"
 import { countLineDiffs, generateUnifiedDiff } from "./diff-utils"
 import { canonicalizeFileText, restoreFileText } from "./file-text-canonicalization"
@@ -30,6 +31,19 @@ type ToolContextWithMetadata = ToolContextWithCallID & {
 function canCreateFromMissingFile(edits: HashlineEdit[]): boolean {
   if (edits.length === 0) return false
   return edits.every((edit) => (edit.op === "append" || edit.op === "prepend") && !edit.pos)
+}
+
+async function authorizePath(context: ToolContext, filePath: string): Promise<void> {
+  const boundary = toCanonicalPath(context.worktree || context.directory)
+  const target = toCanonicalPath(filePath)
+  if (isPathInsideDirectory(target, boundary)) return
+
+  await context.ask({
+    permission: "edit",
+    patterns: [filePath],
+    always: ["*"],
+    metadata: { filepath: filePath },
+  })
 }
 
 function buildSuccessMeta(
@@ -79,8 +93,9 @@ function buildSuccessMeta(
 export async function executeHashlineEditTool(args: HashlineEditArgs, context: ToolContext, pluginCtx?: PluginContext): Promise<string> {
   try {
     const metadataContext = context as ToolContextWithMetadata
-    const filePath = args.filePath
-    const { delete: deleteMode, rename } = args
+    const filePath = resolveInputPath(context.directory, args.filePath)
+    const rename = args.rename ? resolveInputPath(context.directory, args.rename) : undefined
+    const { delete: deleteMode } = args
 
     if (deleteMode && rename) {
       return "Error: delete and rename cannot be used together"
@@ -94,6 +109,8 @@ export async function executeHashlineEditTool(args: HashlineEditArgs, context: T
     }
 
     const edits = deleteMode ? [] : normalizeHashlineEdits(args.edits)
+
+    await Promise.all([authorizePath(context, filePath), ...(rename ? [authorizePath(context, rename)] : [])])
 
     const file = bunFile(filePath)
     const exists = await file.exists()
